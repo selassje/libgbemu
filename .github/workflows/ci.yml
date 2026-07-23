@@ -5,7 +5,7 @@ on: [push]
 env:
   CMAKE_VER: 4.4.0
   NINJA_VER: 1.11.1
-  LLVM_VER_WIN: 21.1.0
+  LLVM_VER_WIN: 22.1.7
 
 jobs:
   build_and_test:
