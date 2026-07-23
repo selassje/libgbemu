@@ -12,3 +12,5 @@ target_sources(
          ${MODULES}
          FILES
          ${MODULES}/gbemu.cppm)
+
+setup_clang_tidy(gb-core)

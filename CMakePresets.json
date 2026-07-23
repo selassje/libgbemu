@@ -47,6 +47,16 @@
       }
     },
     {
+      "name": "dev_ninja_clang_tidy",
+      "displayName": "development (Ninja, clang, clang-tidy) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_ninja_clang",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_tidy/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_tidy/build",
+      "cacheVariables": {
+        "ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
       "inherits": "dev",
@@ -67,6 +77,11 @@
     {
       "name": "dev_ninja_clang",
       "configurePreset": "dev_ninja_clang",
+      "targets": ["all", "clang-format-check"]
+    },
+    {
+      "name": "dev_ninja_clang_tidy",
+      "configurePreset": "dev_ninja_clang_tidy",
       "targets": ["all", "clang-format-check"]
     },
     {
@@ -92,6 +107,11 @@
       "name": "dev_ninja_clang",
       "inherits": "default",
       "configurePreset": "dev_ninja_clang"
+    },
+    {
+      "name": "dev_ninja_clang_tidy",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_tidy"
     },
     {
       "name": "dev_vs_msvc",

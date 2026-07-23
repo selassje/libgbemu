@@ -7,7 +7,7 @@ import gbemu;
 
 TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
 {
-  std::vector<std::uint8_t> rom(gbemu::kMinRomSize - 1, 0);
+  std::vector<std::uint8_t> rom(gbemu::MIN_ROM_SIZE - 1, 0);
 
   auto result = gbemu::GameBoy::create(rom);
 
@@ -17,10 +17,10 @@ TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
 
 TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
 {
-  std::vector<std::uint8_t> rom(gbemu::kMinRomSize, 0);
+  std::vector<std::uint8_t> rom(gbemu::MIN_ROM_SIZE, 0);
 
   auto result = gbemu::GameBoy::create(rom);
 
   REQUIRE(result.has_value());
-  REQUIRE(result->rom_size() == gbemu::kMinRomSize);
+  REQUIRE(result->romSize() == gbemu::MIN_ROM_SIZE);
 }

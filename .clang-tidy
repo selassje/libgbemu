@@ -1,0 +1,41 @@
+Checks: "*,
+         -abseil-string-find-str-contains,
+         -altera-id-dependent-backward-branch,
+         -altera-unroll-loops,
+         -altera-struct-pack-align,
+         -cert-err58-cpp,
+         -cppcoreguidelines-avoid-magic-numbers,
+         -cppcoreguidelines-pro-bounds-constant-array-index,
+         -fuchsia-default-arguments-calls,
+         -fuchsia-statically-constructed-objects,
+         -fuchsia-overloaded-operator,
+         -google-readability-namespace-comments,
+         -llvmlibc-*,
+         -llvm-namespace-comment,
+         -misc-no-recursion,
+         -modernize-use-trailing-return-type,
+         -readability-identifier-length,
+         -readability-function-cognitive-complexity,
+         -modernize-use-designated-initializers,
+         -boost-use-ranges,
+         -bugprone-chained-comparison,
+         -bugprone-suspicious-stringview-data-usage,
+         -llvm-prefer-static-over-anonymous-namespace,
+         -readability-redundant-declaration,
+         -misc-include-cleaner
+         "
+CheckOptions:
+  misc-non-private-member-variables-in-classes.IgnorePublicMemberVariables: true
+  readability-magic-numbers.IgnorePowersOf2IntegerValues: true
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.PrivateMemberPrefix: m_
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.FunctionCase: camelBack
+  readability-identifier-naming.VariableCase: camelBack
+  readability-identifier-naming.MemberCase: camelBack
+  readability-identifier-naming.GlobalConstantCase: UPPER_CASE
+
+WarningsAsErrors: "*"
+HeaderFilterRegex: "(import[\\\/])|(src[\\\/])"
+ExcludeHeaderFilterRegex: "xutility"
