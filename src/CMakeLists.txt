@@ -39,7 +39,7 @@ if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
 
   # It's MSVC's file, not ours - don't lint it.
   set_source_files_properties(${STD_MODULE_DIR}/std.ixx
-                              PROPERTIES CXX_CLANG_TIDY "")
+                              PROPERTIES SKIP_LINTING ON)
 endif()
 
 setup_compiler_warnings(gbemu)
