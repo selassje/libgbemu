@@ -19,7 +19,7 @@ class Cpu // NOLINT(misc-use-internal-linkage)
   std::uint16_t m_DE{ 0 };
   std::uint16_t m_HL{ 0 };
   std::uint16_t m_SP{ 0 };
-  std::uint16_t m_PC{ 0 };
+  std::uint16_t m_PC{ 0x100 };
 };
 
 }
