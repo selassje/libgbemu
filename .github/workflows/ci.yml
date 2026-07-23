@@ -178,6 +178,8 @@ jobs:
             --slave /usr/bin/clang clang /usr/bin/clang-$LLVM_VER_UBUNTU \
             --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VER_UBUNTU
           sudo update-alternatives --set clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU
+          sudo mkdir -p /lib/share
+          sudo ln -s /usr/lib/llvm-$LLVM_VER_UBUNTU/share/libc++ /lib/share
           clang++ --version
           clang-format --version
 
