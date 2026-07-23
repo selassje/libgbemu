@@ -91,35 +91,29 @@
   "buildPresets": [
     {
       "name": "dev_ninja_msvc",
-      "configurePreset": "dev_ninja_msvc",
-      "targets": ["all", "clang-format-check"]
+      "configurePreset": "dev_ninja_msvc"
     },
     {
       "name": "dev_ninja_clang",
-      "configurePreset": "dev_ninja_clang",
-      "targets": ["all", "clang-format-check"]
+      "configurePreset": "dev_ninja_clang"
     },
     {
       "name": "dev_ninja_clang_tidy",
-      "configurePreset": "dev_ninja_clang_tidy",
-      "targets": ["all", "clang-format-check"]
+      "configurePreset": "dev_ninja_clang_tidy"
     },
     {
       "name": "dev_ninja_msvc_analysis",
-      "configurePreset": "dev_ninja_msvc_analysis",
-      "targets": ["all", "clang-format-check"]
+      "configurePreset": "dev_ninja_msvc_analysis"
     },
     {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
-      "configuration": "Debug",
-      "targets": ["ALL_BUILD", "clang-format-check"]
+      "configuration": "Debug"
     },
     {
       "name": "dev_vs_msvc_analysis",
       "configurePreset": "dev_vs_msvc_analysis",
-      "configuration": "Debug",
-      "targets": ["ALL_BUILD", "clang-format-check"]
+      "configuration": "Debug"
     }
   ],
   "testPresets": [

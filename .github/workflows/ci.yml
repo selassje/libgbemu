@@ -66,3 +66,6 @@ jobs:
 
       - name: Run Tests
         run: ctest --preset ${{ matrix.preset }}
+
+      - name: Check Formatting
+        run: cmake --build --preset ${{ matrix.preset }} --target clang-format-check
