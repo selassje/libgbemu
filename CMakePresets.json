@@ -126,7 +126,7 @@
     },
     {
       "name": "dev_ninja_clang_linux",
-      "displayName": "development (Ninja, clang, Linux)",
+      "displayName": "development (Ninja, clang, libc++, Linux)",
       "inherits": "dev_linux",
       "generator": "Ninja",
       "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_linux/generators/conan_toolchain.cmake",
@@ -134,22 +134,13 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
-        "CMAKE_CXX_MODULE_STD": "ON"
+        "CMAKE_CXX_MODULE_STD": "ON",
+        "ENABLE_LIBCXX": "ON",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++"
       },
       "environment": {
         "CXX": "clang++",
         "CC": "clang"
-      }
-    },
-    {
-      "name": "dev_ninja_clang_libcxx_linux",
-      "displayName": "development (Ninja, clang, libc++, Linux)",
-      "inherits": "dev_ninja_clang_linux",
-      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_libcxx_linux/generators/conan_toolchain.cmake",
-      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_libcxx_linux/build",
-      "cacheVariables": {
-        "ENABLE_LIBCXX": "ON",
-        "CMAKE_CXX_FLAGS": "-stdlib=libc++"
       }
     },
     {
@@ -241,10 +232,6 @@
       "configurePreset": "dev_ninja_clang_linux"
     },
     {
-      "name": "dev_ninja_clang_libcxx_linux",
-      "configurePreset": "dev_ninja_clang_libcxx_linux"
-    },
-    {
       "name": "dev_ninja_clang_tidy_linux",
       "configurePreset": "dev_ninja_clang_tidy_linux"
     },
@@ -313,11 +300,6 @@
       "name": "dev_ninja_clang_linux",
       "inherits": "default",
       "configurePreset": "dev_ninja_clang_linux"
-    },
-    {
-      "name": "dev_ninja_clang_libcxx_linux",
-      "inherits": "default",
-      "configurePreset": "dev_ninja_clang_libcxx_linux"
     },
     {
       "name": "dev_ninja_clang_tidy_linux",
