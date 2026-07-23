@@ -8,6 +8,7 @@ env:
   LLVM_VER_WIN: 22.1.7
   LLVM_VER_UBUNTU: 22
   GCC_VER: 16
+  MSVC_VER: 14.51
 
 jobs:
   build_and_test:
@@ -43,10 +44,17 @@ jobs:
           clang-format --version
           clang-tidy --version
 
+      - name: Update MSVC
+        run: |
+          Invoke-WebRequest -URI https://aka.ms/vs/stable/vs_buildtools.exe -OutFile vs_buildtools.exe
+          $process = Start-Process -FilePath vs_buildtools.exe -ArgumentList "--installPath", "$pwd\VSBuildTools", "--passive", "--wait","--add", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64" -Wait -PassThru
+          Write-Output $process.ExitCode
+
       - name: Setup MSVC dev environment
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: TheMrMilchmann/setup-msvc-dev@v2
         with:
           arch: x64
+          toolset: ${{ env.MSVC_VER }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
