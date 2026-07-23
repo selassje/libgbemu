@@ -44,7 +44,13 @@ function(setup_coverage_report_target)
         ${LLVM_COV} report ${OBJECTS}
         -instr-profile=${CMAKE_BINARY_DIR}/coverage.profdata
         -ignore-filename-regex=tests
-      COMMENT "HTML coverage report: ${CMAKE_BINARY_DIR}/coverage-html/index.html")
+      COMMAND
+        ${LLVM_COV} export ${OBJECTS}
+        -instr-profile=${CMAKE_BINARY_DIR}/coverage.profdata
+        -ignore-filename-regex=tests -format=lcov >
+        ${CMAKE_BINARY_DIR}/coverage.lcov
+      COMMENT "HTML coverage report: ${CMAKE_BINARY_DIR}/coverage-html/index.html"
+      )
   endif()
 endfunction()
 

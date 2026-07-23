@@ -3,7 +3,7 @@ name: libgbemu CI
 on: [push]
 
 env:
-  CMAKE_VER: 4.2.0
+  CMAKE_VER: 4.4.0
   NINJA_VER: 1.11.1
   LLVM_VER_WIN: 21.1.0
 
@@ -16,7 +16,7 @@ jobs:
         preset:
           - dev_ninja_msvc
           - dev_ninja_clang
-          - dev_ninja_clang_tidy
+          - dev_ninja_clang_tidy_coverage
           - dev_ninja_msvc_analysis
 
     runs-on: windows-latest
@@ -69,3 +69,15 @@ jobs:
 
       - name: Check Formatting
         run: cmake --build --preset ${{ matrix.preset }} --target clang-format-check
+
+      - name: Generate Coverage Report
+        if: matrix.preset == 'dev_ninja_clang_tidy_coverage'
+        run: cmake --build --preset ${{ matrix.preset }} --target generate-coverage-report
+
+      - name: Upload Coverage to Codecov
+        if: matrix.preset == 'dev_ninja_clang_tidy_coverage'
+        uses: codecov/codecov-action@v5
+        with:
+          files: builds/dev_ninja_clang_tidy_coverage/build/coverage.lcov
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
