@@ -123,6 +123,8 @@ jobs:
           sudo apt-get install -y gcc-$GCC_VER g++-$GCC_VER
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VER 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VER 100
+          sudo mkdir -p /usr/lib/gcc/x86_64-linux-gnu/include/
+          sudo ln -s /usr/include/c++/ /usr/lib/gcc/x86_64-linux-gnu/include/c++
           g++ --version
 
       - name: Setup Python
