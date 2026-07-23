@@ -1,12 +1,6 @@
-module;
-
-#include <cstddef>
-#include <cstdint>
-#include <expected>
-#include <span>
-#include <vector>
-
 export module gbemu;
+
+import std;
 
 export namespace gbemu {
 

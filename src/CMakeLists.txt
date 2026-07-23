@@ -13,6 +13,34 @@ target_sources(
          FILES
          ${MODULES}/gbemu.cppm)
 
+# cl.exe already gets a working `std` module from CMake's own
+# CXX_MODULE_STD=ON mechanism (Ninja and the Visual Studio generator both
+# resolve it on their own). CMake's CXX_MODULE_STD explicitly refuses
+# Clang+MSVC-STL ("Only libc++ and libstdc++ are supported"), so clang needs
+# std.ixx pointed out manually instead - same workaround aoc uses for MSVC,
+# repurposed here for the toolchain CMake doesn't support at all.
+if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows" AND ${CMAKE_GENERATOR} STREQUAL "Ninja"
+   AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+set(VC_TOOLS_INSTALL_DIR "$ENV{VcToolsInstallDir}")
+set(STD_MODULE_DIR ${VC_TOOLS_INSTALL_DIR}/modules)
+set(STD_MODULE ${STD_MODULE_DIR}/std.ixx)
+
+  target_sources(
+    gbemu
+    PUBLIC FILE_SET
+           std_module
+           TYPE
+           CXX_MODULES
+           BASE_DIRS
+           ${STD_MODULE_DIR}
+           FILES
+           ${STD_MODULE_DIR}/std.ixx)
+
+  # It's MSVC's file, not ours - don't lint it.
+  set_source_files_properties(${STD_MODULE_DIR}/std.ixx
+                               PROPERTIES CXX_CLANG_TIDY "")
+endif()
+
 setup_compiler_warnings(gbemu)
 setup_clang_tidy(gbemu)
 setup_msvc_analysis(gbemu)

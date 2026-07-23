@@ -1,8 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <cstdint>
-#include <vector>
-
+import std;
 import gbemu;
 
 TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")

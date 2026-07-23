@@ -22,7 +22,8 @@ Checks: "*,
          -bugprone-suspicious-stringview-data-usage,
          -llvm-prefer-static-over-anonymous-namespace,
          -readability-redundant-declaration,
-         -misc-include-cleaner
+         -misc-include-cleaner,
+         -cert-dcl58-cpp
          "
 CheckOptions:
   misc-non-private-member-variables-in-classes.IgnorePublicMemberVariables: true
