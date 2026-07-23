@@ -7,24 +7,66 @@
   },
   "configurePresets": [
     {
-      "name": "dev_vs_msvc",
-      "displayName": "development (Visual Studio, MSVC)",
-      "generator": "Visual Studio 18 2026",
-      "toolchainFile": "${sourceDir}/build/generators/conan_toolchain.cmake",
+      "name": "dev",
+      "hidden": true,
       "cacheVariables": {
         "ENABLE_TESTS": "ON",
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CONFIGURATION_TYPES": "Debug"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
         "rhs": "Windows"
+      }
+    },
+    {
+      "name": "dev_ninja",
+      "hidden": true,
+      "inherits": "dev",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dev_ninja_msvc",
+      "displayName": "development (Ninja, MSVC) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_ninja",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_msvc/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_msvc/build"
+    },
+    {
+      "name": "dev_ninja_clang",
+      "displayName": "development (Ninja, clang) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_ninja",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang/build",
+      "environment": {
+        "CXX": "clang++",
+        "CC": "clang"
+      }
+    },
+    {
+      "name": "dev_vs_msvc",
+      "displayName": "development (Visual Studio, MSVC)",
+      "inherits": "dev",
+      "generator": "Visual Studio 18 2026",
+      "toolchainFile": "${sourceDir}/builds/dev_vs_msvc/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Debug"
       },
-      "binaryDir": "${sourceDir}/build"
+      "binaryDir": "${sourceDir}/builds/dev_vs_msvc/build"
     }
   ],
   "buildPresets": [
+    {
+      "name": "dev_ninja_msvc",
+      "configurePreset": "dev_ninja_msvc"
+    },
+    {
+      "name": "dev_ninja_clang",
+      "configurePreset": "dev_ninja_clang"
+    },
     {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
@@ -33,11 +75,26 @@
   ],
   "testPresets": [
     {
-      "name": "dev_vs_msvc",
-      "configurePreset": "dev_vs_msvc",
-      "configuration": "Debug",
+      "name": "default",
+      "hidden": true,
       "output": { "outputOnFailure": true },
       "execution": { "noTestsAction": "error", "stopOnFailure": true }
+    },
+    {
+      "name": "dev_ninja_msvc",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_msvc"
+    },
+    {
+      "name": "dev_ninja_clang",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang"
+    },
+    {
+      "name": "dev_vs_msvc",
+      "inherits": "default",
+      "configurePreset": "dev_vs_msvc",
+      "configuration": "Debug"
     }
   ]
 }

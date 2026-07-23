@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.30)
 
+include(cmake/bootstrap_conan.cmake)
+
 project(libgbemu LANGUAGES CXX)
 
 # The Conan toolchain (included by project()) forces CMAKE_CXX_STANDARD to 14
