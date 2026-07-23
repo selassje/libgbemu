@@ -1,0 +1,68 @@
+name: libgbemu CI
+
+on: [push]
+
+env:
+  CMAKE_VER: 4.2.0
+  NINJA_VER: 1.11.1
+  LLVM_VER_WIN: 21.1.0
+
+jobs:
+  build_and_test:
+    name: Build and Test (${{ matrix.preset }})
+    strategy:
+      fail-fast: false
+      matrix:
+        preset:
+          - dev_ninja_msvc
+          - dev_ninja_clang
+          - dev_ninja_clang_tidy
+          - dev_ninja_msvc_analysis
+
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: ${{ env.CMAKE_VER }}
+
+      - name: CMake version
+        run: cmake --version
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+        with:
+          version: ${{ env.NINJA_VER }}
+
+      - name: Install LLVM
+        run: |
+          choco install llvm --version=$env:LLVM_VER_WIN --allow-downgrade
+          clang-format --version
+          clang-tidy --version
+
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan profile detect --force
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Run Tests
+        run: ctest --preset ${{ matrix.preset }}
