@@ -14,8 +14,6 @@ jobs:
       fail-fast: false
       matrix:
         preset:
-          - dev_ninja_msvc
-          - dev_ninja_clang
           - dev_ninja_clang_tidy_coverage
           - dev_ninja_msvc_analysis
 
