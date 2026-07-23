@@ -13,6 +13,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 option(ENABLE_TESTS "Enable Tests" OFF)
 option(ENABLE_CLANG_TIDY "Enable Clang Tidy" OFF)
+option(ENABLE_MSVC_ANALYSIS "Enable MSVC Analysis" OFF)
 
 include(cmake/compiler_and_linker_flags.cmake)
 include(cmake/clang_format.cmake)

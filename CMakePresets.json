@@ -57,6 +57,16 @@
       }
     },
     {
+      "name": "dev_ninja_msvc_analysis",
+      "displayName": "development (Ninja, MSVC, /analyze) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_ninja_msvc",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_msvc_analysis/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_msvc_analysis/build",
+      "cacheVariables": {
+        "ENABLE_MSVC_ANALYSIS": "ON"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
       "inherits": "dev",
@@ -66,6 +76,16 @@
         "CMAKE_CONFIGURATION_TYPES": "Debug"
       },
       "binaryDir": "${sourceDir}/builds/dev_vs_msvc/build"
+    },
+    {
+      "name": "dev_vs_msvc_analysis",
+      "displayName": "development (Visual Studio, MSVC, /analyze)",
+      "inherits": "dev_vs_msvc",
+      "toolchainFile": "${sourceDir}/builds/dev_vs_msvc_analysis/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_vs_msvc_analysis/build",
+      "cacheVariables": {
+        "ENABLE_MSVC_ANALYSIS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -85,8 +105,19 @@
       "targets": ["all", "clang-format-check"]
     },
     {
+      "name": "dev_ninja_msvc_analysis",
+      "configurePreset": "dev_ninja_msvc_analysis",
+      "targets": ["all", "clang-format-check"]
+    },
+    {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
+      "configuration": "Debug",
+      "targets": ["ALL_BUILD", "clang-format-check"]
+    },
+    {
+      "name": "dev_vs_msvc_analysis",
+      "configurePreset": "dev_vs_msvc_analysis",
       "configuration": "Debug",
       "targets": ["ALL_BUILD", "clang-format-check"]
     }
@@ -114,9 +145,20 @@
       "configurePreset": "dev_ninja_clang_tidy"
     },
     {
+      "name": "dev_ninja_msvc_analysis",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_msvc_analysis"
+    },
+    {
       "name": "dev_vs_msvc",
       "inherits": "default",
       "configurePreset": "dev_vs_msvc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "dev_vs_msvc_analysis",
+      "inherits": "default",
+      "configurePreset": "dev_vs_msvc_analysis",
       "configuration": "Debug"
     }
   ]
