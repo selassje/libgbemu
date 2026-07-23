@@ -13,6 +13,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 option(ENABLE_TESTS "Enable Tests" OFF)
 
+include(cmake/clang_format.cmake)
+
 add_subdirectory(src)
 
 if(ENABLE_TESTS)

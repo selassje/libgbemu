@@ -61,16 +61,19 @@
   "buildPresets": [
     {
       "name": "dev_ninja_msvc",
-      "configurePreset": "dev_ninja_msvc"
+      "configurePreset": "dev_ninja_msvc",
+      "targets": ["all", "clang-format-check"]
     },
     {
       "name": "dev_ninja_clang",
-      "configurePreset": "dev_ninja_clang"
+      "configurePreset": "dev_ninja_clang",
+      "targets": ["all", "clang-format-check"]
     },
     {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
-      "configuration": "Debug"
+      "configuration": "Debug",
+      "targets": ["ALL_BUILD", "clang-format-check"]
     }
   ],
   "testPresets": [

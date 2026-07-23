@@ -12,7 +12,8 @@ export namespace gbemu {
 
 inline constexpr std::size_t kMinRomSize = 0x150;
 
-enum class RomLoadError {
+enum class RomLoadError
+{
   BadRomSize,
 };
 
