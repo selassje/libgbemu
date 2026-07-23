@@ -169,6 +169,8 @@ jobs:
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh $LLVM_VER_UBUNTU all
+          sudo update-alternatives --remove-all clang || true
+          sudo update-alternatives --remove-all clang-format || true
           sudo update-alternatives \
             --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU 100 \
             --slave /usr/bin/clang clang /usr/bin/clang-$LLVM_VER_UBUNTU \
