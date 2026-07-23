@@ -175,6 +175,7 @@ jobs:
             --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU 100 \
             --slave /usr/bin/clang clang /usr/bin/clang-$LLVM_VER_UBUNTU \
             --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VER_UBUNTU
+          sudo update-alternatives --set clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU
           clang++ --version
           clang-format --version
 
