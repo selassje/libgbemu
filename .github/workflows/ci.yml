@@ -6,6 +6,7 @@ env:
   CMAKE_VER: 4.4.0
   NINJA_VER: 1.11.1
   LLVM_VER_WIN: 22.1.7
+  LLVM_VER_UBUNTU: 22
   GCC_VER: 16
 
 jobs:
@@ -111,10 +112,61 @@ jobs:
         run: |
           sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
           sudo apt-get update
-          sudo apt-get install -y gcc-$GCC_VER g++-$GCC_VER clang-format
+          sudo apt-get install -y gcc-$GCC_VER g++-$GCC_VER
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VER 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VER 100
           g++ --version
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Conan
+        run: |
+          pip install conan
+          conan profile detect --force
+
+      - name: Configure
+        run: cmake --preset dev_ninja_gcc
+
+      - name: Build
+        run: cmake --build --preset dev_ninja_gcc
+
+      - name: Run Tests
+        run: ctest --preset dev_ninja_gcc
+
+  build_and_test_linux_clang:
+    name: Build and Test (dev_ninja_clang_linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v1.13
+        with:
+          cmake-version: ${{ env.CMAKE_VER }}
+
+      - name: CMake version
+        run: cmake --version
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@master
+        with:
+          version: ${{ env.NINJA_VER }}
+
+      - name: Install LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh $LLVM_VER_UBUNTU all
+          sudo update-alternatives \
+            --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU 100 \
+            --slave /usr/bin/clang clang /usr/bin/clang-$LLVM_VER_UBUNTU \
+            --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VER_UBUNTU
+          clang++ --version
+          clang-format --version
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -130,16 +182,16 @@ jobs:
         run: pip install cmake-format
 
       - name: Configure
-        run: cmake --preset dev_ninja_gcc
+        run: cmake --preset dev_ninja_clang_linux
 
       - name: Build
-        run: cmake --build --preset dev_ninja_gcc
+        run: cmake --build --preset dev_ninja_clang_linux
 
       - name: Run Tests
-        run: ctest --preset dev_ninja_gcc
+        run: ctest --preset dev_ninja_clang_linux
 
       - name: Check Formatting
-        run: cmake --build --preset dev_ninja_gcc --target clang-format-check
+        run: cmake --build --preset dev_ninja_clang_linux --target clang-format-check
 
       - name: Check CMake Formatting
-        run: cmake --build --preset dev_ninja_gcc --target cmake-format-check
+        run: cmake --build --preset dev_ninja_clang_linux --target cmake-format-check
