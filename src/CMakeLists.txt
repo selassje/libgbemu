@@ -16,3 +16,4 @@ target_sources(
 setup_compiler_warnings(gbemu)
 setup_clang_tidy(gbemu)
 setup_msvc_analysis(gbemu)
+setup_coverage_report_flags(gbemu)

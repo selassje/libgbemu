@@ -1,14 +1,25 @@
 find_package(Catch2 REQUIRED CONFIG)
 
-add_executable(gb-core-tests)
+add_executable(gbemu-tests)
 
-target_sources(gb-core-tests PRIVATE gameboy_test.cpp)
+target_sources(gbemu-tests PRIVATE gameboy_test.cpp)
 
-target_link_libraries(gb-core-tests PRIVATE gbemu Catch2::Catch2WithMain)
+target_link_libraries(gbemu-tests PRIVATE gbemu Catch2::Catch2WithMain)
 
-setup_compiler_warnings(gb-core-tests)
-setup_clang_tidy(gb-core-tests)
-setup_msvc_analysis(gb-core-tests)
+setup_compiler_warnings(gbemu-tests)
+setup_clang_tidy(gbemu-tests)
+setup_msvc_analysis(gbemu-tests)
+setup_coverage_report_flags(gbemu-tests)
 
 include(Catch)
-catch_discover_tests(gb-core-tests)
+if(ENABLE_COVERAGE_REPORT)
+  # Catch2's test discovery runs gbemu-tests once per TEST_CASE, all from
+  # the same binary; %p (process id) keeps each run's profile data separate
+  # so they can all be merged afterwards by generate-coverage-report.
+  catch_discover_tests(
+    gbemu-tests
+    PROPERTIES ENVIRONMENT
+               "LLVM_PROFILE_FILE=${CMAKE_BINARY_DIR}/coverage/%p.profraw")
+else()
+  catch_discover_tests(gbemu-tests)
+endif()

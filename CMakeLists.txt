@@ -14,10 +14,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 option(ENABLE_TESTS "Enable Tests" OFF)
 option(ENABLE_CLANG_TIDY "Enable Clang Tidy" OFF)
 option(ENABLE_MSVC_ANALYSIS "Enable MSVC Analysis" OFF)
+option(ENABLE_COVERAGE_REPORT "Enable Test Coverage Report" OFF)
 
 include(cmake/compiler_and_linker_flags.cmake)
 include(cmake/clang_format.cmake)
 include(cmake/setup_static_analysis.cmake)
+include(cmake/coverage_report.cmake)
 
 add_subdirectory(src)
 
@@ -26,3 +28,5 @@ if(ENABLE_TESTS)
   enable_testing()
   add_subdirectory(tests)
 endif()
+
+setup_coverage_report_target()
