@@ -1,10 +1,6 @@
 # Self-bootstraps Conan when the toolchain file a preset points at doesn't exist
 # yet (fresh clone, or `builds/` was deleted/cleaned). Must be include()-d
 # BEFORE project(), since CMAKE_TOOLCHAIN_FILE is only consulted there.
-#
-# Windows-only for now (matches the "dev" preset's own Windows condition);
-# revisit the PATH separator/environment handling below when WSL/Linux presets
-# are added.
 
 if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
   message(
@@ -52,9 +48,16 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
   # Conan may need to build a dependency (e.g. Catch2) from source, which shells
   # out to cmake itself; make sure it can find this same cmake even though it's
   # deliberately not on the persistent PATH.
+  if(CMAKE_HOST_WIN32)
+    set(PATH_LIST_SEP ";")
+  else()
+    set(PATH_LIST_SEP ":")
+  endif()
   execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E env "PATH=${CMAKE_BIN_DIR};$ENV{PATH}" conan
-            install "${CMAKE_SOURCE_DIR}" ${CONAN_INSTALL_ARGS}
+    COMMAND
+      "${CMAKE_COMMAND}" -E env
+      "PATH=${CMAKE_BIN_DIR}${PATH_LIST_SEP}$ENV{PATH}" conan install
+      "${CMAKE_SOURCE_DIR}" ${CONAN_INSTALL_ARGS}
     RESULT_VARIABLE CONAN_INSTALL_RESULT)
 
   if(NOT CONAN_INSTALL_RESULT EQUAL 0)

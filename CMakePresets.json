@@ -12,7 +12,12 @@
       "cacheVariables": {
         "ENABLE_TESTS": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      },
+      }
+    },
+    {
+      "name": "dev_windows",
+      "hidden": true,
+      "inherits": "dev",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -20,9 +25,19 @@
       }
     },
     {
-      "name": "dev_ninja",
+      "name": "dev_linux",
       "hidden": true,
       "inherits": "dev",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "dev_ninja",
+      "hidden": true,
+      "inherits": "dev_windows",
       "generator": "Ninja",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
@@ -93,9 +108,26 @@
       }
     },
     {
+      "name": "dev_ninja_gcc",
+      "displayName": "development (Ninja, gcc)",
+      "inherits": "dev_linux",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_gcc/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_gcc/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "ON"
+      },
+      "environment": {
+        "CXX": "g++",
+        "CC": "gcc"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
-      "inherits": "dev",
+      "inherits": "dev_windows",
       "generator": "Visual Studio 18 2026",
       "toolchainFile": "${sourceDir}/builds/dev_vs_msvc/generators/conan_toolchain.cmake",
       "cacheVariables": {
@@ -140,6 +172,10 @@
     {
       "name": "dev_ninja_msvc_analysis",
       "configurePreset": "dev_ninja_msvc_analysis"
+    },
+    {
+      "name": "dev_ninja_gcc",
+      "configurePreset": "dev_ninja_gcc"
     },
     {
       "name": "dev_vs_msvc",
@@ -188,6 +224,11 @@
       "name": "dev_ninja_msvc_analysis",
       "inherits": "default",
       "configurePreset": "dev_ninja_msvc_analysis"
+    },
+    {
+      "name": "dev_ninja_gcc",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_gcc"
     },
     {
       "name": "dev_vs_msvc",
