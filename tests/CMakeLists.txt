@@ -6,6 +6,9 @@ target_sources(gbemu-tests PRIVATE gameboy_test.cpp)
 
 target_link_libraries(gbemu-tests PRIVATE gbemu Catch2::Catch2WithMain)
 
+target_compile_definitions(
+  gbemu-tests PRIVATE GB_TEST_ROMS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gb-test-roms")
+
 setup_compiler_warnings(gbemu-tests)
 setup_clang_tidy(gbemu-tests)
 setup_msvc_analysis(gbemu-tests)
