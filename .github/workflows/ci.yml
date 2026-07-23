@@ -56,6 +56,9 @@ jobs:
           pip install conan
           conan profile detect --force
 
+      - name: Install cmake-format
+        run: pip install cmake-format
+
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
 
@@ -67,6 +70,9 @@ jobs:
 
       - name: Check Formatting
         run: cmake --build --preset ${{ matrix.preset }} --target clang-format-check
+
+      - name: Check CMake Formatting
+        run: cmake --build --preset ${{ matrix.preset }} --target cmake-format-check
 
       - name: Generate Coverage Report
         if: matrix.preset == 'dev_ninja_clang_tidy_coverage'

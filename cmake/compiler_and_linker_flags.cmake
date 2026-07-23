@@ -33,16 +33,13 @@ function(setup_compiler_warnings TARGET)
               -Wimplicit-fallthrough
               -Wno-include-angled-in-module-purview
               -Wno-reserved-module-identifier
-              -Wno-unknown-pragmas
-              )
+              -Wno-unknown-pragmas)
 
     if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
       target_compile_options(
-        ${TARGET} PRIVATE -Wno-unused-function
-                          -Wno-unused-variable
-                          -Wno-unused-parameter
-                          -Wno-unused-lambda-capture
-                          -Wno-unused-but-set-variable)
+        ${TARGET}
+        PRIVATE -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter
+                -Wno-unused-lambda-capture -Wno-unused-but-set-variable)
     endif()
 
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" AND NOT ${ENABLE_CLANG_TIDY})

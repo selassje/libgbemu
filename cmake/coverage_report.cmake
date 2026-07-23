@@ -1,7 +1,7 @@
 # LLVM-only coverage support (source-based, via -fprofile-instr-generate),
-# unlike aoc's version which also supports GNU/gcov+lcov. This project only
-# ever builds with cl.exe or clang++ on Windows, never gcc, so the gcov path
-# was dropped rather than carried over unused.
+# unlike aoc's version which also supports GNU/gcov+lcov. This project only ever
+# builds with cl.exe or clang++ on Windows, never gcc, so the gcov path was
+# dropped rather than carried over unused.
 
 function(setup_coverage_report_target)
   if(ENABLE_COVERAGE_REPORT)
@@ -49,8 +49,8 @@ function(setup_coverage_report_target)
         -instr-profile=${CMAKE_BINARY_DIR}/coverage.profdata
         -ignore-filename-regex=tests -format=lcov >
         ${CMAKE_BINARY_DIR}/coverage.lcov
-      COMMENT "HTML coverage report: ${CMAKE_BINARY_DIR}/coverage-html/index.html"
-      )
+      COMMENT
+        "HTML coverage report: ${CMAKE_BINARY_DIR}/coverage-html/index.html")
   endif()
 endfunction()
 

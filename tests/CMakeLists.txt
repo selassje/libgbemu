@@ -13,13 +13,12 @@ setup_coverage_report_flags(gbemu-tests)
 
 include(Catch)
 if(ENABLE_COVERAGE_REPORT)
-  # Catch2's test discovery runs gbemu-tests once per TEST_CASE, all from
-  # the same binary; %p (process id) keeps each run's profile data separate
-  # so they can all be merged afterwards by generate-coverage-report.
+  # Catch2's test discovery runs gbemu-tests once per TEST_CASE, all from the
+  # same binary; %p (process id) keeps each run's profile data separate so they
+  # can all be merged afterwards by generate-coverage-report.
   catch_discover_tests(
-    gbemu-tests
-    PROPERTIES ENVIRONMENT
-               "LLVM_PROFILE_FILE=${CMAKE_BINARY_DIR}/coverage/%p.profraw")
+    gbemu-tests PROPERTIES ENVIRONMENT
+    "LLVM_PROFILE_FILE=${CMAKE_BINARY_DIR}/coverage/%p.profraw")
 else()
   catch_discover_tests(gbemu-tests)
 endif()
