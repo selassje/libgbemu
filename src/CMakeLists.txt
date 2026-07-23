@@ -10,8 +10,10 @@ target_sources(
          CXX_MODULES
          BASE_DIRS
          ${MODULES}
+         ${CMAKE_CURRENT_LIST_DIR}
          FILES
-         ${MODULES}/gbemu.cppm)
+         ${MODULES}/gbemu.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm)
 
 # cl.exe already gets a working `std` module from CMake's own CXX_MODULE_STD=ON
 # mechanism (Ninja and the Visual Studio generator both resolve it on their

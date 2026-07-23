@@ -2,6 +2,8 @@ export module gbemu;
 
 import std;
 
+export import :cpu;
+
 export namespace gbemu {
 
 inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
