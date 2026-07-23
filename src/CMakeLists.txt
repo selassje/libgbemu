@@ -13,4 +13,5 @@ target_sources(
          FILES
          ${MODULES}/gbemu.cppm)
 
+setup_compiler_warnings(gbemu)
 setup_clang_tidy(gbemu)

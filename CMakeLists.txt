@@ -14,6 +14,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED YES)
 option(ENABLE_TESTS "Enable Tests" OFF)
 option(ENABLE_CLANG_TIDY "Enable Clang Tidy" OFF)
 
+include(cmake/compiler_and_linker_flags.cmake)
 include(cmake/clang_format.cmake)
 include(cmake/setup_static_analysis.cmake)
 
