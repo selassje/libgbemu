@@ -125,6 +125,54 @@
       }
     },
     {
+      "name": "dev_ninja_clang_linux",
+      "displayName": "development (Ninja, clang, Linux)",
+      "inherits": "dev_linux",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_linux/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "ON"
+      },
+      "environment": {
+        "CXX": "clang++",
+        "CC": "clang"
+      }
+    },
+    {
+      "name": "dev_ninja_clang_tidy_linux",
+      "displayName": "development (Ninja, clang, clang-tidy, Linux)",
+      "inherits": "dev_ninja_clang_linux",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_tidy_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_tidy_linux/build",
+      "cacheVariables": {
+        "ENABLE_CLANG_TIDY": "ON"
+      }
+    },
+    {
+      "name": "dev_ninja_clang_coverage_linux",
+      "displayName": "development (Ninja, clang, coverage, Linux)",
+      "inherits": "dev_ninja_clang_linux",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_coverage_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_coverage_linux/build",
+      "cacheVariables": {
+        "ENABLE_COVERAGE_REPORT": "ON"
+      }
+    },
+    {
+      "name": "dev_ninja_clang_tidy_coverage_linux",
+      "displayName": "development (Ninja, clang, clang-tidy, coverage, Linux)",
+      "inherits": "dev_ninja_clang_linux",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_tidy_coverage_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_tidy_coverage_linux/build",
+      "cacheVariables": {
+        "ENABLE_CLANG_TIDY": "ON",
+        "ENABLE_COVERAGE_REPORT": "ON"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
       "inherits": "dev_windows",
@@ -178,6 +226,22 @@
       "configurePreset": "dev_ninja_gcc"
     },
     {
+      "name": "dev_ninja_clang_linux",
+      "configurePreset": "dev_ninja_clang_linux"
+    },
+    {
+      "name": "dev_ninja_clang_tidy_linux",
+      "configurePreset": "dev_ninja_clang_tidy_linux"
+    },
+    {
+      "name": "dev_ninja_clang_coverage_linux",
+      "configurePreset": "dev_ninja_clang_coverage_linux"
+    },
+    {
+      "name": "dev_ninja_clang_tidy_coverage_linux",
+      "configurePreset": "dev_ninja_clang_tidy_coverage_linux"
+    },
+    {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
       "configuration": "Debug"
@@ -229,6 +293,26 @@
       "name": "dev_ninja_gcc",
       "inherits": "default",
       "configurePreset": "dev_ninja_gcc"
+    },
+    {
+      "name": "dev_ninja_clang_linux",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_linux"
+    },
+    {
+      "name": "dev_ninja_clang_tidy_linux",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_tidy_linux"
+    },
+    {
+      "name": "dev_ninja_clang_coverage_linux",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_coverage_linux"
+    },
+    {
+      "name": "dev_ninja_clang_tidy_coverage_linux",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_tidy_coverage_linux"
     },
     {
       "name": "dev_vs_msvc",

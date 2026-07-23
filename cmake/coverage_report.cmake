@@ -15,8 +15,14 @@ function(setup_coverage_report_target)
       return()
     endif()
 
-    find_program(LLVM_PROFDATA "llvm-profdata" REQUIRED)
-    find_program(LLVM_COV "llvm-cov" REQUIRED)
+    # Windows' LLVM install exposes unversioned names (llvm-cov.exe);
+    # apt.llvm.org packages on Linux only ship version-suffixed ones
+    # (llvm-cov-21) unless update-alternatives was run, so fall back to a
+    # version-suffixed name derived from the compiler itself.
+    string(REGEX REPLACE "\\..+" "" LLVM_VER "${CMAKE_CXX_COMPILER_VERSION}")
+    find_program(LLVM_PROFDATA NAMES "llvm-profdata"
+                                     "llvm-profdata-${LLVM_VER}" REQUIRED)
+    find_program(LLVM_COV NAMES "llvm-cov" "llvm-cov-${LLVM_VER}" REQUIRED)
 
     file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/coverage)
 
