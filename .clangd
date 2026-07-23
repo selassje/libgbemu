@@ -1,0 +1,7 @@
+Diagnostics:
+  ClangTidy:
+    Remove:
+      - misc-use-anonymous-namespace
+      - cppcoreguidelines-avoid-do-while
+  Includes:
+    IgnoreHeader: ""
