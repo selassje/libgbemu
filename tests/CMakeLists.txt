@@ -10,6 +10,7 @@ setup_compiler_warnings(gbemu-tests)
 setup_clang_tidy(gbemu-tests)
 setup_msvc_analysis(gbemu-tests)
 setup_coverage_report_flags(gbemu-tests)
+setup_std_lib(gbemu-tests)
 
 include(Catch)
 if(ENABLE_COVERAGE_REPORT)

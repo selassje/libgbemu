@@ -45,6 +45,30 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
     )
   endif()
 
+  # ENABLE_LIBCXX presets build our own code against libc++ (-stdlib=libc++);
+  # Catch2 must be built against the same stdlib or linking fails with an ABI
+  # mismatch against the default profile's libstdc++11 build. libc++ isn't a
+  # valid settings.compiler.libcxx value for compiler=gcc (the default profile's
+  # detected compiler), so compiler/compiler.version must be overridden to clang
+  # too, not just libcxx.
+  if(ENABLE_LIBCXX)
+    execute_process(COMMAND clang++ --version
+                    OUTPUT_VARIABLE CLANG_VERSION_OUTPUT)
+    string(REGEX MATCH "version ([0-9]+)" CLANG_VERSION_MATCH
+                 "${CLANG_VERSION_OUTPUT}")
+    list(
+      APPEND
+      CONAN_INSTALL_ARGS
+      -s
+      compiler=clang
+      -s
+      compiler.version=${CMAKE_MATCH_1}
+      -s
+      compiler.libcxx=libc++
+      -s
+      compiler.cppstd=gnu17)
+  endif()
+
   # Conan may need to build a dependency (e.g. Catch2) from source, which shells
   # out to cmake itself; make sure it can find this same cmake even though it's
   # deliberately not on the persistent PATH.
