@@ -15,6 +15,8 @@ target_sources(
          ${MODULES}/gbemu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm)
 
+target_sources(gbemu PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp)
+
 # cl.exe already gets a working `std` module from CMake's own CXX_MODULE_STD=ON
 # mechanism (Ninja and the Visual Studio generator both resolve it on their
 # own). CMake's CXX_MODULE_STD explicitly refuses Clang+MSVC-STL ("Only libc++

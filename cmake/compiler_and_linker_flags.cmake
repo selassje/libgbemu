@@ -40,7 +40,7 @@ function(setup_compiler_warnings TARGET)
       target_compile_options(
         ${TARGET}
         PRIVATE -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter
-                -Wno-unused-lambda-capture -Wno-unused-but-set-variable)
+                -Wno-unused-lambda-capture -Wno-unused-but-set-variable -Wno-unused-private-field)
     endif()
 
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" AND NOT ${ENABLE_CLANG_TIDY})
