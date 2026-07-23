@@ -1,9 +1,9 @@
 set(MODULES ${CMAKE_CURRENT_LIST_DIR}/../import)
 
-add_library(gb-core STATIC)
+add_library(gbemu STATIC)
 
 target_sources(
-  gb-core
+  gbemu
   PUBLIC FILE_SET
          public_modules
          TYPE
@@ -13,4 +13,4 @@ target_sources(
          FILES
          ${MODULES}/gbemu.cppm)
 
-setup_clang_tidy(gb-core)
+setup_clang_tidy(gbemu)
