@@ -16,6 +16,13 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   result.at(0xD0) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
   result.at(0xD8) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
   result.at(0xC9) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
+  result.at(0xD9) = { &Cpu::reti };  // NOLINT(readability-magic-numbers)
+  constexpr std::size_t rstFirst = 0xC7;
+  constexpr std::size_t rstLast = 0xFF;
+  constexpr std::size_t rstStep = 0x08;
+  for (std::size_t opcode = rstFirst; opcode <= rstLast; opcode += rstStep) {
+    result.at(opcode) = { &Cpu::rst };
+  }
   constexpr std::size_t ldRRd16First = 0x01;
   constexpr std::size_t ldRRd16Last = 0x31;
   constexpr std::size_t ldRRd16Step = 0x10;
@@ -72,6 +79,8 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   result.at(0xFA) = { &Cpu::ldaa16 };       // NOLINT(readability-magic-numbers)
   result.at(0xE0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
   result.at(0xF0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
+  result.at(0xE2) = { &Cpu::ldhca };        // NOLINT(readability-magic-numbers)
+  result.at(0xF2) = { &Cpu::ldhca };        // NOLINT(readability-magic-numbers)
   result.at(0xCB) = { &Cpu::cbPrefixed };   // NOLINT(readability-magic-numbers)
   result.at(0x07) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
   result.at(0x0F) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
@@ -551,6 +560,32 @@ Cpu::ei()
 }
 
 std::size_t
+Cpu::reti()
+{
+  m_PC = m_mmu.get().readWord(m_SP);
+  m_SP += 2;
+  m_ime = true;
+  return 4; // NOLINT(readability-magic-numbers)
+}
+
+std::size_t
+Cpu::rst()
+{
+  constexpr unsigned targetMask = 0x38;
+
+  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto target =
+    static_cast<std::uint16_t>(static_cast<unsigned>(opcode) & targetMask);
+  const auto returnAddress = static_cast<std::uint16_t>(m_PC + 1);
+
+  m_SP -= 2;
+  m_mmu.get().writeWord(m_SP, returnAddress);
+  m_PC = target;
+
+  return 4; // NOLINT(readability-magic-numbers)
+}
+
+std::size_t
 Cpu::stop()
 {
   // STOP is a 2-byte instruction (the second byte is a mandatory padding
@@ -593,6 +628,24 @@ Cpu::ldha8()
 
   m_PC += 2;
   return 3; // NOLINT(readability-magic-numbers)
+}
+
+std::size_t
+Cpu::ldhca()
+{
+  const auto opcode = m_mmu.get().readByte(m_PC);
+  const bool load = (static_cast<unsigned>(opcode) & 0x10U) != 0;
+  const auto address =
+    static_cast<std::uint16_t>(IO_REGISTERS_BASE + getR8(REG_C));
+
+  if (load) {
+    setR8(REG_A, m_mmu.get().readByte(address));
+  } else {
+    m_mmu.get().writeByte(address, getR8(REG_A));
+  }
+
+  m_PC += 1;
+  return 2;
 }
 
 std::size_t

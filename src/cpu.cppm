@@ -60,8 +60,11 @@ private:
   std::size_t di();
   std::size_t ei();
   std::size_t stop();
+  std::size_t reti();
+  std::size_t rst();
   std::size_t ldaa16();
   std::size_t ldha8();
+  std::size_t ldhca();
   std::size_t callcc();
   std::size_t pushr16();
   std::size_t popr16();
