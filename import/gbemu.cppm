@@ -3,6 +3,7 @@ export module gbemu;
 import std;
 
 export import :cpu;
+export import :mmu;
 
 export namespace gbemu {
 
