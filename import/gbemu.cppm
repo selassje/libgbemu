@@ -4,6 +4,7 @@ import std;
 
 export import :cpu;
 export import :mmu;
+export import :ppu;
 
 export namespace gbemu {
 
@@ -11,7 +12,7 @@ class GameBoy
 {
 public:
   GameBoy()
-    : m_cpu(m_mmu)
+    : m_cpu(m_mmu), m_ppu(m_mmu)
   {
   }
 
@@ -23,6 +24,7 @@ public:
 private:
   Mmu m_mmu;
   Cpu m_cpu;
+  Ppu m_ppu;
 };
 
 }

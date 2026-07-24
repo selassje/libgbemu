@@ -21,7 +21,11 @@ gbemu::GameBoy::runNextFrame()
     if (!result) {
       return std::unexpected(result.error());
     }
-    mCycles += result.value();
+    const auto cycles = result.value();
+    for (std::size_t i = 0; i < cycles * 4; ++i) {
+      m_ppu.runNextTCycle();
+    }
+    mCycles += cycles;
   }
   return {};
 }
