@@ -42,14 +42,9 @@ private:
   };
 
   std::expected<std::size_t, std::string> nop();
+  std::expected<std::size_t, std::string> jpa16();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };
-
-constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
-  std::array<Instruction, 256> result{};
-  result.at(0x00) = { &Cpu::nop, 1 };
-  return result;
-}();
 
 }
