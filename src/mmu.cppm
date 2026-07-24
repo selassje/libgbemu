@@ -5,6 +5,12 @@ import std;
 namespace gbemu {
 
 export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
+
+#ifdef ENABLE_TESTS
+export inline std::string
+  gSerialOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+#endif
+
 class Mmu // NOLINT(misc-use-internal-linkage)
 {
 public:

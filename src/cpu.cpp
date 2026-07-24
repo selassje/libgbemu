@@ -5,7 +5,11 @@ namespace gbemu {
 constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   std::array<Instruction, 256> result{};
   result.at(0x00) = { &Cpu::nop };
-  result.at(0xC3) = { &Cpu::jpa16 }; // NOLINT(readability-magic-numbers)
+  result.at(0xC2) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
+  result.at(0xC3) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
+  result.at(0xCA) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
+  result.at(0xD2) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
+  result.at(0xDA) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
   result.at(0xE9) = { &Cpu::jphl };  // NOLINT(readability-magic-numbers)
   result.at(0xC0) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
   result.at(0xC8) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
@@ -56,26 +60,32 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
        opcode += decr8Step) {
     result.at(opcode) = { &Cpu::decr8 };
   }
-  result.at(0x18) = { &Cpu::jrcc };       // NOLINT(readability-magic-numbers)
-  result.at(0x20) = { &Cpu::jrcc };       // NOLINT(readability-magic-numbers)
-  result.at(0x28) = { &Cpu::jrcc };       // NOLINT(readability-magic-numbers)
-  result.at(0x30) = { &Cpu::jrcc };       // NOLINT(readability-magic-numbers)
-  result.at(0x38) = { &Cpu::jrcc };       // NOLINT(readability-magic-numbers)
-  result.at(0xF3) = { &Cpu::di };         // NOLINT(readability-magic-numbers)
-  result.at(0xEA) = { &Cpu::ldaa16 };     // NOLINT(readability-magic-numbers)
-  result.at(0xFA) = { &Cpu::ldaa16 };     // NOLINT(readability-magic-numbers)
-  result.at(0xE0) = { &Cpu::ldha8 };      // NOLINT(readability-magic-numbers)
-  result.at(0xF0) = { &Cpu::ldha8 };      // NOLINT(readability-magic-numbers)
-  result.at(0xCB) = { &Cpu::cbPrefixed }; // NOLINT(readability-magic-numbers)
-  result.at(0x07) = { &Cpu::rotateA };    // NOLINT(readability-magic-numbers)
-  result.at(0x0F) = { &Cpu::rotateA };    // NOLINT(readability-magic-numbers)
-  result.at(0x17) = { &Cpu::rotateA };    // NOLINT(readability-magic-numbers)
-  result.at(0x1F) = { &Cpu::rotateA };    // NOLINT(readability-magic-numbers)
-  result.at(0xC4) = { &Cpu::callcc };     // NOLINT(readability-magic-numbers)
-  result.at(0xCC) = { &Cpu::callcc };     // NOLINT(readability-magic-numbers)
-  result.at(0xD4) = { &Cpu::callcc };     // NOLINT(readability-magic-numbers)
-  result.at(0xDC) = { &Cpu::callcc };     // NOLINT(readability-magic-numbers)
-  result.at(0xCD) = { &Cpu::callcc };     // NOLINT(readability-magic-numbers)
+  result.at(0x18) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
+  result.at(0x20) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
+  result.at(0x28) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
+  result.at(0x30) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
+  result.at(0x38) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
+  result.at(0x10) = { &Cpu::stop };         // NOLINT(readability-magic-numbers)
+  result.at(0xF3) = { &Cpu::di };           // NOLINT(readability-magic-numbers)
+  result.at(0xFB) = { &Cpu::ei };           // NOLINT(readability-magic-numbers)
+  result.at(0xEA) = { &Cpu::ldaa16 };       // NOLINT(readability-magic-numbers)
+  result.at(0xFA) = { &Cpu::ldaa16 };       // NOLINT(readability-magic-numbers)
+  result.at(0xE0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
+  result.at(0xF0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
+  result.at(0xCB) = { &Cpu::cbPrefixed };   // NOLINT(readability-magic-numbers)
+  result.at(0x07) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
+  result.at(0x0F) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
+  result.at(0x17) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
+  result.at(0x1F) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
+  result.at(0x27) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
+  result.at(0x2F) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
+  result.at(0x37) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
+  result.at(0x3F) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
+  result.at(0xC4) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
+  result.at(0xCC) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
+  result.at(0xD4) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
+  result.at(0xDC) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
+  result.at(0xCD) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
   constexpr std::size_t pushFirst = 0xC5;
   constexpr std::size_t pushLast = 0xF5;
   constexpr std::size_t popFirst = 0xC1;
@@ -109,6 +119,10 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
        opcode += addhlr16Step) {
     result.at(opcode) = { &Cpu::addhlr16 };
   }
+  result.at(0x08) = { &Cpu::ldA16Sp };   // NOLINT(readability-magic-numbers)
+  result.at(0xE8) = { &Cpu::addSpHlE8 }; // NOLINT(readability-magic-numbers)
+  result.at(0xF8) = { &Cpu::addSpHlE8 }; // NOLINT(readability-magic-numbers)
+  result.at(0xF9) = { &Cpu::ldSpHl };    // NOLINT(readability-magic-numbers)
   constexpr std::size_t aluR8First = 0x80;
   constexpr std::size_t aluR8Last = 0xBF;
   for (std::size_t opcode = aluR8First; opcode <= aluR8Last; ++opcode) {
@@ -214,10 +228,41 @@ Cpu::nop()
 }
 
 std::size_t
-Cpu::jpa16()
+Cpu::jpcc()
 {
-  m_PC = m_mmu.get().readWord(m_PC + 1);
-  return 4;
+  constexpr std::size_t unconditionalOpcode = 0xC3;
+
+  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto target = m_mmu.get().readWord(m_PC + 1);
+
+  bool takeBranch = true;
+  if (opcode != unconditionalOpcode) {
+    const auto cc =
+      static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x03U);
+    const bool zeroSet = (m_AF & static_cast<std::uint16_t>(Flag::Zero)) != 0;
+    const bool carrySet = (m_AF & static_cast<std::uint16_t>(Flag::Carry)) != 0;
+    switch (cc) {
+      case 0x0:
+        takeBranch = !zeroSet; // NZ
+        break;
+      case 0x1:
+        takeBranch = zeroSet; // Z
+        break;
+      case 0x2:
+        takeBranch = !carrySet; // NC
+        break;
+      default:
+        takeBranch = carrySet; // C
+        break;
+    }
+  }
+
+  if (takeBranch) {
+    m_PC = target;
+    return 4; // NOLINT(readability-magic-numbers)
+  }
+  m_PC += 3;
+  return 3; // NOLINT(readability-magic-numbers)
 }
 
 std::size_t
@@ -494,6 +539,24 @@ Cpu::di()
 {
   m_ime = false;
   m_PC += 1;
+  return 1;
+}
+
+std::size_t
+Cpu::ei()
+{
+  m_ime = true;
+  m_PC += 1;
+  return 1;
+}
+
+std::size_t
+Cpu::stop()
+{
+  // STOP is a 2-byte instruction (the second byte is a mandatory padding
+  // byte); real low-power/speed-switch behavior isn't implemented yet since
+  // nothing can wake the CPU from it, so this just skips both bytes.
+  m_PC += 2;
   return 1;
 }
 
@@ -1020,6 +1083,133 @@ std::size_t
 Cpu::jphl()
 {
   m_PC = m_HL;
+  return 1;
+}
+
+std::size_t
+Cpu::ldA16Sp()
+{
+  const auto address = m_mmu.get().readWord(m_PC + 1);
+  m_mmu.get().writeWord(address, m_SP);
+
+  m_PC += 3;
+  return 5; // NOLINT(readability-magic-numbers)
+}
+
+std::size_t
+Cpu::addSpHlE8()
+{
+  constexpr std::uint8_t opcodeAddSp = 0xE8;
+  constexpr unsigned byteOverflow = 0x100;
+
+  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto immediate = m_mmu.get().readByte(m_PC + 1);
+  const auto offset = static_cast<std::int8_t>(immediate);
+
+  // H/C are computed as an unsigned 8-bit add of SP's low byte with the
+  // immediate's raw byte value, not from the signed 16-bit sum below - a
+  // well-known GB CPU quirk shared by ADD SP,e8 and LD HL,SP+e8.
+  const auto lowSp = static_cast<unsigned>(m_SP) & LOW_BYTE_MASK;
+  const auto operand = static_cast<unsigned>(immediate);
+  unsigned flags = 0;
+  if (((lowSp & NIBBLE_MASK) + (operand & NIBBLE_MASK)) > NIBBLE_MASK) {
+    flags |= static_cast<unsigned>(Flag::HalfCarry);
+  }
+  if ((lowSp + operand) >= byteOverflow) {
+    flags |= static_cast<unsigned>(Flag::Carry);
+  }
+
+  const auto result =
+    static_cast<std::uint16_t>(static_cast<int>(m_SP) + offset);
+  if (opcode == opcodeAddSp) {
+    m_SP = result;
+  } else {
+    m_HL = result;
+  }
+
+  // Z and N are always cleared; A is untouched by either opcode.
+  m_AF = static_cast<std::uint16_t>(
+    (static_cast<unsigned>(m_AF) & HIGH_BYTE_MASK) | flags);
+
+  m_PC += 2;
+  return opcode == opcodeAddSp ? 4 : 3; // NOLINT(readability-magic-numbers)
+}
+
+std::size_t
+Cpu::ldSpHl()
+{
+  m_SP = m_HL;
+  m_PC += 1;
+  return 2;
+}
+
+std::size_t
+Cpu::daaCplScfCcf()
+{
+  constexpr std::uint8_t opDaa = 0x27;
+  constexpr std::uint8_t opCpl = 0x2F;
+  constexpr std::uint8_t opScf = 0x37;
+  constexpr unsigned daaAddHalf = 0x06;
+  constexpr unsigned daaAddFull = 0x60;
+  constexpr unsigned daaLowNibbleThreshold = 0x09;
+  constexpr unsigned daaFullThreshold = 0x99;
+
+  const auto opcode = m_mmu.get().readByte(m_PC);
+  const bool subtractSet =
+    (m_AF & static_cast<std::uint16_t>(Flag::Subtract)) != 0;
+  const bool halfCarrySet =
+    (m_AF & static_cast<std::uint16_t>(Flag::HalfCarry)) != 0;
+  const bool carrySet = (m_AF & static_cast<std::uint16_t>(Flag::Carry)) != 0;
+  const auto zeroFlagBits =
+    static_cast<unsigned>(m_AF) & static_cast<unsigned>(Flag::Zero);
+
+  unsigned flags = 0;
+
+  if (opcode == opDaa) {
+    auto a = static_cast<unsigned>(getR8(REG_A));
+    bool newCarry = carrySet;
+    if (!subtractSet) {
+      if (carrySet || a > daaFullThreshold) {
+        a += daaAddFull;
+        newCarry = true;
+      }
+      if (halfCarrySet || (a & NIBBLE_MASK) > daaLowNibbleThreshold) {
+        a += daaAddHalf;
+      }
+    } else {
+      if (carrySet) {
+        a -= daaAddFull;
+      }
+      if (halfCarrySet) {
+        a -= daaAddHalf;
+      }
+    }
+    setR8(REG_A, static_cast<std::uint8_t>(a));
+    flags = static_cast<unsigned>(m_AF) & static_cast<unsigned>(Flag::Subtract);
+    if (static_cast<std::uint8_t>(a) == 0) {
+      flags |= static_cast<unsigned>(Flag::Zero);
+    }
+    if (newCarry) {
+      flags |= static_cast<unsigned>(Flag::Carry);
+    }
+  } else if (opcode == opCpl) {
+    setR8(REG_A, static_cast<std::uint8_t>(~getR8(REG_A)));
+    flags = zeroFlagBits | static_cast<unsigned>(Flag::Subtract) |
+            static_cast<unsigned>(Flag::HalfCarry) |
+            (static_cast<unsigned>(m_AF) & static_cast<unsigned>(Flag::Carry));
+  } else if (opcode == opScf) {
+    flags = zeroFlagBits | static_cast<unsigned>(Flag::Carry);
+  } else { // CCF
+    flags = zeroFlagBits;
+    if (!carrySet) {
+      flags |= static_cast<unsigned>(Flag::Carry);
+    }
+  }
+
+  m_AF = static_cast<std::uint16_t>(
+    (static_cast<unsigned>(m_AF) & HIGH_BYTE_MASK) | flags);
+
+  m_PC += 1;
   return 1;
 }
 

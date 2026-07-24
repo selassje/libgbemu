@@ -75,6 +75,14 @@ Mmu::readWord(std::uint16_t address) const
 void
 Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 {
+#ifdef ENABLE_TESTS
+  if (address == 0xFF02 && value == 0x81) { // NOLINT(readability-magic-numbers)
+    const auto serialChar =
+      static_cast<char>(readByte(0xFF01)); // NOLINT(readability-magic-numbers)
+    gSerialOutput += serialChar;
+  }
+#endif
+
   getByteRef(address) = value;
 }
 

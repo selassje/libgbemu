@@ -24,7 +24,8 @@ private:
     Carry = 0x10,
   };
 
-  std::uint16_t m_AF{ 0 };
+  // post-boot-ROM DMG/SGB state: A=0x01, F=Z100
+  std::uint16_t m_AF{ 0x01B0 }; // NOLINT(readability-magic-numbers)
   std::uint16_t m_BC{ 0 };
   std::uint16_t m_DE{ 0 };
   std::uint16_t m_HL{ 0 };
@@ -46,7 +47,7 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   std::size_t nop();
-  std::size_t jpa16();
+  std::size_t jpcc();
   std::size_t retcc();
   std::size_t ldRRd16();
   std::size_t ldRR();
@@ -57,6 +58,8 @@ private:
   std::size_t decr8();
   std::size_t jrcc();
   std::size_t di();
+  std::size_t ei();
+  std::size_t stop();
   std::size_t ldaa16();
   std::size_t ldha8();
   std::size_t callcc();
@@ -69,6 +72,10 @@ private:
   std::size_t rotateA();
   std::size_t addhlr16();
   std::size_t jphl();
+  std::size_t ldA16Sp();
+  std::size_t addSpHlE8();
+  std::size_t ldSpHl();
+  std::size_t daaCplScfCcf();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };

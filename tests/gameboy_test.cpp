@@ -1,4 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include <new>
 
 import std;
 import gbemu;
@@ -63,11 +65,80 @@ TEST_CASE("06-ld r,r", "[GameBoy]")
   REQUIRE(result.has_value());
 
   result =
-    runFor(std::chrono::milliseconds(5000), // NOLINT(readability-magic-numbers)
+    runFor(std::chrono::milliseconds(1000), // NOLINT(readability-magic-numbers)
            gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
   REQUIRE(result.has_value());
+  REQUIRE_THAT(gbemu::gSerialOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
+}
+
+TEST_CASE("04-op r,imm", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
+                      "individual" / "04-op r,imm.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  REQUIRE_THAT(gbemu::gSerialOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
+}
+
+TEST_CASE("03-op sp,hl", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
+                      "individual" / "03-op sp,hl.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  REQUIRE_THAT(gbemu::gSerialOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
+}
+
+TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
+                      "cpu_instrs.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(60000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  REQUIRE_THAT(gbemu::gSerialOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
 }
 }
