@@ -40,11 +40,19 @@ private:
     InstructionFun fun = nullptr;
   };
 
+  [[nodiscard]] std::uint8_t getR8(std::uint8_t code) const;
+  void setR8(std::uint8_t code, std::uint8_t value);
+
   std::size_t nop();
   std::size_t jpa16();
   std::size_t retnz();
-  std::size_t ldhln16();
-  std::size_t ldba();
+  std::size_t ldRRd16();
+  std::size_t ldRR();
+  std::size_t ldRd8();
+  std::size_t ldhlia();
+  std::size_t ldbcdea();
+  std::size_t incr8();
+  std::size_t jrcc();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };
