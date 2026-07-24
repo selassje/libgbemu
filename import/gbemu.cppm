@@ -2,36 +2,27 @@ export module gbemu;
 
 import std;
 
+export import :cpu;
+export import :mmu;
+
 export namespace gbemu {
-
-inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
-
-enum class RomLoadError : std::uint8_t
-{
-  BadRomSize,
-};
 
 class GameBoy
 {
 public:
-  static std::expected<GameBoy, RomLoadError> create(
-    std::span<const std::uint8_t> rom)
+  GameBoy()
+    : m_cpu(m_mmu)
   {
-    if (rom.size() < MIN_ROM_SIZE) {
-      return std::unexpected(RomLoadError::BadRomSize);
-    }
-    return GameBoy{ rom };
   }
 
-  [[nodiscard]] std::size_t romSize() const { return m_rom.size(); }
+  [[nodiscard]] std::expected<void, std::string> loadRom(
+    std::span<const std::uint8_t> rom);
+
+  std::expected<void, std::string> runNextFrame();
 
 private:
-  explicit GameBoy(std::span<const std::uint8_t> rom)
-    : m_rom(rom.begin(), rom.end())
-  {
-  }
-
-  std::vector<std::uint8_t> m_rom;
+  Mmu m_mmu;
+  Cpu m_cpu;
 };
 
 }

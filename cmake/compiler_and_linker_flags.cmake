@@ -40,7 +40,8 @@ function(setup_compiler_warnings TARGET)
       target_compile_options(
         ${TARGET}
         PRIVATE -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter
-                -Wno-unused-lambda-capture -Wno-unused-but-set-variable)
+                -Wno-unused-lambda-capture -Wno-unused-but-set-variable
+                -Wno-unused-private-field)
     endif()
 
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" AND NOT ${ENABLE_CLANG_TIDY})
@@ -55,5 +56,11 @@ function(setup_std_lib TARGET)
   if(ENABLE_LIBCXX AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
     target_compile_options(${TARGET} PRIVATE -stdlib=libc++)
     target_link_options(${TARGET} PRIVATE -stdlib=libc++)
+  endif()
+endfunction()
+
+function(setup_tests_flags TARGET)
+  if(ENABLE_TESTS)
+    target_compile_definitions(${TARGET} PRIVATE ENABLE_TESTS)
   endif()
 endfunction()
