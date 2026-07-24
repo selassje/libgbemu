@@ -15,6 +15,13 @@ setup_msvc_analysis(gbemu-tests)
 setup_coverage_report_flags(gbemu-tests)
 setup_std_lib(gbemu-tests)
 
+if(ENABLE_MSVC_ANALYSIS)
+  # Test cases construct gbemu::GameBoy (which owns the ~58KB Mmu memory
+  # map) on the stack, tripping C6262. That's fine for test binaries.
+  set_source_files_properties(gameboy_test.cpp PROPERTIES COMPILE_OPTIONS
+                                                            "/wd6262")
+endif()
+
 include(Catch)
 if(ENABLE_COVERAGE_REPORT)
   # Catch2's test discovery runs gbemu-tests once per TEST_CASE, all from the
