@@ -30,6 +30,7 @@ private:
   std::uint16_t m_HL{ 0 };
   std::uint16_t m_SP{ 0 };
   std::uint16_t m_PC{ 0x100 };
+  bool m_ime{ false };
 
   std::reference_wrapper<Mmu> m_mmu;
 
@@ -42,17 +43,32 @@ private:
 
   [[nodiscard]] std::uint8_t getR8(std::uint8_t code) const;
   void setR8(std::uint8_t code, std::uint8_t value);
+  void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   std::size_t nop();
   std::size_t jpa16();
-  std::size_t retnz();
+  std::size_t retcc();
   std::size_t ldRRd16();
   std::size_t ldRR();
   std::size_t ldRd8();
   std::size_t ldhlia();
   std::size_t ldbcdea();
   std::size_t incr8();
+  std::size_t decr8();
   std::size_t jrcc();
+  std::size_t di();
+  std::size_t ldaa16();
+  std::size_t ldha8();
+  std::size_t callcc();
+  std::size_t pushr16();
+  std::size_t popr16();
+  std::size_t incdecr16();
+  std::size_t aluR8();
+  std::size_t aluD8();
+  std::size_t cbPrefixed();
+  std::size_t rotateA();
+  std::size_t addhlr16();
+  std::size_t jphl();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };

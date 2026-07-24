@@ -63,7 +63,8 @@ Mmu::readByte(std::uint16_t address) const
   return self.getByteRef(address);
 }
 
-std::uint16_t Mmu::readWord(std::uint16_t address) const
+std::uint16_t
+Mmu::readWord(std::uint16_t address) const
 {
   const auto lowByte = readByte(address);
   const auto highByte = readByte(address + 1);
@@ -77,11 +78,20 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   getByteRef(address) = value;
 }
 
+void
+Mmu::writeWord(std::uint16_t address, std::uint16_t value)
+{
+  writeByte(address, static_cast<std::uint8_t>(value));
+  writeByte(static_cast<std::uint16_t>(address + 1),
+            static_cast<std::uint8_t>(static_cast<unsigned>(value) >> 8U));
+}
+
 std::expected<void, std::string>
 Mmu::loadRom(std::span<const std::uint8_t> rom)
 {
   if (rom.size() < MIN_ROM_SIZE) {
-    return std::unexpected("ROM size is too small. Must be at least 0x150 bytes.");	
+    return std::unexpected(
+      "ROM size is too small. Must be at least 0x150 bytes.");
   }
   m_rom.assign(rom.begin(), rom.end());
   return {};

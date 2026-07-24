@@ -63,7 +63,7 @@ TEST_CASE("06-ld r,r", "[GameBoy]")
   REQUIRE(result.has_value());
 
   result =
-    runFor(std::chrono::milliseconds(100), // NOLINT(readability-magic-numbers)
+    runFor(std::chrono::milliseconds(5000), // NOLINT(readability-magic-numbers)
            gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());

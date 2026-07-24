@@ -17,6 +17,7 @@ public:
   [[nodiscard]] std::uint8_t readByte(std::uint16_t address) const;
   [[nodiscard]] std::uint16_t readWord(std::uint16_t address) const;
   void writeByte(std::uint16_t address, std::uint8_t value);
+  void writeWord(std::uint16_t address, std::uint16_t value);
 
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
