@@ -133,9 +133,7 @@ Cpu::setR8(std::uint8_t code, std::uint8_t value)
 }
 
 std::size_t
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
-Cpu::nop() // must stay non-static: &Cpu::nop has to match InstructionFun's
-           // (Cpu::*)() type, shared by every other (stateful) opcode
+Cpu::nop()
 {
   m_PC += 1;
   return 1;
