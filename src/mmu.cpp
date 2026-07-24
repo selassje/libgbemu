@@ -39,8 +39,7 @@ Mmu::getByteRef(std::uint16_t address)
   }
 
   if (address < 0xFF00) { // NOLINT(readability-magic-numbers)
-    return const_cast<    // NOLINT(cppcoreguidelines-pro-type-const-cast)
-      std::uint8_t&>(M_UNUSABLE);
+    return m_unusable;
   }
 
   if (address < 0xFF80) {             // NOLINT(readability-magic-numbers)
@@ -50,7 +49,7 @@ Mmu::getByteRef(std::uint16_t address)
   if (address < 0xFFFF) {               // NOLINT(readability-magic-numbers)
     return m_hram.at(address - 0xFF80); // NOLINT(readability-magic-numbers)
   }
-  return m_InterruptEnableRegister;
+  return m_interruptEnableRegister;
 }
 
 std::uint8_t
@@ -68,6 +67,16 @@ void
 Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 {
   getByteRef(address) = value;
+}
+
+std::expected<void, RomLoadError>
+Mmu::loadRom(std::span<const std::uint8_t> rom)
+{
+  if (rom.size() < MIN_ROM_SIZE) {
+    return std::unexpected(RomLoadError::BadRomSize);
+  }
+  m_rom.assign(rom.begin(), rom.end());
+  return {};
 }
 
 };

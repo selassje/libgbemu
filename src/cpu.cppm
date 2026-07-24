@@ -6,6 +6,10 @@ namespace gbemu {
 
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
+public:
+  Cpu() = default;
+
+private:
   enum class Flag : std::uint8_t
   {
     Zero = 0x80,
