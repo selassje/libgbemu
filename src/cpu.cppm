@@ -44,6 +44,7 @@ private:
   std::size_t jpa16();
   std::size_t retnz();
   std::size_t ldhln16();
+  std::size_t ldba();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };

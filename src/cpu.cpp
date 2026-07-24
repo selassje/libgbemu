@@ -8,6 +8,7 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   result.at(0xC3) = { &Cpu::jpa16 };   // NOLINT(readability-magic-numbers)
   result.at(0xC0) = { &Cpu::retnz };   // NOLINT(readability-magic-numbers)
   result.at(0x21) = { &Cpu::ldhln16 }; // NOLINT(readability-magic-numbers)
+  result.at(0x47) = { &Cpu::ldba }; // NOLINT(readability-magic-numbers)
   return result;
 }();
 
@@ -45,6 +46,13 @@ Cpu::ldhln16()
   m_HL = m_mmu.get().readWord(m_PC + 1);
   m_PC += 3;
   return 3;
+}
+
+std::size_t Cpu::ldba()
+{
+  m_BC = m_AF;
+  m_PC += 1;
+  return 1;
 }
 
 std::expected<void, std::string>
