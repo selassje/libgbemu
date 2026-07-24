@@ -11,10 +11,17 @@ if(DEFINED CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
   get_filename_component(CONAN_OUTPUT_DIR "${CMAKE_TOOLCHAIN_FILE}" DIRECTORY)
   get_filename_component(CMAKE_BIN_DIR "${CMAKE_COMMAND}" DIRECTORY)
 
+  # Multi-config generators (e.g. the Visual Studio preset) don't set
+  # CMAKE_BUILD_TYPE at all; Debug remains the right default for those.
+  set(CONAN_BUILD_TYPE "Debug")
+  if(CMAKE_BUILD_TYPE)
+    set(CONAN_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  endif()
+
   set(CONAN_INSTALL_ARGS
       --build=missing
       -s
-      build_type=Debug
+      build_type=${CONAN_BUILD_TYPE}
       -of
       "${CONAN_OUTPUT_DIR}"
       # We drive CMake ourselves via our own explicit CMakePresets.json; without

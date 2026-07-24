@@ -175,6 +175,42 @@
       }
     },
     {
+      "name": "release_ninja_gcc",
+      "displayName": "release (Ninja, gcc)",
+      "inherits": "dev_linux",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/release_ninja_gcc/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/release_ninja_gcc/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "ON"
+      },
+      "environment": {
+        "CXX": "g++",
+        "CC": "gcc"
+      }
+    },
+    {
+      "name": "release_ninja_clang_linux",
+      "displayName": "release (Ninja, clang, libc++, Linux)",
+      "inherits": "dev_linux",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/release_ninja_clang_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/release_ninja_clang_linux/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "ON",
+        "ENABLE_LIBCXX": "ON",
+        "CMAKE_CXX_FLAGS": "-stdlib=libc++"
+      },
+      "environment": {
+        "CXX": "clang++",
+        "CC": "clang"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
       "inherits": "dev_windows",
@@ -242,6 +278,14 @@
     {
       "name": "dev_ninja_clang_tidy_coverage_linux",
       "configurePreset": "dev_ninja_clang_tidy_coverage_linux"
+    },
+    {
+      "name": "release_ninja_gcc",
+      "configurePreset": "release_ninja_gcc"
+    },
+    {
+      "name": "release_ninja_clang_linux",
+      "configurePreset": "release_ninja_clang_linux"
     },
     {
       "name": "dev_vs_msvc",
@@ -315,6 +359,16 @@
       "name": "dev_ninja_clang_tidy_coverage_linux",
       "inherits": "default",
       "configurePreset": "dev_ninja_clang_tidy_coverage_linux"
+    },
+    {
+      "name": "release_ninja_gcc",
+      "inherits": "default",
+      "configurePreset": "release_ninja_gcc"
+    },
+    {
+      "name": "release_ninja_clang_linux",
+      "inherits": "default",
+      "configurePreset": "release_ninja_clang_linux"
     },
     {
       "name": "dev_vs_msvc",
