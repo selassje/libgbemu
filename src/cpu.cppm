@@ -43,6 +43,7 @@ private:
   std::expected<std::size_t, std::string> nop();
   std::expected<std::size_t, std::string> jpa16();
   std::expected<std::size_t, std::string> retnz();
+  std::expected<std::size_t, std::string> ldhln16();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };

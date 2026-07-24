@@ -7,6 +7,7 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   result.at(0x00) = { &Cpu::nop };
   result.at(0xC3) = { &Cpu::jpa16 }; // NOLINT(readability-magic-numbers)
   result.at(0xC0) = { &Cpu::retnz }; // NOLINT(readability-magic-numbers)
+  result.at(0x21) = { &Cpu::ldhln16 }; // NOLINT(readability-magic-numbers)
   return result;
 }();
 
@@ -42,6 +43,17 @@ Cpu::retnz()
   }
   m_PC += 1;
   return 2;
+}
+
+std::expected<std::size_t, std::string>
+Cpu::ldhln16()
+{
+  const auto lowByte = m_mmu.get().readByte(m_PC + 1);
+  const auto highByte = m_mmu.get().readByte(m_PC + 2);
+  m_HL = static_cast<std::uint16_t>((static_cast<unsigned>(highByte) << 8U) |
+                                    static_cast<unsigned>(lowByte));
+  m_PC += 3;
+  return 3;
 }
 
 std::expected<void, std::string>
