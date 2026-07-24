@@ -49,6 +49,7 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   std::size_t handleInterrupts();
+  void handleTimer();
 
   std::size_t nop();
   std::size_t jpcc();

@@ -163,12 +163,22 @@ constexpr std::uint8_t NIBBLE_MASK = 0x0F;
 constexpr std::uint16_t IO_REGISTERS_BASE = 0xFF00;
 constexpr std::uint16_t FLAGS_UNUSED_BITS_MASK = 0xFFF0;
 constexpr std::uint16_t NUM_INTERRUPTS = 5;
+constexpr std::uint16_t NUM_TIMER_FREQS = 4;
 constexpr std::uint16_t INTERRUPT_FLAGS_ADDR = 0xFF0F;
 constexpr std::uint16_t INTERRUPT_ENABLE_ADDR = 0xFFFF;
+constexpr std::uint16_t TAC_ADDR = 0xFF07;
+constexpr std::uint16_t TIMER_MODULO_ADDR = 0xFF06;
+constexpr std::uint16_t TIMER_ADDR = 0xFF05;
 
 constexpr std::array<std::uint16_t, NUM_INTERRUPTS>
   INTERRUPT_VECTORS = { 0x40, 0x48, 0x50, 0x58, 0x60 };
-}
+};
+
+constexpr std::array<std::uint16_t, NUM_TIMER_FREQS> TIMER_FREQS = { 256,
+                                                                     4,
+                                                                     16,
+                                                                     64 };
+
 std::uint8_t
 Cpu::getR8(std::uint8_t code) const
 {
@@ -1307,9 +1317,37 @@ Cpu::handleInterrupts()
   return 0;
 }
 
+void
+Cpu::handleTimer()
+{
+  const auto tac = m_mmu.get().readByte(TAC_ADDR);
+  const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
+  const auto timerFrequencyBits =
+    static_cast<std::uint8_t>(static_cast<unsigned>(tac) & 0x03U);
+
+  if (timerEnabled) {
+    const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
+    if (m_cycles % timerFrequency == 0) {
+      const auto tima = m_mmu.get().readByte(TIMER_ADDR);
+      if (tima == 0xFF) { // NOLINT(readability-magic-numbers)
+        m_mmu.get().writeByte(TIMER_ADDR,
+                              m_mmu.get().readByte(TIMER_MODULO_ADDR));
+        const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
+        m_mmu.get().writeByte(INTERRUPT_FLAGS_ADDR,
+                              static_cast<std::uint8_t>(
+                                static_cast<unsigned>(interruptFlags) |
+                                0x04U)); // NOLINT(readability-magic-numbers)
+      } else {
+        m_mmu.get().writeByte(TIMER_ADDR, tima + 1);
+      }
+    }
+  }
+}
+
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
+  handleTimer();
   const auto interruptCycles = handleInterrupts();
   const auto opcode = m_mmu.get().readByte(m_PC);
   const auto& instruction = INSTRUCTIONS.at(opcode);
