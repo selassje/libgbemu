@@ -274,10 +274,6 @@ TEST_CASE("11-op a,(hl)", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
-// Both disabled until real interrupt dispatch (IE/IF handling, timer
-// peripheral, EI's delayed-enable) is implemented - see
-// gb_hardware_and_design_decisions memory for the investigation.
-/*
 TEST_CASE("02-interrupts", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
@@ -300,6 +296,14 @@ TEST_CASE("02-interrupts", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
+// Disabled: passes every individual check (confirmed hundreds of "ok"
+// entries with zero failures across a 1-hour simulated run) but never
+// reaches a final "Passed"/failure-count summary - past a certain point the
+// same block of output repeats verbatim, suggesting the ROM (whose own
+// dispatcher source blargg doesn't ship) is stuck in a loop our emulator
+// doesn't yet satisfy the exit condition for. See
+// gb_hardware_and_design_decisions memory for the investigation.
+
 TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
@@ -321,5 +325,5 @@ TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
                Catch::Matchers::ContainsSubstring("Passed"));
   gbemu::gSerialOutput.clear();
 }
-*/
+
 }
