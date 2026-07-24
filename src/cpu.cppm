@@ -38,11 +38,11 @@ private:
   struct Instruction
   {
     InstructionFun fun = nullptr;
-    std::uint16_t length = 0;
   };
 
   std::expected<std::size_t, std::string> nop();
   std::expected<std::size_t, std::string> jpa16();
+  std::expected<std::size_t, std::string> retnz();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };
