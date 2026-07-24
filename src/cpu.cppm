@@ -32,8 +32,10 @@ private:
   std::uint16_t m_SP{ 0 };
   std::uint16_t m_PC{ 0x100 };
   bool m_ime{ false };
+  bool m_halted{ false };
 
   std::size_t m_cycles{ 0 };
+  std::size_t m_lastTimerCyclesIncrement{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
 
@@ -50,8 +52,10 @@ private:
 
   std::size_t handleInterrupts();
   void handleTimer();
+  [[nodiscard]] bool interruptRequestPending() const;
 
   std::size_t nop();
+  std::size_t halt();
   std::size_t jpcc();
   std::size_t retcc();
   std::size_t ldRRd16();

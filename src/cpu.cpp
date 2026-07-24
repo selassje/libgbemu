@@ -38,6 +38,7 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
       result.at(opcode) = { &Cpu::ldRR };
     }
   }
+  result.at(halt) = { &Cpu::halt };
   constexpr std::size_t ldRd8First = 0x06;
   constexpr std::size_t ldRd8Last = 0x3E;
   constexpr std::size_t ldRd8Step = 0x08;
@@ -247,6 +248,14 @@ Cpu::setR8(std::uint8_t code, std::uint8_t value)
 std::size_t
 Cpu::nop()
 {
+  m_PC += 1;
+  return 1;
+}
+
+std::size_t
+Cpu::halt()
+{
+  m_halted = true;
   m_PC += 1;
   return 1;
 }
@@ -1281,6 +1290,15 @@ Cpu::daaCplScfCcf()
   return 1;
 }
 
+bool
+Cpu::interruptRequestPending() const
+{
+  const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
+  const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
+  return (static_cast<unsigned>(interruptFlags) &
+          static_cast<unsigned>(interruptEnable)) != 0;
+}
+
 std::size_t
 Cpu::handleInterrupts()
 {
@@ -1327,7 +1345,9 @@ Cpu::handleTimer()
 
   if (timerEnabled) {
     const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
-    if (m_cycles % timerFrequency == 0) {
+    const auto cyclesSinceLastUpdate = m_cycles - m_lastTimerCyclesIncrement;
+    if (cyclesSinceLastUpdate >= timerFrequency) {
+      m_lastTimerCyclesIncrement += timerFrequency;
       const auto tima = m_mmu.get().readByte(TIMER_ADDR);
       if (tima == 0xFF) { // NOLINT(readability-magic-numbers)
         m_mmu.get().writeByte(TIMER_ADDR,
@@ -1348,6 +1368,16 @@ std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
   handleTimer();
+
+  if (m_halted) {
+    if (!interruptRequestPending()) {
+      constexpr std::size_t haltIdleCycles = 1;
+      m_cycles += haltIdleCycles;
+      return haltIdleCycles;
+    }
+    m_halted = false;
+  }
+
   const auto interruptCycles = handleInterrupts();
   const auto opcode = m_mmu.get().readByte(m_PC);
   const auto& instruction = INSTRUCTIONS.at(opcode);
