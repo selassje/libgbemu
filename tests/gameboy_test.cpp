@@ -37,17 +37,20 @@ TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
 
 TEST_CASE("06-ld r,r", "[GameBoy]")
 {
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs"
-                       / "individual" / "06-ld r,r.gb");
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
+                      "individual" / "06-ld r,r.gb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
 
   REQUIRE(result.has_value());
 
-  for (int i = 0; i < 100; ++i) { //NOLINT(readability-magic-numbers)
+  for (int i = 0; i < 100; ++i) { // NOLINT(readability-magic-numbers)
     result = gb.runNextInstruction();
+    if (!result.has_value()) {
+      FAIL("Failed to run instruction " + std::to_string(i) + ": " +
+           result.error());
+    }
     REQUIRE(result.has_value());
   }
-
 }

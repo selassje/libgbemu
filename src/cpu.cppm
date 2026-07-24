@@ -32,6 +32,24 @@ private:
   std::uint16_t m_PC{ 0x100 };
 
   std::reference_wrapper<Mmu> m_mmu;
+
+  using InstructionFun = std::expected<std::size_t, std::string> (Cpu::*)();
+
+  struct Instruction
+  {
+    InstructionFun fun = nullptr;
+    std::uint16_t length = 0;
+  };
+
+  std::expected<std::size_t, std::string> nop();
+
+  static const std::array<Instruction, 256> INSTRUCTIONS;
 };
+
+constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
+  std::array<Instruction, 256> result{};
+  result.at(0x00) = { &Cpu::nop, 1 };
+  return result;
+}();
 
 }
