@@ -12,7 +12,16 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
 };
 
 std::expected<void, std::string>
-gbemu::GameBoy::runNextInstruction()
+gbemu::GameBoy::runNextFrame()
 {
-  return m_cpu.runNextInstruction();
+  constexpr std::size_t mCyclesPerFrame = 17556;
+  std::size_t mCycles = 0;
+  while (mCycles < mCyclesPerFrame) {
+    const auto result = m_cpu.runNextInstruction();
+    if (!result) {
+      return std::unexpected(result.error());
+    }
+    mCycles += result.value();
+  }
+  return {};
 }

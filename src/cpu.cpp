@@ -348,7 +348,7 @@ Cpu::jrcc()
   return 2;
 }
 
-std::expected<void, std::string>
+std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
   const auto opcode = m_mmu.get().readByte(m_PC);
@@ -357,9 +357,7 @@ Cpu::runNextInstruction()
     return std::unexpected(
       std::format("Unimplemented opcode: {:#04x}", opcode));
   }
-
-  (this->*instruction.fun)();
-  return {};
+  return (this->*instruction.fun)();
 }
 
 };

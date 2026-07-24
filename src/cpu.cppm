@@ -13,7 +13,7 @@ public:
   {
   }
 
-  std::expected<void, std::string> runNextInstruction();
+  std::expected<std::size_t, std::string> runNextInstruction();
 
 private:
   enum class Flag : std::uint8_t

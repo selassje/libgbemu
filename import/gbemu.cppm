@@ -18,7 +18,7 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
-  std::expected<void, std::string> runNextInstruction();
+  std::expected<void, std::string> runNextFrame();
 
 private:
   Mmu m_mmu;
