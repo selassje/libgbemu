@@ -1,13 +1,17 @@
 export module gbemu:cpu;
 
 import std;
+import :mmu;
 
 namespace gbemu {
 
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
-  Cpu() = default;
+  explicit Cpu(Mmu& mmu)
+    : m_mmu(mmu)
+  {
+  }
 
   std::expected<void, std::string> runNextInstruction();
 
@@ -26,6 +30,8 @@ private:
   std::uint16_t m_HL{ 0 };
   std::uint16_t m_SP{ 0 };
   std::uint16_t m_PC{ 0x100 };
+
+  std::reference_wrapper<Mmu> m_mmu;
 };
 
 }

@@ -10,7 +10,10 @@ export namespace gbemu {
 class GameBoy
 {
 public:
-  GameBoy() = default;
+  GameBoy()
+    : m_cpu(m_mmu)
+  {
+  }
 
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
