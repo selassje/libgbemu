@@ -9,6 +9,8 @@ class Cpu // NOLINT(misc-use-internal-linkage)
 public:
   Cpu() = default;
 
+  std::expected<void, std::string> runNextInstruction();
+
 private:
   enum class Flag : std::uint8_t
   {

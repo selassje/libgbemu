@@ -69,11 +69,11 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   getByteRef(address) = value;
 }
 
-std::expected<void, RomLoadError>
+std::expected<void, std::string>
 Mmu::loadRom(std::span<const std::uint8_t> rom)
 {
   if (rom.size() < MIN_ROM_SIZE) {
-    return std::unexpected(RomLoadError::BadRomSize);
+    return std::unexpected("ROM size is too small. Must be at least 0x150 bytes.");	
   }
   m_rom.assign(rom.begin(), rom.end());
   return {};

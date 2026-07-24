@@ -5,11 +5,6 @@ import std;
 namespace gbemu {
 
 export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
-
-export enum class RomLoadError : std::uint8_t {
-  BadRomSize,
-};
-
 class Mmu // NOLINT(misc-use-internal-linkage)
 {
 public:
@@ -22,7 +17,7 @@ public:
   [[nodiscard]] std::uint8_t readByte(std::uint16_t address) const;
   void writeByte(std::uint16_t address, std::uint8_t value);
 
-  [[nodiscard]] std::expected<void, RomLoadError> loadRom(
+  [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
 private:

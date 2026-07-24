@@ -2,7 +2,7 @@ module gbemu;
 
 namespace gbemu {
 
-[[nodiscard]] std::expected<void, RomLoadError>
+[[nodiscard]] std::expected<void, std::string>
 GameBoy::loadRom(std::span<const std::uint8_t> rom)
 
 {
@@ -10,3 +10,9 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
 }
 
 };
+
+std::expected<void, std::string>
+gbemu::GameBoy::runNextInstruction()
+{
+  return m_cpu.runNextInstruction();
+}

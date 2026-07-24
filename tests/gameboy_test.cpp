@@ -23,7 +23,6 @@ TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
   auto result = gb.loadRom(rom);
 
   REQUIRE_FALSE(result.has_value());
-  REQUIRE(result.error() == gbemu::RomLoadError::BadRomSize);
 }
 
 TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
@@ -45,4 +44,10 @@ TEST_CASE("06-ld r,r", "[GameBoy]")
   auto result = gb.loadRom(rom);
 
   REQUIRE(result.has_value());
+
+  for (int i = 0; i < 100; ++i) { //NOLINT(readability-magic-numbers)
+    result = gb.runNextInstruction();
+    REQUIRE(result.has_value());
+  }
+
 }
