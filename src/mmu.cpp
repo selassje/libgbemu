@@ -63,6 +63,14 @@ Mmu::readByte(std::uint16_t address) const
   return self.getByteRef(address);
 }
 
+std::uint16_t Mmu::readWord(std::uint16_t address) const
+{
+  const auto lowByte = readByte(address);
+  const auto highByte = readByte(address + 1);
+  return static_cast<std::uint16_t>((static_cast<unsigned>(highByte) << 8U) |
+                                    static_cast<unsigned>(lowByte));
+}
+
 void
 Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 {

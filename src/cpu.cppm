@@ -33,17 +33,17 @@ private:
 
   std::reference_wrapper<Mmu> m_mmu;
 
-  using InstructionFun = std::expected<std::size_t, std::string> (Cpu::*)();
+  using InstructionFun = std::size_t (Cpu::*)();
 
   struct Instruction
   {
     InstructionFun fun = nullptr;
   };
 
-  std::expected<std::size_t, std::string> nop();
-  std::expected<std::size_t, std::string> jpa16();
-  std::expected<std::size_t, std::string> retnz();
-  std::expected<std::size_t, std::string> ldhln16();
+  std::size_t nop();
+  std::size_t jpa16();
+  std::size_t retnz();
+  std::size_t ldhln16();
 
   static const std::array<Instruction, 256> INSTRUCTIONS;
 };

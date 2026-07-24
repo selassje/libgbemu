@@ -15,6 +15,7 @@ public:
   Mmu() = default;
 
   [[nodiscard]] std::uint8_t readByte(std::uint16_t address) const;
+  [[nodiscard]] std::uint16_t readWord(std::uint16_t address) const;
   void writeByte(std::uint16_t address, std::uint8_t value);
 
   [[nodiscard]] std::expected<void, std::string> loadRom(
