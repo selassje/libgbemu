@@ -162,8 +162,13 @@ constexpr std::uint16_t HIGH_BYTE_MASK = 0xFF00;
 constexpr std::uint8_t NIBBLE_MASK = 0x0F;
 constexpr std::uint16_t IO_REGISTERS_BASE = 0xFF00;
 constexpr std::uint16_t FLAGS_UNUSED_BITS_MASK = 0xFFF0;
-}
+constexpr std::uint16_t NUM_INTERRUPTS = 5;
+constexpr std::uint16_t INTERRUPT_FLAGS_ADDR = 0xFF0F;
+constexpr std::uint16_t INTERRUPT_ENABLE_ADDR = 0xFFFF;
 
+constexpr std::array<std::uint16_t, NUM_INTERRUPTS>
+  INTERRUPT_VECTORS = { 0x40, 0x48, 0x50, 0x58, 0x60 };
+}
 std::uint8_t
 Cpu::getR8(std::uint8_t code) const
 {
@@ -1266,16 +1271,55 @@ Cpu::daaCplScfCcf()
   return 1;
 }
 
+std::size_t
+Cpu::handleInterrupts()
+{
+  if (!m_ime) {
+    return 0;
+  }
+  const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
+  const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
+  const auto pendingInterrupts =
+    static_cast<std::uint8_t>(static_cast<unsigned>(interruptFlags) &
+                              static_cast<unsigned>(interruptEnable));
+
+  if (pendingInterrupts == 0) {
+    return 0;
+  }
+
+  m_ime = false;
+
+  for (std::uint8_t i = 0; i < NUM_INTERRUPTS; ++i) {
+    const auto interruptBit = static_cast<std::uint8_t>(1U << i);
+    if ((pendingInterrupts & interruptBit) != 0) {
+      m_mmu.get().writeByte(
+        INTERRUPT_FLAGS_ADDR,
+        static_cast<std::uint8_t>(static_cast<unsigned>(interruptFlags) &
+                                  ~static_cast<unsigned>(interruptBit)));
+
+      m_SP -= 2;
+      m_mmu.get().writeWord(m_SP, m_PC);
+      m_PC = INTERRUPT_VECTORS.at(i);
+      m_cycles += 5; // NOLINT(readability-magic-numbers)
+      return 5;      // NOLINT(readability-magic-numbers)
+    }
+  }
+  return 0;
+}
+
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
+  const auto interruptCycles = handleInterrupts();
   const auto opcode = m_mmu.get().readByte(m_PC);
   const auto& instruction = INSTRUCTIONS.at(opcode);
   if (instruction.fun == nullptr) {
     return std::unexpected(
       std::format("Unimplemented opcode: {:#04x}", opcode));
   }
-  return (this->*instruction.fun)();
+  const auto cycles = (this->*instruction.fun)();
+  m_cycles += cycles;
+  return cycles + interruptCycles;
 }
 
 };

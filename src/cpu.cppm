@@ -33,6 +33,8 @@ private:
   std::uint16_t m_PC{ 0x100 };
   bool m_ime{ false };
 
+  std::size_t m_cycles{ 0 };
+
   std::reference_wrapper<Mmu> m_mmu;
 
   using InstructionFun = std::size_t (Cpu::*)();
@@ -45,6 +47,8 @@ private:
   [[nodiscard]] std::uint8_t getR8(std::uint8_t code) const;
   void setR8(std::uint8_t code, std::uint8_t value);
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
+
+  std::size_t handleInterrupts();
 
   std::size_t nop();
   std::size_t jpcc();
