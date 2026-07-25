@@ -5,6 +5,7 @@ import std;
 export import :cpu;
 export import :mmu;
 export import :ppu;
+export import :boot_rom;
 
 export namespace gbemu {
 

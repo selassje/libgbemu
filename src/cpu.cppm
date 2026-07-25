@@ -13,6 +13,12 @@ public:
   {
   }
 
+  // True hardware power-on/reset state (PC=0, SP=0xFFFF, all other
+  // registers/flags zero) - the boot ROM (see :boot_rom) is what brings the
+  // CPU to a real post-boot state by actually executing, the same as on
+  // real hardware; this is not a "seed the post-boot values" shortcut.
+  void reset();
+
   std::expected<std::size_t, std::string> runNextInstruction();
 
 private:
@@ -24,13 +30,12 @@ private:
     Carry = 0x10,
   };
 
-  // post-boot-ROM DMG/SGB state: A=0x01, F=Z100
-  std::uint16_t m_AF{ 0x01B0 }; // NOLINT(readability-magic-numbers)
+  std::uint16_t m_AF{ 0 };
   std::uint16_t m_BC{ 0 };
   std::uint16_t m_DE{ 0 };
   std::uint16_t m_HL{ 0 };
-  std::uint16_t m_SP{ 0 };
-  std::uint16_t m_PC{ 0x100 };
+  std::uint16_t m_SP{ 0xFFFF }; // NOLINT(readability-magic-numbers)
+  std::uint16_t m_PC{ 0 };
   bool m_ime{ false };
   bool m_halted{ false };
 

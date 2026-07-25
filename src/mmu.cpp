@@ -52,9 +52,27 @@ Mmu::getByteRef(std::uint16_t address)
   return m_interruptEnableRegister;
 }
 
+namespace {
+
+constexpr std::uint16_t BOOT_ROM_FIRST_PART_END = 0x100;
+constexpr std::uint16_t BOOT_ROM_SECOND_PART_START = 0x200;
+constexpr std::uint16_t BOOT_ROM_SECOND_PART_END = 0x900;
+constexpr std::uint16_t BOOT_ROM_DISABLE_ADDRESS = 0xFF50;
+
+}
+
 std::uint8_t
 Mmu::readByte(std::uint16_t address) const
 {
+  if (m_bootRomActive) {
+    const bool inFirstPart = address < BOOT_ROM_FIRST_PART_END;
+    const bool inSecondPart = m_bootRom.size() > BOOT_ROM_FIRST_PART_END &&
+                              address >= BOOT_ROM_SECOND_PART_START &&
+                              address < BOOT_ROM_SECOND_PART_END;
+    if (inFirstPart || inSecondPart) {
+      return m_bootRom.at(address);
+    }
+  }
   // Safe: getByteRef() is only ever read through here, never written to, so
   // no actual mutation of a const object can occur regardless of whether
   // *this genuinely refers to a const Mmu.
@@ -83,6 +101,12 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 #endif
 
+  // One-way latch: once disabled, the boot ROM can never be re-mapped, even
+  // by writing 0 afterward - only a power cycle (a fresh Mmu) undoes this.
+  if (address == BOOT_ROM_DISABLE_ADDRESS && value != 0) {
+    m_bootRomActive = false;
+  }
+
   getByteRef(address) = value;
 }
 
@@ -92,6 +116,13 @@ Mmu::writeWord(std::uint16_t address, std::uint16_t value)
   writeByte(address, static_cast<std::uint8_t>(value));
   writeByte(static_cast<std::uint16_t>(address + 1),
             static_cast<std::uint8_t>(static_cast<unsigned>(value) >> 8U));
+}
+
+void
+Mmu::enableBootRom(std::span<const std::uint8_t> bootRom)
+{
+  m_bootRom.assign(bootRom.begin(), bootRom.end());
+  m_bootRomActive = true;
 }
 
 std::expected<void, std::string>

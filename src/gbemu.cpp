@@ -1,12 +1,29 @@
 module gbemu;
 
+namespace {
+
+constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
+constexpr std::uint8_t CGB_FLAG_MASK = 0x80;
+
+}
+
 namespace gbemu {
 
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::loadRom(std::span<const std::uint8_t> rom)
 
 {
-  return m_mmu.loadRom(rom);
+  auto result = m_mmu.loadRom(rom);
+  if (!result) {
+    return result;
+  }
+
+  const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
+  const bool isCgb = (cgbFlag & CGB_FLAG_MASK) != 0;
+  m_mmu.enableBootRom(isCgb ? cgbBootRom() : dmgBootRom());
+  m_cpu.reset();
+
+  return result;
 }
 
 };

@@ -1364,6 +1364,21 @@ Cpu::handleTimer()
   }
 }
 
+void
+Cpu::reset()
+{
+  m_AF = 0;
+  m_BC = 0;
+  m_DE = 0;
+  m_HL = 0;
+  m_SP = 0xFFFF; // NOLINT(readability-magic-numbers)
+  m_PC = 0;
+  m_ime = false;
+  m_halted = false;
+  m_cycles = 0;
+  m_lastTimerCyclesIncrement = 0;
+}
+
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {

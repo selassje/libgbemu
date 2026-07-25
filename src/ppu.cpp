@@ -12,6 +12,9 @@ constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 constexpr std::uint16_t SCX_REGISTER_ADDRESS = 0xFF43;
 constexpr std::uint16_t SCY_REGISTER_ADDRESS = 0xFF42;
 constexpr std::uint16_t LY_REGISTER_ADDRESS = 0xFF44;
+constexpr std::uint16_t IF_REGISTER_ADDRESS = 0xFF0F;
+constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
+constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
 
 }
 
@@ -49,6 +52,12 @@ Ppu::incrementDot()
     m_mmu.get().writeByte(LY_REGISTER_ADDRESS, m_scanline);
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
+      if (m_scanline == FIRST_VBLANK_SCANLINE) {
+        const auto interruptFlags = m_mmu.get().readByte(IF_REGISTER_ADDRESS);
+        m_mmu.get().writeByte(
+          IF_REGISTER_ADDRESS,
+          static_cast<std::uint8_t>(interruptFlags | VBLANK_INTERRUPT_BIT));
+      }
     } else {
       m_mode = Mode::OAMSearch;
     }

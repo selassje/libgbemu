@@ -28,7 +28,11 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
+  void enableBootRom(std::span<const std::uint8_t> bootRom);
+
 private:
+  std::vector<std::uint8_t> m_bootRom;
+  bool m_bootRomActive{ false };
   std::vector<std::uint8_t> m_rom;
   std::array<std::uint8_t, KB16> m_vram{};
   std::array<std::uint8_t, KB8> m_extRam{};
