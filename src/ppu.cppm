@@ -26,6 +26,8 @@ class Ppu // NOLINT(misc-use-internal-linkage)
     std::uint8_t m_scanline{ 0 };
     std::uint16_t m_dot{ 0 };
     Mode m_mode{ Mode::OAMSearch};
+
+    void incrementDot();
 };
 
 };

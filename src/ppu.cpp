@@ -16,7 +16,12 @@ namespace gbemu {
 void
 Ppu::runNextTCycle()
 {
+  incrementDot();
+}
 
+void
+Ppu::incrementDot()
+{
   ++m_dot;
   if (m_dot >= DOTS_PER_SCANLINE) {
     m_dot = 0;
