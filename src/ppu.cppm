@@ -28,6 +28,11 @@ class Ppu // NOLINT(misc-use-internal-linkage)
     Mode m_mode{ Mode::OAMSearch};
 
     void incrementDot();
+
+    void handleHBlank();
+    void handleVBlank();
+    void handleOAMSearch();
+    void handlePixelTransfer();
 };
 
 };

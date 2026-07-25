@@ -16,6 +16,21 @@ namespace gbemu {
 void
 Ppu::runNextTCycle()
 {
+  switch (m_mode) {
+    case Mode::HBlank:
+      handleHBlank();
+      break;
+    case Mode::VBlank:
+      handleVBlank();
+      break;
+    case Mode::OAMSearch:
+      handleOAMSearch();
+      break;
+    case Mode::PixelTransfer:
+      handlePixelTransfer();
+      break;
+  }
+
   incrementDot();
 }
 
@@ -41,4 +56,29 @@ Ppu::incrementDot()
     }
   }
 }
+
+void
+Ppu::handleHBlank() {
+  // HBlank logic can be implemented here
+
+};
+
+void
+Ppu::handleVBlank() {
+  // VBlank logic can be implemented here
+
+};
+
+void
+Ppu::handleOAMSearch() {
+  // OAM Search logic can be implemented here
+
+};
+
+void
+Ppu::handlePixelTransfer() {
+  // Pixel Transfer logic can be implemented here
+
+};
+
 };
