@@ -9,6 +9,10 @@ constexpr std::uint16_t MODE_3_DOTS = 172;
 constexpr std::uint16_t MODE_0_DOTS = 456 - MODE_2_DOTS - MODE_3_DOTS;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
+constexpr std::uint16_t SCX_REGISTER_ADDRESS = 0xFF43;
+constexpr std::uint16_t SCY_REGISTER_ADDRESS = 0xFF42;
+constexpr std::uint16_t LY_REGISTER_ADDRESS = 0xFF44;
+
 }
 
 namespace gbemu {
@@ -40,7 +44,9 @@ Ppu::incrementDot()
   ++m_dot;
   if (m_dot >= DOTS_PER_SCANLINE) {
     m_dot = 0;
+    m_nextPixelXToRender = 0;
     m_scanline = static_cast<std::uint8_t>(m_scanline + 1) % TOTAL_SCANLINES;
+    m_mmu.get().writeByte(LY_REGISTER_ADDRESS, m_scanline);
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
     } else {
