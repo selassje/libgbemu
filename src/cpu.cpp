@@ -1396,7 +1396,7 @@ Cpu::runNextInstruction()
   const auto interruptCycles = handleInterrupts();
 #ifdef ENABLE_TESTS
   {
-    if (true) { //NOLINT(readability-simplify-boolean-expr))
+    if (false) { //NOLINT(readability-simplify-boolean-expr))
       const auto opcodeByte = m_mmu.get().readByte(m_PC);
       const auto a = m_AF >> 8U;
       const auto f = m_AF & 0xFFU;

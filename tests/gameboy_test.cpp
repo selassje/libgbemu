@@ -315,7 +315,7 @@ TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
   REQUIRE(result.has_value());
 
   result = runFor(
-    std::chrono::milliseconds(600000), // NOLINT(readability-magic-numbers)
+    std::chrono::milliseconds(25000), // NOLINT(readability-magic-numbers)
     gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
