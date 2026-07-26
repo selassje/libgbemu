@@ -164,6 +164,7 @@ constexpr std::uint8_t NIBBLE_MASK = 0x0F;
 constexpr std::uint16_t IO_REGISTERS_BASE = 0xFF00;
 constexpr std::uint16_t FLAGS_UNUSED_BITS_MASK = 0xFFF0;
 constexpr std::uint16_t NUM_INTERRUPTS = 5;
+constexpr std::uint8_t INTERRUPT_MASK = 0x1F;
 constexpr std::uint16_t NUM_TIMER_FREQS = 4;
 constexpr std::uint16_t INTERRUPT_FLAGS_ADDR = 0xFF0F;
 constexpr std::uint16_t INTERRUPT_ENABLE_ADDR = 0xFFFF;
@@ -255,8 +256,12 @@ Cpu::nop()
 std::size_t
 Cpu::halt()
 {
-  m_halted = true;
   m_PC += 1;
+  m_halted = true;
+  if (!m_ime && interruptRequestPending()) {
+    m_haltBugPending = true;
+    m_halted = false;
+  }
   return 1;
 }
 
@@ -265,7 +270,7 @@ Cpu::jpcc()
 {
   constexpr std::size_t unconditionalOpcode = 0xC3;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto target = m_mmu.get().readWord(m_PC + 1);
 
   bool takeBranch = true;
@@ -303,7 +308,7 @@ Cpu::retcc()
 {
   constexpr std::size_t unconditionalOpcode = 0xC9;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
 
   bool takeBranch = true;
   if (opcode != unconditionalOpcode) {
@@ -341,7 +346,7 @@ Cpu::retcc()
 std::size_t
 Cpu::ldRRd16()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto r16 =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 4U) & 0x03U);
   const auto value = m_mmu.get().readWord(m_PC + 1);
@@ -368,7 +373,7 @@ Cpu::ldRRd16()
 std::size_t
 Cpu::ldRR()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto dst =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
   const auto src =
@@ -400,7 +405,7 @@ Cpu::ldRR()
 std::size_t
 Cpu::ldRd8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto dst =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
   const auto value = m_mmu.get().readByte(m_PC + 1);
@@ -421,7 +426,7 @@ Cpu::ldRd8()
 std::size_t
 Cpu::ldhlia()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool load = (static_cast<unsigned>(opcode) & 0x08U) != 0;
   const bool decrement = (static_cast<unsigned>(opcode) & 0x10U) != 0;
 
@@ -442,7 +447,7 @@ Cpu::ldhlia()
 std::size_t
 Cpu::ldbcdea()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool useDE = (static_cast<unsigned>(opcode) & 0x10U) != 0;
   const bool load = (static_cast<unsigned>(opcode) & 0x08U) != 0;
   const auto address = useDE ? m_DE : m_BC;
@@ -462,7 +467,7 @@ Cpu::ldbcdea()
 std::size_t
 Cpu::incr8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto reg =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
 
@@ -502,7 +507,7 @@ Cpu::incr8()
 std::size_t
 Cpu::decr8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto reg =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
 
@@ -545,7 +550,7 @@ Cpu::jrcc()
 {
   constexpr std::size_t unconditionalOpcode = 0x18;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto offset = static_cast<std::int8_t>(m_mmu.get().readByte(m_PC + 1));
   m_PC += 2;
 
@@ -582,6 +587,7 @@ std::size_t
 Cpu::di()
 {
   m_ime = false;
+  m_imeEnableDelay = 0;
   m_PC += 1;
   return 1;
 }
@@ -589,7 +595,8 @@ Cpu::di()
 std::size_t
 Cpu::ei()
 {
-  m_ime = true;
+  // EI takes effect only after the instruction following it completes.
+  m_imeEnableDelay = 2; // NOLINT(readability-magic-numbers)
   m_PC += 1;
   return 1;
 }
@@ -600,6 +607,7 @@ Cpu::reti()
   m_PC = m_mmu.get().readWord(m_SP);
   m_SP += 2;
   m_ime = true;
+  m_imeEnableDelay = 0;
   return 4; // NOLINT(readability-magic-numbers)
 }
 
@@ -608,7 +616,7 @@ Cpu::rst()
 {
   constexpr unsigned targetMask = 0x38;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto target =
     static_cast<std::uint16_t>(static_cast<unsigned>(opcode) & targetMask);
   const auto returnAddress = static_cast<std::uint16_t>(m_PC + 1);
@@ -633,7 +641,7 @@ Cpu::stop()
 std::size_t
 Cpu::ldaa16()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool load = (static_cast<unsigned>(opcode) & 0x10U) != 0;
   const auto address = m_mmu.get().readWord(m_PC + 1);
 
@@ -652,7 +660,7 @@ Cpu::ldaa16()
 std::size_t
 Cpu::ldha8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool load = (static_cast<unsigned>(opcode) & 0x10U) != 0;
   const auto offset = m_mmu.get().readByte(m_PC + 1);
   const auto address = static_cast<std::uint16_t>(IO_REGISTERS_BASE + offset);
@@ -672,7 +680,7 @@ Cpu::ldha8()
 std::size_t
 Cpu::ldhca()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool load = (static_cast<unsigned>(opcode) & 0x10U) != 0;
   const auto address =
     static_cast<std::uint16_t>(IO_REGISTERS_BASE + getR8(REG_C));
@@ -694,7 +702,7 @@ Cpu::callcc()
 {
   constexpr std::size_t unconditionalOpcode = 0xCD;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto target = m_mmu.get().readWord(m_PC + 1);
   const auto returnAddress = static_cast<std::uint16_t>(m_PC + 3);
 
@@ -733,7 +741,7 @@ Cpu::callcc()
 std::size_t
 Cpu::pushr16()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto r16 =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 4U) & 0x03U);
 
@@ -763,7 +771,7 @@ Cpu::pushr16()
 std::size_t
 Cpu::popr16()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto r16 =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 4U) & 0x03U);
 
@@ -793,7 +801,7 @@ Cpu::popr16()
 std::size_t
 Cpu::incdecr16()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto r16 =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 4U) & 0x03U);
   const bool decrement = (static_cast<unsigned>(opcode) & 0x08U) != 0;
@@ -918,7 +926,7 @@ Cpu::applyAluOp(std::uint8_t op, std::uint8_t operand)
 std::size_t
 Cpu::aluR8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto op =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
   const auto srcCode =
@@ -943,7 +951,7 @@ Cpu::aluR8()
 std::size_t
 Cpu::aluD8()
 {
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto op =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
   const auto operand = m_mmu.get().readByte(m_PC + 1);
@@ -1088,7 +1096,7 @@ Cpu::rotateA()
   constexpr std::uint8_t signBit = 0x80;
   constexpr std::uint8_t lowBit = 0x01;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto op =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x03U);
   auto value = getR8(REG_A);
@@ -1136,7 +1144,7 @@ Cpu::addhlr16()
   constexpr unsigned bits0To11Mask = 0x0FFF;
   constexpr unsigned word16Overflow = 0x10000;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto r16 =
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 4U) & 0x03U);
 
@@ -1201,7 +1209,7 @@ Cpu::addSpHlE8()
   constexpr std::uint8_t opcodeAddSp = 0xE8;
   constexpr unsigned byteOverflow = 0x100;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto immediate = m_mmu.get().readByte(m_PC + 1);
   const auto offset = static_cast<std::int8_t>(immediate);
 
@@ -1253,7 +1261,7 @@ Cpu::daaCplScfCcf()
   constexpr unsigned daaLowNibbleThreshold = 0x09;
   constexpr unsigned daaFullThreshold = 0x99;
 
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const bool subtractSet =
     (m_AF & static_cast<std::uint16_t>(Flag::Subtract)) != 0;
   const bool halfCarrySet =
@@ -1318,7 +1326,8 @@ Cpu::interruptRequestPending() const
   const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
   const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
   return (static_cast<unsigned>(interruptFlags) &
-          static_cast<unsigned>(interruptEnable)) != 0;
+          static_cast<unsigned>(interruptEnable) &
+          static_cast<unsigned>(INTERRUPT_MASK)) != 0;
 }
 
 void
@@ -1331,7 +1340,8 @@ Cpu::handleInterrupts()
   const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
   const auto pendingInterrupts =
     static_cast<std::uint8_t>(static_cast<unsigned>(interruptFlags) &
-                              static_cast<unsigned>(interruptEnable));
+                              static_cast<unsigned>(interruptEnable) &
+                              static_cast<unsigned>(INTERRUPT_MASK));
 
   if (pendingInterrupts == 0) {
     return;
@@ -1398,6 +1408,9 @@ Cpu::reset()
   m_PC = 0;
   m_ime = false;
   m_halted = false;
+  m_haltBugPending = false;
+  m_currentOpcode = 0;
+  m_imeEnableDelay = 0;
   m_mcycles = 0;
   m_lastTimerMCycles = 0;
 }
@@ -1457,13 +1470,24 @@ Cpu::runNextInstruction()
     }
   }
 #endif
-  const auto opcode = m_mmu.get().readByte(m_PC);
+  m_currentOpcode = m_mmu.get().readByte(m_PC);
+  const auto opcode = m_currentOpcode;
   const auto& instruction = INSTRUCTIONS.at(opcode);
   if (instruction.fun == nullptr) {
     return std::unexpected(
       std::format("Unimplemented opcode: {:#04x}", opcode));
   }
+  if (m_haltBugPending) {
+    --m_PC;
+    m_haltBugPending = false;
+  }
   const auto cycles = (this->*instruction.fun)();
+  if (m_imeEnableDelay != 0) {
+    --m_imeEnableDelay;
+    if (m_imeEnableDelay == 0) {
+      m_ime = true;
+    }
+  }
   m_mcycles += cycles;
   return m_mcycles - lastMCycles;
 }

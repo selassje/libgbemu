@@ -13,7 +13,8 @@ class GameBoy
 {
 public:
   GameBoy()
-    : m_ppu(m_mmu), m_cpu(m_mmu, m_ppu)
+    : m_ppu(m_mmu)
+    , m_cpu(m_mmu, m_ppu)
   {
   }
 

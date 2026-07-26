@@ -71,6 +71,8 @@ constexpr std::uint16_t BOOT_ROM_FIRST_PART_END = 0x100;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_START = 0x200;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_END = 0x900;
 constexpr std::uint16_t BOOT_ROM_DISABLE_ADDRESS = 0xFF50;
+constexpr std::uint16_t INTERRUPT_FLAGS_ADDRESS = 0xFF0F;
+constexpr std::uint8_t INTERRUPT_FLAGS_UNUSED_BITS = 0xE0;
 
 constexpr std::uint16_t MBC1_ROM_BANK_REGISTER_START = 0x2000;
 constexpr std::uint16_t MBC1_RAM_BANK_REGISTER_START = 0x4000;
@@ -98,7 +100,13 @@ Mmu::readByte(std::uint16_t address) const
   // *this genuinely refers to a const Mmu.
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
   auto& self = const_cast<Mmu&>(*this);
-  return self.getByteRef(address);
+  const auto value = self.getByteRef(address);
+  if (address == INTERRUPT_FLAGS_ADDRESS) {
+    return static_cast<std::uint8_t>(
+      static_cast<unsigned>(value) |
+      static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
+  }
+  return value;
 }
 
 std::uint16_t
@@ -119,8 +127,10 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
       static_cast<char>(readByte(0xFF01)); // NOLINT(readability-magic-numbers)
     gSerialOutput += serialChar;
   }
-  constexpr std::uint16_t textOutBase = 0xA004; // NOLINT(readability-magic-numbers)
-  constexpr std::uint16_t textOutEnd = 0xC000;  // NOLINT(readability-magic-numbers)
+  constexpr std::uint16_t textOutBase =
+    0xA004; // NOLINT(readability-magic-numbers)
+  constexpr std::uint16_t textOutEnd =
+    0xC000; // NOLINT(readability-magic-numbers)
   if (address >= textOutBase && address < textOutEnd) {
     const auto offset = static_cast<std::size_t>(address - textOutBase);
     if (gMemoryOutput.size() <= offset) {

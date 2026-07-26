@@ -298,8 +298,8 @@ TEST_CASE("02-interrupts", "[GameBoy]")
 
 TEST_CASE("instr_timing", "[GameBoy]")
 {
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
-                      "instr_timing" / "instr_timing.gb");
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "instr_timing" /
+                      "instr_timing.gb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
@@ -340,10 +340,34 @@ TEST_CASE("mem_timing", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
+TEST_CASE("halt_bug", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "halt_bug.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(50000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  // Diagnostic only for now -- just want to see what this ROM actually
+  // prints, channel unknown yet.
+  REQUIRE_THAT(gbemu::gSerialOutput + "|" + gbemu::gMemoryOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
+  gbemu::gMemoryOutput.clear();
+}
+
 TEST_CASE("mem_timing-2", "[GameBoy]")
 {
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
-                      "mem_timing-2" / "mem_timing.gb");
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "mem_timing-2" /
+                      "mem_timing.gb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);

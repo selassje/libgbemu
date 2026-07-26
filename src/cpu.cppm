@@ -40,6 +40,9 @@ private:
   std::uint16_t m_PC{ 0 };
   bool m_ime{ false };
   bool m_halted{ false };
+  bool m_haltBugPending{ false };
+  std::uint8_t m_currentOpcode{ 0 };
+  std::uint8_t m_imeEnableDelay{ 0 };
 
   std::size_t m_mcycles{ 0 };
   std::size_t m_lastTimerMCycles{ 0 };
