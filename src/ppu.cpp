@@ -6,11 +6,11 @@ constexpr std::uint8_t TOTAL_SCANLINES = 154;
 constexpr std::uint8_t LAST_VISIBLE_SCANLINE = 143;
 constexpr std::uint16_t MODE_2_DOTS = 80;
 constexpr std::uint16_t MODE_3_DOTS = 172;
-constexpr std::uint16_t MODE_0_DOTS = 456 - MODE_2_DOTS - MODE_3_DOTS;
+// constexpr std::uint16_t MODE_0_DOTS = 456 - MODE_2_DOTS - MODE_3_DOTS;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
-constexpr std::uint16_t SCX_REGISTER_ADDRESS = 0xFF43;
-constexpr std::uint16_t SCY_REGISTER_ADDRESS = 0xFF42;
+// constexpr std::uint16_t SCX_REGISTER_ADDRESS = 0xFF43;
+// constexpr std::uint16_t SCY_REGISTER_ADDRESS = 0xFF42;
 constexpr std::uint16_t LY_REGISTER_ADDRESS = 0xFF44;
 constexpr std::uint16_t IF_REGISTER_ADDRESS = 0xFF0F;
 constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
