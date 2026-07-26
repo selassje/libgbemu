@@ -192,10 +192,12 @@ jobs:
           sudo ./llvm.sh $LLVM_VER_UBUNTU all
           sudo update-alternatives --remove-all clang || true
           sudo update-alternatives --remove-all clang-format || true
+          sudo update-alternatives --remove-all llvm-symbolizer || true
           sudo update-alternatives \
             --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU 100 \
             --slave /usr/bin/clang clang /usr/bin/clang-$LLVM_VER_UBUNTU \
-            --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VER_UBUNTU
+            --slave /usr/bin/clang-format clang-format /usr/bin/clang-format-$LLVM_VER_UBUNTU \
+            --slave /usr/bin/llvm-symbolizer llvm-symbolizer /usr/bin/llvm-symbolizer-$LLVM_VER_UBUNTU
           sudo update-alternatives --set clang++ /usr/bin/clang++-$LLVM_VER_UBUNTU
           sudo mkdir -p /lib/share
           sudo ln -s /usr/lib/llvm-$LLVM_VER_UBUNTU/share/libc++ /lib/share

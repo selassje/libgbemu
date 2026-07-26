@@ -383,7 +383,8 @@
       "inherits": "default",
       "configurePreset": "dev_ninja_clang_sanitizers_linux",
       "environment": {
-        "ASAN_OPTIONS": "check_initialization_order=1"
+        "ASAN_OPTIONS": "check_initialization_order=1",
+        "ASAN_SYMBOLIZER_PATH": "/usr/bin/llvm-symbolizer"
       }
     },
     {
