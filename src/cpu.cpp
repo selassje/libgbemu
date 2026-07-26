@@ -1364,7 +1364,6 @@ Cpu::handleTimer()
       }
     }
   }
-  m_lastMCycles = m_mcycles;
 }
 
 void
@@ -1433,6 +1432,7 @@ Cpu::runNextInstruction()
     }
   }
 #endif
+  m_lastMCycles = m_mcycles;
   const auto opcode = m_mmu.get().readByte(m_PC);
   const auto& instruction = INSTRUCTIONS.at(opcode);
   if (instruction.fun == nullptr) {
