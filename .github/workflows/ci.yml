@@ -164,6 +164,7 @@ jobs:
         preset:
           - dev_ninja_clang_linux
           - release_ninja_clang_linux
+          - dev_ninja_clang_sanitizers_linux
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -52,6 +52,23 @@ function(setup_compiler_warnings TARGET)
   endif()
 endfunction()
 
+function(setup_sanitizers TARGET)
+  if(ENABLE_SANITIZERS)
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+      target_compile_options(
+        ${TARGET} PRIVATE -fsanitize=address -fsanitize=undefined
+                          -fno-omit-frame-pointer -fno-optimize-sibling-calls)
+      target_link_options(${TARGET} PRIVATE -fsanitize=address
+                          -fsanitize=undefined)
+    endif()
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+      target_compile_options(${TARGET} PRIVATE -fsanitize=address
+                            -Wno-conversion)
+      target_link_options(${TARGET} PRIVATE -fsanitize=address)
+    endif()
+  endif()
+endfunction()
+
 function(setup_std_lib TARGET)
   if(ENABLE_LIBCXX AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
     target_compile_options(${TARGET} PRIVATE -stdlib=libc++)

@@ -125,6 +125,16 @@
       }
     },
     {
+      "name": "dev_ninja_gcc_asan",
+      "displayName": "development (Ninja, gcc, ASan) - UBSan omitted: pathologically slow combined with GCC's C++20 module compilation",
+      "inherits": "dev_ninja_gcc",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_gcc_asan/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_gcc_asan/build",
+      "cacheVariables": {
+        "ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
       "name": "dev_ninja_clang_linux",
       "displayName": "development (Ninja, clang, libc++, Linux)",
       "inherits": "dev_linux",
@@ -141,6 +151,16 @@
       "environment": {
         "CXX": "clang++",
         "CC": "clang"
+      }
+    },
+    {
+      "name": "dev_ninja_clang_sanitizers_linux",
+      "displayName": "development (Ninja, clang, libc++, ASan+UBSan, Linux)",
+      "inherits": "dev_ninja_clang_linux",
+      "toolchainFile": "${sourceDir}/builds/dev_ninja_clang_sanitizers_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/dev_ninja_clang_sanitizers_linux/build",
+      "cacheVariables": {
+        "ENABLE_SANITIZERS": "ON"
       }
     },
     {
@@ -264,8 +284,16 @@
       "configurePreset": "dev_ninja_gcc"
     },
     {
+      "name": "dev_ninja_gcc_asan",
+      "configurePreset": "dev_ninja_gcc_asan"
+    },
+    {
       "name": "dev_ninja_clang_linux",
       "configurePreset": "dev_ninja_clang_linux"
+    },
+    {
+      "name": "dev_ninja_clang_sanitizers_linux",
+      "configurePreset": "dev_ninja_clang_sanitizers_linux"
     },
     {
       "name": "dev_ninja_clang_tidy_linux",
@@ -341,9 +369,19 @@
       "configurePreset": "dev_ninja_gcc"
     },
     {
+      "name": "dev_ninja_gcc_asan",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_gcc_asan"
+    },
+    {
       "name": "dev_ninja_clang_linux",
       "inherits": "default",
       "configurePreset": "dev_ninja_clang_linux"
+    },
+    {
+      "name": "dev_ninja_clang_sanitizers_linux",
+      "inherits": "default",
+      "configurePreset": "dev_ninja_clang_sanitizers_linux"
     },
     {
       "name": "dev_ninja_clang_tidy_linux",
