@@ -6,11 +6,18 @@ std::uint8_t&
 Mmu::getByteRef(std::uint16_t address)
 {
   if (address < 0x4000) {
-    return m_rom.at(address);
+    std::size_t bank = 0;
+    if (m_usesMbc1 && m_mbc1BankingMode) {
+      bank = static_cast<std::size_t>(m_mbc1BankHigh) << 5U;
+    }
+    const auto bankCount = std::max<std::size_t>(1, m_rom.size() / KB16);
+    bank %= bankCount;
+    return m_rom.at((bank * KB16) + address);
   }
   if (address < 0x8000) {
-    const std::size_t bankedAddress =
-      (m_switchableRomBank * KB16) + (address - KB16);
+    const auto bankCount = std::max<std::size_t>(1, m_rom.size() / KB16);
+    const auto bank = m_switchableRomBank % bankCount;
+    const std::size_t bankedAddress = (bank * KB16) + (address - KB16);
     return m_rom.at(bankedAddress);
   }
   if (address < 0xA000) { // NOLINT(readability-magic-numbers)
@@ -101,6 +108,27 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 #endif
 
+  // Writes in the cartridge ROM area control the memory-bank controller; ROM
+  // itself is never writable. cpu_instrs.gb is an MBC1 cartridge and uses
+  // this register to dispatch each of its individual test banks.
+  if (address < 0x8000) {
+    if (m_usesMbc1) {
+      if (address >= 0x2000 && address < 0x4000) {
+        m_mbc1RomBankLow = value & 0x1F;
+        if (m_mbc1RomBankLow == 0) {
+          m_mbc1RomBankLow = 1;
+        }
+      } else if (address >= 0x4000 && address < 0x6000) {
+        m_mbc1BankHigh = value & 0x03;
+      } else if (address >= 0x6000) {
+        m_mbc1BankingMode = (value & 0x01) != 0;
+      }
+      m_switchableRomBank =
+        (static_cast<std::size_t>(m_mbc1BankHigh) << 5U) | m_mbc1RomBankLow;
+    }
+    return;
+  }
+
   // One-way latch: once disabled, the boot ROM can never be re-mapped, even
   // by writing 0 afterward - only a power cycle (a fresh Mmu) undoes this.
   if (address == BOOT_ROM_DISABLE_ADDRESS && value != 0) {
@@ -133,6 +161,14 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
       "ROM size is too small. Must be at least 0x150 bytes.");
   }
   m_rom.assign(rom.begin(), rom.end());
+  constexpr std::size_t cartridgeTypeAddress = 0x147;
+  const auto cartridgeType = m_rom.at(cartridgeTypeAddress);
+  m_usesMbc1 =
+    cartridgeType == 0x01 || cartridgeType == 0x02 || cartridgeType == 0x03;
+  m_mbc1RomBankLow = 1;
+  m_mbc1BankHigh = 0;
+  m_mbc1BankingMode = false;
+  m_switchableRomBank = 1;
   return {};
 }
 

@@ -41,6 +41,10 @@ private:
   std::array<std::uint8_t, 0x80> m_io{};   // NOLINT(readability-magic-numbers)
   std::array<std::uint8_t, 0x7F> m_hram{}; // NOLINT(readability-magic-numbers)
   std::size_t m_switchableRomBank{ 1 };
+  std::uint8_t m_mbc1RomBankLow{ 1 };
+  std::uint8_t m_mbc1BankHigh{ 0 };
+  bool m_mbc1BankingMode{ false };
+  bool m_usesMbc1{ false };
   std::size_t m_switchableVRamBank{ 0 };
   std::size_t m_switchableWRamBank{ 1 };
   std::uint8_t m_interruptEnableRegister{ 0 };

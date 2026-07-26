@@ -296,14 +296,6 @@ TEST_CASE("02-interrupts", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
-// Disabled: passes every individual check (confirmed hundreds of "ok"
-// entries with zero failures across a 1-hour simulated run) but never
-// reaches a final "Passed"/failure-count summary - past a certain point the
-// same block of output repeats verbatim, suggesting the ROM (whose own
-// dispatcher source blargg doesn't ship) is stuck in a loop our emulator
-// doesn't yet satisfy the exit condition for. See
-// gb_hardware_and_design_decisions memory for the investigation.
-
 TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
@@ -315,7 +307,7 @@ TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
   REQUIRE(result.has_value());
 
   result = runFor(
-    std::chrono::milliseconds(25000), // NOLINT(readability-magic-numbers)
+    std::chrono::milliseconds(55000), // NOLINT(readability-magic-numbers)
     gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
