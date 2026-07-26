@@ -28,7 +28,7 @@ jobs:
           submodules: true
 
       - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: jwlawson/actions-setup-cmake@65b272e1213f99771fbba0c237e0b3312270e0c9 # v1.13
         with:
           cmake-version: ${{ env.CMAKE_VER }}
 
@@ -36,7 +36,7 @@ jobs:
         run: cmake --version
 
       - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
+        uses: seanmiddleditch/gha-setup-ninja@7e868db0f3406270dd46e1dac26c65f621456723 # master
         with:
           version: ${{ env.NINJA_VER }}
 
@@ -53,7 +53,7 @@ jobs:
           Write-Output $process.ExitCode
 
       - name: Setup MSVC dev environment
-        uses: TheMrMilchmann/setup-msvc-dev@v2
+        uses: TheMrMilchmann/setup-msvc-dev@3cc490970305750dc49f92cfc3a5543976a1d2cc # v2
         with:
           arch: x64
           toolset: ${{ env.MSVC_VER }}
@@ -65,11 +65,11 @@ jobs:
 
       - name: Install Conan
         run: |
-          pip install conan
+          pip install --only-binary :all: conan==2.31.1
           conan profile detect --force
 
       - name: Install cmake-format
-        run: pip install cmake-format
+        run: "pip install --only-binary :all: cmake-format==0.6.13"
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
@@ -92,7 +92,7 @@ jobs:
 
       - name: Upload Coverage to Codecov
         if: matrix.preset == 'dev_ninja_clang_tidy_coverage'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5
         with:
           files: builds/dev_ninja_clang_tidy_coverage/build/coverage.lcov
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -114,7 +114,7 @@ jobs:
           submodules: true
 
       - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: jwlawson/actions-setup-cmake@65b272e1213f99771fbba0c237e0b3312270e0c9 # v1.13
         with:
           cmake-version: ${{ env.CMAKE_VER }}
 
@@ -122,7 +122,7 @@ jobs:
         run: cmake --version
 
       - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
+        uses: seanmiddleditch/gha-setup-ninja@7e868db0f3406270dd46e1dac26c65f621456723 # master
         with:
           version: ${{ env.NINJA_VER }}
 
@@ -144,7 +144,7 @@ jobs:
 
       - name: Install Conan
         run: |
-          pip install conan
+          pip install --only-binary :all: conan==2.31.1
           conan profile detect --force
 
       - name: Configure
@@ -173,7 +173,7 @@ jobs:
           submodules: true
 
       - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v1.13
+        uses: jwlawson/actions-setup-cmake@65b272e1213f99771fbba0c237e0b3312270e0c9 # v1.13
         with:
           cmake-version: ${{ env.CMAKE_VER }}
 
@@ -181,13 +181,13 @@ jobs:
         run: cmake --version
 
       - name: Install Ninja
-        uses: seanmiddleditch/gha-setup-ninja@master
+        uses: seanmiddleditch/gha-setup-ninja@7e868db0f3406270dd46e1dac26c65f621456723 # master
         with:
           version: ${{ env.NINJA_VER }}
 
       - name: Install LLVM
         run: |
-          wget https://apt.llvm.org/llvm.sh
+          wget --max-redirect=0 https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh $LLVM_VER_UBUNTU all
           sudo update-alternatives --remove-all clang || true
@@ -211,11 +211,11 @@ jobs:
 
       - name: Install Conan
         run: |
-          pip install conan
+          pip install --only-binary :all: conan==2.31.1
           conan profile detect --force
 
       - name: Install cmake-format
-        run: pip install cmake-format
+        run: "pip install --only-binary :all: cmake-format==0.6.13"
 
       - name: Configure
         run: cmake --preset ${{ matrix.preset }}
