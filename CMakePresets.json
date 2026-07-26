@@ -381,7 +381,10 @@
     {
       "name": "dev_ninja_clang_sanitizers_linux",
       "inherits": "default",
-      "configurePreset": "dev_ninja_clang_sanitizers_linux"
+      "configurePreset": "dev_ninja_clang_sanitizers_linux",
+      "environment": {
+        "ASAN_OPTIONS": "check_initialization_order=1"
+      }
     },
     {
       "name": "dev_ninja_clang_tidy_linux",
