@@ -119,6 +119,15 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
       static_cast<char>(readByte(0xFF01)); // NOLINT(readability-magic-numbers)
     gSerialOutput += serialChar;
   }
+  constexpr std::uint16_t textOutBase = 0xA004; // NOLINT(readability-magic-numbers)
+  constexpr std::uint16_t textOutEnd = 0xC000;  // NOLINT(readability-magic-numbers)
+  if (address >= textOutBase && address < textOutEnd) {
+    const auto offset = static_cast<std::size_t>(address - textOutBase);
+    if (gMemoryOutput.size() <= offset) {
+      gMemoryOutput.resize(offset + 1, '\0');
+    }
+    gMemoryOutput.at(offset) = static_cast<char>(value);
+  }
 #endif
 
   // Writes in the cartridge ROM area control the memory-bank controller; ROM

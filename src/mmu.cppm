@@ -9,6 +9,13 @@ export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
 #ifdef ENABLE_TESTS
 export inline std::string
   gSerialOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// Some test ROMs (e.g. blargg's interrupt_time.gb) report their result via a
+// zero-terminated string written to cartridge RAM at $A004 instead of over
+// the serial port. Captured positionally (indexed by address, not
+// append-on-write) so the interleaved null-terminator writes each character
+// print performs land in the right place.
+export inline std::string
+  gMemoryOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 #endif
 
 class Mmu // NOLINT(misc-use-internal-linkage)
