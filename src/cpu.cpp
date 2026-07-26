@@ -1404,21 +1404,22 @@ Cpu::runNextInstruction()
       const auto c = m_BC & 0xFFU;
       const auto d = m_DE >> 8U;
       const auto e = m_DE & 0xFFU;
-      const char flagsStr[5]= { ((f & 0x80U) != 0u) ? 'Z' : 'z',
-                                  (f & 0x40U) ? 'N' : 'n',
-                                  (f & 0x20U) ? 'H' : 'h',
-                                  (f & 0x10U) ? 'C' : 'c',
-                                  '\0' };
+      const std::array<char, 5> flagsStr = {
+        (f & 0x80U) != 0U ? 'Z' : 'z', (f & 0x40U) != 0U ? 'N' : 'n',
+        (f & 0x20U) != 0U ? 'H' : 'h', (f & 0x10U) != 0U ? 'C' : 'c', '\0'
+      };
+      constexpr std::uint16_t lyRegisterAddress = 0xFF44;
       std::cerr << std::uppercase << std::hex << std::setw(4)
                 << std::setfill('0') << m_PC << "  op=" << std::setw(2)
                 << static_cast<unsigned>(opcodeByte) << "  A:" << std::setw(2)
                 << a << " B:" << std::setw(2) << b << " C:" << std::setw(2)
                 << c << " D:" << std::setw(2) << d << " E:" << std::setw(2)
-                << e << " F:" << flagsStr << " HL:" << std::setw(4) << m_HL
-                << " SP:" << std::setw(4) << m_SP << std::dec << " V:" << std::setw(2)
-                << static_cast<unsigned>(m_mmu.get().readByte(0xFF44))
-                << " H:" << m_ppu.get().dot()
-                << "\n";
+                << e << " F:" << flagsStr.data() << " HL:" << std::setw(4)
+                << m_HL << " SP:" << std::setw(4) << m_SP << std::dec
+                << " V:" << std::setw(2)
+                << static_cast<unsigned>(
+                     m_mmu.get().readByte(lyRegisterAddress))
+                << " H:" << m_ppu.get().dot() << "\n";
     }
   }
 #endif

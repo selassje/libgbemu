@@ -1,5 +1,11 @@
 module gbemu;
 
+namespace {
+
+constexpr unsigned MBC1_BANK_HIGH_SHIFT = 5U;
+
+}
+
 namespace gbemu {
 
 std::uint8_t&
@@ -8,7 +14,7 @@ Mmu::getByteRef(std::uint16_t address)
   if (address < 0x4000) {
     std::size_t bank = 0;
     if (m_usesMbc1 && m_mbc1BankingMode) {
-      bank = static_cast<std::size_t>(m_mbc1BankHigh) << 5U;
+      bank = static_cast<std::size_t>(m_mbc1BankHigh) << MBC1_BANK_HIGH_SHIFT;
     }
     const auto bankCount = std::max<std::size_t>(1, m_rom.size() / KB16);
     bank %= bankCount;
@@ -66,6 +72,13 @@ constexpr std::uint16_t BOOT_ROM_SECOND_PART_START = 0x200;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_END = 0x900;
 constexpr std::uint16_t BOOT_ROM_DISABLE_ADDRESS = 0xFF50;
 
+constexpr std::uint16_t MBC1_ROM_BANK_REGISTER_START = 0x2000;
+constexpr std::uint16_t MBC1_RAM_BANK_REGISTER_START = 0x4000;
+constexpr std::uint16_t MBC1_BANKING_MODE_REGISTER_START = 0x6000;
+constexpr unsigned MBC1_ROM_BANK_MASK = 0x1FU;
+constexpr unsigned MBC1_BANK_HIGH_MASK = 0x03U;
+constexpr unsigned MBC1_BANKING_MODE_MASK = 0x01U;
+
 }
 
 std::uint8_t
@@ -113,18 +126,24 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   // this register to dispatch each of its individual test banks.
   if (address < 0x8000) {
     if (m_usesMbc1) {
-      if (address >= 0x2000 && address < 0x4000) {
-        m_mbc1RomBankLow = value & 0x1F;
+      const auto unsignedValue = static_cast<unsigned>(value);
+      if (address >= MBC1_ROM_BANK_REGISTER_START &&
+          address < MBC1_RAM_BANK_REGISTER_START) {
+        m_mbc1RomBankLow =
+          static_cast<std::uint8_t>(unsignedValue & MBC1_ROM_BANK_MASK);
         if (m_mbc1RomBankLow == 0) {
           m_mbc1RomBankLow = 1;
         }
-      } else if (address >= 0x4000 && address < 0x6000) {
-        m_mbc1BankHigh = value & 0x03;
-      } else if (address >= 0x6000) {
-        m_mbc1BankingMode = (value & 0x01) != 0;
+      } else if (address >= MBC1_RAM_BANK_REGISTER_START &&
+                 address < MBC1_BANKING_MODE_REGISTER_START) {
+        m_mbc1BankHigh =
+          static_cast<std::uint8_t>(unsignedValue & MBC1_BANK_HIGH_MASK);
+      } else if (address >= MBC1_BANKING_MODE_REGISTER_START) {
+        m_mbc1BankingMode = (unsignedValue & MBC1_BANKING_MODE_MASK) != 0;
       }
       m_switchableRomBank =
-        (static_cast<std::size_t>(m_mbc1BankHigh) << 5U) | m_mbc1RomBankLow;
+        (static_cast<std::size_t>(m_mbc1BankHigh) << MBC1_BANK_HIGH_SHIFT) |
+        m_mbc1RomBankLow;
     }
     return;
   }
