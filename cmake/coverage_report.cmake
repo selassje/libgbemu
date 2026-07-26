@@ -55,6 +55,13 @@ function(setup_coverage_report_target)
         -instr-profile=${CMAKE_BINARY_DIR}/coverage.profdata
         -ignore-filename-regex=tests -format=lcov >
         ${CMAKE_BINARY_DIR}/coverage.lcov
+      # Clear raw profiles *after* this report is generated, not before -
+      # otherwise the next invocation would start clean, but this one would
+      # have wiped out the very files it needs to merge. Leaving them around
+      # would instead make every future report cumulative across however many
+      # unrelated test runs happened since the last generate-coverage-report,
+      # rather than reflecting just whatever ran since this one.
+      COMMAND ${CMAKE_COMMAND} -E rm -f ${CMAKE_BINARY_DIR}/coverage/*.profraw
       COMMENT
         "HTML coverage report: ${CMAKE_BINARY_DIR}/coverage-html/index.html")
   endif()
