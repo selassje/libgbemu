@@ -70,8 +70,6 @@ namespace {
 constexpr std::uint16_t BOOT_ROM_FIRST_PART_END = 0x100;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_START = 0x200;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_END = 0x900;
-constexpr std::uint16_t BOOT_ROM_DISABLE_ADDRESS = 0xFF50;
-constexpr std::uint16_t INTERRUPT_FLAGS_ADDRESS = 0xFF0F;
 constexpr std::uint8_t INTERRUPT_FLAGS_UNUSED_BITS = 0xE0;
 
 constexpr std::uint16_t MBC1_ROM_BANK_REGISTER_START = 0x2000;
@@ -101,7 +99,7 @@ Mmu::readByte(std::uint16_t address) const
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
   auto& self = const_cast<Mmu&>(*this);
   const auto value = self.getByteRef(address);
-  if (address == INTERRUPT_FLAGS_ADDRESS) {
+  if (address == regs::IF) {
     return static_cast<std::uint8_t>(
       static_cast<unsigned>(value) |
       static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
@@ -169,7 +167,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 
   // One-way latch: once disabled, the boot ROM can never be re-mapped, even
   // by writing 0 afterward - only a power cycle (a fresh Mmu) undoes this.
-  if (address == BOOT_ROM_DISABLE_ADDRESS && value != 0) {
+  if (address == regs::BOOT_ROM_DISABLE && value != 0) {
     m_bootRomActive = false;
   }
 

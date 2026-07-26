@@ -8,11 +8,8 @@ constexpr std::uint16_t MODE_2_DOTS = 80;
 constexpr std::uint16_t MODE_3_DOTS = 172;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
-constexpr std::uint16_t LY_REGISTER_ADDRESS = 0xFF44;
-constexpr std::uint16_t IF_REGISTER_ADDRESS = 0xFF0F;
 constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
 constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
-constexpr std::uint16_t LCDC_REGISTER_ADDRESS = 0xFF40;
 constexpr std::uint8_t LCD_ENABLE_BIT = 0x80;
 
 }
@@ -26,7 +23,7 @@ Ppu::runNextTCycle()
   // no dot/scanline/mode advancement, no interrupts. LY stays wherever it
   // was left (0 at boot, since the CPU/PPU/MMU all reset to zero) until the
   // boot ROM (or a game) explicitly enables the LCD.
-  if ((m_mmu.get().readByte(LCDC_REGISTER_ADDRESS) & LCD_ENABLE_BIT) == 0) {
+  if ((m_mmu.get().readByte(regs::LCDC) & LCD_ENABLE_BIT) == 0) {
     return;
   }
 
@@ -56,13 +53,13 @@ Ppu::incrementDot()
     m_dot = 0;
     m_nextPixelXToRender = 0;
     m_scanline = static_cast<std::uint8_t>(m_scanline + 1) % TOTAL_SCANLINES;
-    m_mmu.get().writeByte(LY_REGISTER_ADDRESS, m_scanline);
+    m_mmu.get().writeByte(regs::LY, m_scanline);
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
       if (m_scanline == FIRST_VBLANK_SCANLINE) {
-        const auto interruptFlags = m_mmu.get().readByte(IF_REGISTER_ADDRESS);
+        const auto interruptFlags = m_mmu.get().readByte(regs::IF);
         m_mmu.get().writeByte(
-          IF_REGISTER_ADDRESS,
+          regs::IF,
           static_cast<std::uint8_t>(interruptFlags | VBLANK_INTERRUPT_BIT));
       }
     } else {

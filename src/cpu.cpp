@@ -166,11 +166,6 @@ constexpr std::uint16_t FLAGS_UNUSED_BITS_MASK = 0xFFF0;
 constexpr std::uint16_t NUM_INTERRUPTS = 5;
 constexpr std::uint8_t INTERRUPT_MASK = 0x1F;
 constexpr std::uint16_t NUM_TIMER_FREQS = 4;
-constexpr std::uint16_t INTERRUPT_FLAGS_ADDR = 0xFF0F;
-constexpr std::uint16_t INTERRUPT_ENABLE_ADDR = 0xFFFF;
-constexpr std::uint16_t TAC_ADDR = 0xFF07;
-constexpr std::uint16_t TIMER_MODULO_ADDR = 0xFF06;
-constexpr std::uint16_t TIMER_ADDR = 0xFF05;
 
 constexpr std::array<std::uint16_t, NUM_INTERRUPTS>
   INTERRUPT_VECTORS = { 0x40, 0x48, 0x50, 0x58, 0x60 };
@@ -1323,8 +1318,8 @@ Cpu::daaCplScfCcf()
 bool
 Cpu::interruptRequestPending() const
 {
-  const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
-  const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
+  const auto interruptFlags = m_mmu.get().readByte(regs::IF);
+  const auto interruptEnable = m_mmu.get().readByte(regs::IE);
   return (static_cast<unsigned>(interruptFlags) &
           static_cast<unsigned>(interruptEnable) &
           static_cast<unsigned>(INTERRUPT_MASK)) != 0;
@@ -1336,8 +1331,8 @@ Cpu::handleInterrupts()
   if (!m_ime) {
     return;
   }
-  const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
-  const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
+  const auto interruptFlags = m_mmu.get().readByte(regs::IF);
+  const auto interruptEnable = m_mmu.get().readByte(regs::IE);
   const auto pendingInterrupts =
     static_cast<std::uint8_t>(static_cast<unsigned>(interruptFlags) &
                               static_cast<unsigned>(interruptEnable) &
@@ -1353,7 +1348,7 @@ Cpu::handleInterrupts()
     const auto interruptBit = static_cast<std::uint8_t>(1U << i);
     if ((pendingInterrupts & interruptBit) != 0) {
       m_mmu.get().writeByte(
-        INTERRUPT_FLAGS_ADDR,
+        regs::IF,
         static_cast<std::uint8_t>(static_cast<unsigned>(interruptFlags) &
                                   ~static_cast<unsigned>(interruptBit)));
 
@@ -1369,7 +1364,7 @@ Cpu::handleInterrupts()
 void
 Cpu::handleTimer(std::size_t currentMCycles)
 {
-  const auto tac = m_mmu.get().readByte(TAC_ADDR);
+  const auto tac = m_mmu.get().readByte(regs::TAC);
   const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
   const auto timerFrequencyBits =
     static_cast<std::uint8_t>(static_cast<unsigned>(tac) & 0x03U);
@@ -1380,17 +1375,16 @@ Cpu::handleTimer(std::size_t currentMCycles)
     const auto currentTimerTicks = currentMCycles / timerFrequency;
     const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
     for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
-      const auto tima = m_mmu.get().readByte(TIMER_ADDR);
+      const auto tima = m_mmu.get().readByte(regs::TIMA);
       if (tima == 0xFF) { // NOLINT(readability-magic-numbers)
-        m_mmu.get().writeByte(TIMER_ADDR,
-                              m_mmu.get().readByte(TIMER_MODULO_ADDR));
-        const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
-        m_mmu.get().writeByte(INTERRUPT_FLAGS_ADDR,
+        m_mmu.get().writeByte(regs::TIMA, m_mmu.get().readByte(regs::TMA));
+        const auto interruptFlags = m_mmu.get().readByte(regs::IF);
+        m_mmu.get().writeByte(regs::IF,
                               static_cast<std::uint8_t>(
                                 static_cast<unsigned>(interruptFlags) |
                                 0x04U)); // NOLINT(readability-magic-numbers)
       } else {
-        m_mmu.get().writeByte(TIMER_ADDR, tima + 1);
+        m_mmu.get().writeByte(regs::TIMA, tima + 1);
       }
     }
   }
@@ -1446,27 +1440,23 @@ Cpu::runNextInstruction()
                                              (f & 0x20U) != 0U ? 'H' : 'h',
                                              (f & 0x10U) != 0U ? 'C' : 'c',
                                              '\0' };
-      constexpr std::uint16_t lyRegisterAddress = 0xFF44;
-      std::cerr
-        << std::uppercase << std::hex << std::setw(4) << std::setfill('0')
-        << m_PC << "  op=" << std::setw(2) << static_cast<unsigned>(opcodeByte)
-        << "  A:" << std::setw(2) << a << " B:" << std::setw(2) << b
-        << " C:" << std::setw(2) << c << " D:" << std::setw(2) << d
-        << " E:" << std::setw(2) << e << " F:" << flagsStr.data()
-        << " HL:" << std::setw(4) << m_HL << " SP:" << std::setw(4) << m_SP
-        << std::dec << " V:" << std::setw(2)
-        << static_cast<unsigned>(m_mmu.get().readByte(lyRegisterAddress))
-        << " H:" << m_ppu.get().dot() << " CYC:" << std::dec << m_mcycles
-        << " IF:" << std::hex
-        << static_cast<unsigned>(
-             m_mmu.get().readByte(0xFF0F)) // NOLINT(readability-magic-numbers)
-        << " TIMA:"
-        << static_cast<unsigned>(
-             m_mmu.get().readByte(0xFF05)) // NOLINT(readability-magic-numbers)
-        << " TAC:"
-        << static_cast<unsigned>(
-             m_mmu.get().readByte(0xFF07)) // NOLINT(readability-magic-numbers)
-        << "\n";
+      std::cerr << std::uppercase << std::hex << std::setw(4)
+                << std::setfill('0') << m_PC << "  op=" << std::setw(2)
+                << static_cast<unsigned>(opcodeByte) << "  A:" << std::setw(2)
+                << a << " B:" << std::setw(2) << b << " C:" << std::setw(2) << c
+                << " D:" << std::setw(2) << d << " E:" << std::setw(2) << e
+                << " F:" << flagsStr.data() << " HL:" << std::setw(4) << m_HL
+                << " SP:" << std::setw(4) << m_SP << std::dec
+                << " V:" << std::setw(2)
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " H:" << m_ppu.get().dot() << " CYC:" << std::dec
+                << m_mcycles << " IF:" << std::hex
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::IF))
+                << " TIMA:"
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::TIMA))
+                << " TAC:"
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::TAC))
+                << "\n";
     }
   }
 #endif

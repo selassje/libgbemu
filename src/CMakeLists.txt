@@ -16,7 +16,8 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm)
+         ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/regs.cppm)
 
 target_sources(
   gbemu

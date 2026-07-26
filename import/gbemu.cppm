@@ -6,6 +6,7 @@ export import :cpu;
 export import :mmu;
 export import :ppu;
 export import :boot_rom;
+export import :regs;
 
 export namespace gbemu {
 
