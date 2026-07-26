@@ -1385,6 +1385,7 @@ std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
   handleTimer();
+  m_lastMCycles = m_mcycles;
 
   if (m_halted) {
     if (!interruptRequestPending()) {
@@ -1395,7 +1396,7 @@ Cpu::runNextInstruction()
     m_halted = false;
   }
 
-  const auto interruptCycles = handleInterrupts();
+  handleInterrupts();
 #ifdef ENABLE_TESTS
   {
     if (false) { //NOLINT(readability-simplify-boolean-expr))
@@ -1432,7 +1433,6 @@ Cpu::runNextInstruction()
     }
   }
 #endif
-  m_lastMCycles = m_mcycles;
   const auto opcode = m_mmu.get().readByte(m_PC);
   const auto& instruction = INSTRUCTIONS.at(opcode);
   if (instruction.fun == nullptr) {
@@ -1441,7 +1441,7 @@ Cpu::runNextInstruction()
   }
   const auto cycles = (this->*instruction.fun)();
   m_mcycles += cycles;
-  return cycles + interruptCycles;
+  return m_mcycles - m_lastMCycles;
 }
 
 };
