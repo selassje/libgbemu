@@ -63,7 +63,7 @@ function(setup_sanitizers TARGET)
     endif()
     if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
       target_compile_options(${TARGET} PRIVATE -fsanitize=address
-                            -Wno-conversion)
+                                               -Wno-conversion)
       target_link_options(${TARGET} PRIVATE -fsanitize=address)
     endif()
   endif()
