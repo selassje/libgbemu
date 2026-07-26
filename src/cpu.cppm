@@ -43,6 +43,7 @@ private:
 
   std::size_t m_mcycles{ 0 };
   std::size_t m_lastMCycles{ 0 };
+  std::size_t m_lastTimerMCycles{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
   std::reference_wrapper<Ppu> m_ppu;
@@ -59,7 +60,7 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   void handleInterrupts();
-  void handleTimer();
+  void handleTimer(std::size_t currentMCycles);
   [[nodiscard]] bool interruptRequestPending() const;
 
   std::size_t nop();

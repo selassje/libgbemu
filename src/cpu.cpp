@@ -378,6 +378,7 @@ Cpu::ldRR()
 
   std::uint8_t value = 0;
   if (src == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     value = m_mmu.get().readByte(m_HL);
     cycles = 2; // NOLINT(readability-magic-numbers)
   } else {
@@ -385,6 +386,7 @@ Cpu::ldRR()
   }
 
   if (dst == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, value);
     cycles = 2; // NOLINT(readability-magic-numbers)
   } else {
@@ -405,6 +407,7 @@ Cpu::ldRd8()
 
   std::size_t cycles = 2; // NOLINT(readability-magic-numbers)
   if (dst == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, value);
     cycles = 3; // NOLINT(readability-magic-numbers)
   } else {
@@ -423,8 +426,10 @@ Cpu::ldhlia()
   const bool decrement = (static_cast<unsigned>(opcode) & 0x10U) != 0;
 
   if (load) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     setR8(REG_A, m_mmu.get().readByte(m_HL));
   } else {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, getR8(REG_A));
   }
 
@@ -443,8 +448,10 @@ Cpu::ldbcdea()
   const auto address = useDE ? m_DE : m_BC;
 
   if (load) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -462,6 +469,7 @@ Cpu::incr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     oldValue = m_mmu.get().readByte(m_HL);
     cycles = 3; // NOLINT(readability-magic-numbers)
   } else {
@@ -471,6 +479,7 @@ Cpu::incr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue + 1);
 
   if (reg == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -500,6 +509,7 @@ Cpu::decr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     oldValue = m_mmu.get().readByte(m_HL);
     cycles = 3; // NOLINT(readability-magic-numbers)
   } else {
@@ -509,6 +519,7 @@ Cpu::decr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue - 1);
 
   if (reg == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -627,8 +638,10 @@ Cpu::ldaa16()
   const auto address = m_mmu.get().readWord(m_PC + 1);
 
   if (load) {
+    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
+    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -645,8 +658,10 @@ Cpu::ldha8()
   const auto address = static_cast<std::uint16_t>(IO_REGISTERS_BASE + offset);
 
   if (load) {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -663,8 +678,10 @@ Cpu::ldhca()
     static_cast<std::uint16_t>(IO_REGISTERS_BASE + getR8(REG_C));
 
   if (load) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -910,6 +927,7 @@ Cpu::aluR8()
   std::size_t cycles = 1;
   std::uint8_t operand = 0;
   if (srcCode == REG_HL_INDIRECT) {
+    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
     operand = m_mmu.get().readByte(m_HL);
     cycles = 2; // NOLINT(readability-magic-numbers)
   } else {
@@ -964,6 +982,9 @@ Cpu::cbPrefixed()
     static_cast<std::uint8_t>(static_cast<unsigned>(cbOpcode) & 0x07U);
 
   const bool isMemory = (regCode == REG_HL_INDIRECT);
+  if (isMemory) {
+    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+  }
   auto value = isMemory ? m_mmu.get().readByte(m_HL) : getR8(regCode);
 
   std::size_t cycles = isMemory ? 4 : 2; // NOLINT(readability-magic-numbers)
@@ -1048,6 +1069,7 @@ Cpu::cbPrefixed()
   }
 
   if (isMemory) {
+    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
     m_mmu.get().writeByte(m_HL, value);
   } else {
     setR8(regCode, value);
@@ -1335,7 +1357,7 @@ Cpu::handleInterrupts()
 }
 
 void
-Cpu::handleTimer()
+Cpu::handleTimer(std::size_t currentMCycles)
 {
   const auto tac = m_mmu.get().readByte(TAC_ADDR);
   const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
@@ -1344,8 +1366,8 @@ Cpu::handleTimer()
 
   if (timerEnabled) {
     const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
-    const auto previousTimerTicks = m_lastMCycles / timerFrequency;
-    const auto currentTimerTicks = m_mcycles / timerFrequency;
+    const auto previousTimerTicks = m_lastTimerMCycles / timerFrequency;
+    const auto currentTimerTicks = currentMCycles / timerFrequency;
     const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
     for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
       const auto tima = m_mmu.get().readByte(TIMER_ADDR);
@@ -1362,6 +1384,7 @@ Cpu::handleTimer()
       }
     }
   }
+  m_lastTimerMCycles = currentMCycles;
 }
 
 void
@@ -1377,12 +1400,13 @@ Cpu::reset()
   m_halted = false;
   m_mcycles = 0;
   m_lastMCycles = 0;
+  m_lastTimerMCycles = 0;
 }
 
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
-  handleTimer();
+  handleTimer(m_mcycles);
   m_lastMCycles = m_mcycles;
 
   if (m_halted) {
