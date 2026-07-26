@@ -58,8 +58,8 @@ function(setup_sanitizers TARGET)
       target_compile_options(
         ${TARGET}
         PRIVATE -fsanitize=address -fsanitize=undefined
-                -fno-sanitize-recover=undefined -fno-omit-frame-pointer
-                -fno-optimize-sibling-calls)
+                -fno-sanitize-recover=undefined -fno-sanitize-merge
+                -fno-omit-frame-pointer -fno-optimize-sibling-calls)
       target_link_options(${TARGET} PRIVATE -fsanitize=address
                           -fsanitize=undefined)
     endif()

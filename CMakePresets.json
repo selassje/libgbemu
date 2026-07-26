@@ -384,7 +384,8 @@
       "configurePreset": "dev_ninja_clang_sanitizers_linux",
       "environment": {
         "ASAN_OPTIONS": "check_initialization_order=1",
-        "ASAN_SYMBOLIZER_PATH": "/usr/bin/llvm-symbolizer"
+        "ASAN_SYMBOLIZER_PATH": "/usr/bin/llvm-symbolizer",
+        "UBSAN_OPTIONS": "print_stacktrace=1:external_symbolizer_path=/usr/bin/llvm-symbolizer"
       }
     },
     {
