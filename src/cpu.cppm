@@ -42,7 +42,6 @@ private:
   bool m_halted{ false };
 
   std::size_t m_mcycles{ 0 };
-  std::size_t m_lastMCycles{ 0 };
   std::size_t m_lastTimerMCycles{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;

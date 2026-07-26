@@ -1399,7 +1399,6 @@ Cpu::reset()
   m_ime = false;
   m_halted = false;
   m_mcycles = 0;
-  m_lastMCycles = 0;
   m_lastTimerMCycles = 0;
 }
 
@@ -1407,7 +1406,7 @@ std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
   handleTimer(m_mcycles);
-  m_lastMCycles = m_mcycles;
+  const auto lastMCycles = m_mcycles;
 
   if (m_halted) {
     if (!interruptRequestPending()) {
@@ -1466,7 +1465,7 @@ Cpu::runNextInstruction()
   }
   const auto cycles = (this->*instruction.fun)();
   m_mcycles += cycles;
-  return m_mcycles - m_lastMCycles;
+  return m_mcycles - lastMCycles;
 }
 
 };
