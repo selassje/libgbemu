@@ -1299,11 +1299,11 @@ Cpu::interruptRequestPending() const
           static_cast<unsigned>(interruptEnable)) != 0;
 }
 
-std::size_t
+void
 Cpu::handleInterrupts()
 {
   if (!m_ime) {
-    return 0;
+    return;
   }
   const auto interruptFlags = m_mmu.get().readByte(INTERRUPT_FLAGS_ADDR);
   const auto interruptEnable = m_mmu.get().readByte(INTERRUPT_ENABLE_ADDR);
@@ -1312,7 +1312,7 @@ Cpu::handleInterrupts()
                               static_cast<unsigned>(interruptEnable));
 
   if (pendingInterrupts == 0) {
-    return 0;
+    return;
   }
 
   m_ime = false;
@@ -1329,10 +1329,9 @@ Cpu::handleInterrupts()
       m_mmu.get().writeWord(m_SP, m_PC);
       m_PC = INTERRUPT_VECTORS.at(i);
       m_mcycles += 5; // NOLINT(readability-magic-numbers)
-      return 5;      // NOLINT(readability-magic-numbers)
+      return;
     }
   }
-  return 0;
 }
 
 void
@@ -1345,8 +1344,7 @@ Cpu::handleTimer()
 
   if (timerEnabled) {
     const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
-    const auto previousTimerTicks =
-      m_lastMCycles / timerFrequency;
+    const auto previousTimerTicks = m_lastMCycles / timerFrequency;
     const auto currentTimerTicks = m_mcycles / timerFrequency;
     const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
     for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
@@ -1399,7 +1397,7 @@ Cpu::runNextInstruction()
   handleInterrupts();
 #ifdef ENABLE_TESTS
   {
-    if (false) { //NOLINT(readability-simplify-boolean-expr))
+    if (false) { // NOLINT(readability-simplify-boolean-expr))
       const auto opcodeByte = m_mmu.get().readByte(m_PC);
       const auto a = m_AF >> 8U;
       const auto f = m_AF & 0xFFU;
@@ -1407,29 +1405,32 @@ Cpu::runNextInstruction()
       const auto c = m_BC & 0xFFU;
       const auto d = m_DE >> 8U;
       const auto e = m_DE & 0xFFU;
-      const std::array<char, 5> flagsStr = {
-        (f & 0x80U) != 0U ? 'Z' : 'z', (f & 0x40U) != 0U ? 'N' : 'n',
-        (f & 0x20U) != 0U ? 'H' : 'h', (f & 0x10U) != 0U ? 'C' : 'c', '\0'
-      };
+      const std::array<char, 5> flagsStr = { (f & 0x80U) != 0U ? 'Z' : 'z',
+                                             (f & 0x40U) != 0U ? 'N' : 'n',
+                                             (f & 0x20U) != 0U ? 'H' : 'h',
+                                             (f & 0x10U) != 0U ? 'C' : 'c',
+                                             '\0' };
       constexpr std::uint16_t lyRegisterAddress = 0xFF44;
-      std::cerr << std::uppercase << std::hex << std::setw(4)
-                << std::setfill('0') << m_PC << "  op=" << std::setw(2)
-                << static_cast<unsigned>(opcodeByte) << "  A:" << std::setw(2)
-                << a << " B:" << std::setw(2) << b << " C:" << std::setw(2)
-                << c << " D:" << std::setw(2) << d << " E:" << std::setw(2)
-                << e << " F:" << flagsStr.data() << " HL:" << std::setw(4)
-                << m_HL << " SP:" << std::setw(4) << m_SP << std::dec
-                << " V:" << std::setw(2)
-                << static_cast<unsigned>(
-                     m_mmu.get().readByte(lyRegisterAddress))
-                << " H:" << m_ppu.get().dot() << " CYC:" << std::dec
-                << m_mcycles << " IF:" << std::hex
-                << static_cast<unsigned>(m_mmu.get().readByte(0xFF0F)) //NOLINT(readability-magic-numbers)
-                << " TIMA:"
-                << static_cast<unsigned>(m_mmu.get().readByte(0xFF05)) //NOLINT(readability-magic-numbers)
-                << " TAC:"
-                << static_cast<unsigned>(m_mmu.get().readByte(0xFF07)) //NOLINT(readability-magic-numbers)
-                << "\n";
+      std::cerr
+        << std::uppercase << std::hex << std::setw(4) << std::setfill('0')
+        << m_PC << "  op=" << std::setw(2) << static_cast<unsigned>(opcodeByte)
+        << "  A:" << std::setw(2) << a << " B:" << std::setw(2) << b
+        << " C:" << std::setw(2) << c << " D:" << std::setw(2) << d
+        << " E:" << std::setw(2) << e << " F:" << flagsStr.data()
+        << " HL:" << std::setw(4) << m_HL << " SP:" << std::setw(4) << m_SP
+        << std::dec << " V:" << std::setw(2)
+        << static_cast<unsigned>(m_mmu.get().readByte(lyRegisterAddress))
+        << " H:" << m_ppu.get().dot() << " CYC:" << std::dec << m_mcycles
+        << " IF:" << std::hex
+        << static_cast<unsigned>(
+             m_mmu.get().readByte(0xFF0F)) // NOLINT(readability-magic-numbers)
+        << " TIMA:"
+        << static_cast<unsigned>(
+             m_mmu.get().readByte(0xFF05)) // NOLINT(readability-magic-numbers)
+        << " TAC:"
+        << static_cast<unsigned>(
+             m_mmu.get().readByte(0xFF07)) // NOLINT(readability-magic-numbers)
+        << "\n";
     }
   }
 #endif

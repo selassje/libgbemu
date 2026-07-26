@@ -58,7 +58,7 @@ private:
   void setR8(std::uint8_t code, std::uint8_t value);
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
-  std::size_t handleInterrupts();
+  void handleInterrupts();
   void handleTimer();
   [[nodiscard]] bool interruptRequestPending() const;
 
