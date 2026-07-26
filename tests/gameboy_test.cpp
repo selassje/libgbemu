@@ -340,6 +340,31 @@ TEST_CASE("mem_timing", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
+TEST_CASE("mem_timing-2", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
+                      "mem_timing-2" / "mem_timing.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  // mem_timing-2 uses the newer shell, which reports its result via
+  // cartridge RAM (gMemoryOutput) rather than the serial port.
+  REQUIRE_THAT(gbemu::gMemoryOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gMemoryOutput.clear();
+  gbemu::gSerialOutput.clear();
+}
+
 TEST_CASE("interrupt_time", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
