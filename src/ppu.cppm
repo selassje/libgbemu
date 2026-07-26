@@ -12,6 +12,9 @@ class Ppu // NOLINT(misc-use-internal-linkage)
     {
     }
     void runNextTCycle();
+
+    [[nodiscard]] std::uint16_t dot() const { return m_dot; }
+
   private:
 
     enum class Mode : std::uint8_t

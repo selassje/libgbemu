@@ -2,14 +2,16 @@ export module gbemu:cpu;
 
 import std;
 import :mmu;
+import :ppu;
 
 namespace gbemu {
 
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
-  explicit Cpu(Mmu& mmu)
+  Cpu(Mmu& mmu, Ppu& ppu)
     : m_mmu(mmu)
+    , m_ppu(ppu)
   {
   }
 
@@ -43,6 +45,7 @@ private:
   std::size_t m_lastTimerCyclesIncrement{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
+  std::reference_wrapper<Ppu> m_ppu;
 
   using InstructionFun = std::size_t (Cpu::*)();
 

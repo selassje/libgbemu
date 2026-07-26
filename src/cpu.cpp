@@ -1415,8 +1415,9 @@ Cpu::runNextInstruction()
                 << a << " B:" << std::setw(2) << b << " C:" << std::setw(2)
                 << c << " D:" << std::setw(2) << d << " E:" << std::setw(2)
                 << e << " F:" << flagsStr << " HL:" << std::setw(4) << m_HL
-                << " SP:" << std::setw(4) << m_SP << " V:" << std::setw(2)
+                << " SP:" << std::setw(4) << m_SP << std::dec << " V:" << std::setw(2)
                 << static_cast<unsigned>(m_mmu.get().readByte(0xFF44))
+                << " H:" << m_ppu.get().dot()
                 << "\n";
     }
   }

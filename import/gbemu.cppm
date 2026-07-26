@@ -13,7 +13,7 @@ class GameBoy
 {
 public:
   GameBoy()
-    : m_cpu(m_mmu), m_ppu(m_mmu)
+    : m_ppu(m_mmu), m_cpu(m_mmu, m_ppu)
   {
   }
 
@@ -24,8 +24,10 @@ public:
 
 private:
   Mmu m_mmu;
-  Cpu m_cpu;
+  // Declared before m_cpu so it's fully constructed before Cpu's
+  // constructor receives a reference to it.
   Ppu m_ppu;
+  Cpu m_cpu;
 };
 
 }

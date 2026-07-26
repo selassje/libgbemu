@@ -15,6 +15,8 @@ constexpr std::uint16_t LY_REGISTER_ADDRESS = 0xFF44;
 constexpr std::uint16_t IF_REGISTER_ADDRESS = 0xFF0F;
 constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
 constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
+constexpr std::uint16_t LCDC_REGISTER_ADDRESS = 0xFF40;
+constexpr std::uint8_t LCD_ENABLE_BIT = 0x80;
 
 }
 
@@ -23,6 +25,14 @@ namespace gbemu {
 void
 Ppu::runNextTCycle()
 {
+  // Real hardware: the PPU is completely inert while LCDC bit 7 is clear -
+  // no dot/scanline/mode advancement, no interrupts. LY stays wherever it
+  // was left (0 at boot, since the CPU/PPU/MMU all reset to zero) until the
+  // boot ROM (or a game) explicitly enables the LCD.
+  if ((m_mmu.get().readByte(LCDC_REGISTER_ADDRESS) & LCD_ENABLE_BIT) == 0) {
+    return;
+  }
+
   switch (m_mode) {
     case Mode::HBlank:
       handleHBlank();
