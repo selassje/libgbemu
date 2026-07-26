@@ -296,6 +296,28 @@ TEST_CASE("02-interrupts", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
+TEST_CASE("instr_timing", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
+                      "instr_timing" / "instr_timing.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(
+    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
+    gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+  REQUIRE_THAT(gbemu::gSerialOutput,
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::gSerialOutput.clear();
+}
+
 TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /

@@ -1328,7 +1328,7 @@ Cpu::handleInterrupts()
       m_SP -= 2;
       m_mmu.get().writeWord(m_SP, m_PC);
       m_PC = INTERRUPT_VECTORS.at(i);
-      m_cycles += 5; // NOLINT(readability-magic-numbers)
+      m_mcycles += 5; // NOLINT(readability-magic-numbers)
       return 5;      // NOLINT(readability-magic-numbers)
     }
   }
@@ -1345,9 +1345,11 @@ Cpu::handleTimer()
 
   if (timerEnabled) {
     const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
-    const auto cyclesSinceLastUpdate = m_cycles - m_lastTimerCyclesIncrement;
-    if (cyclesSinceLastUpdate >= timerFrequency) {
-      m_lastTimerCyclesIncrement += timerFrequency;
+    const auto previousTimerTicks =
+      m_lastMCycles / timerFrequency;
+    const auto currentTimerTicks = m_mcycles / timerFrequency;
+    const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
+    for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
       const auto tima = m_mmu.get().readByte(TIMER_ADDR);
       if (tima == 0xFF) { // NOLINT(readability-magic-numbers)
         m_mmu.get().writeByte(TIMER_ADDR,
@@ -1362,6 +1364,7 @@ Cpu::handleTimer()
       }
     }
   }
+  m_lastMCycles = m_mcycles;
 }
 
 void
@@ -1375,8 +1378,8 @@ Cpu::reset()
   m_PC = 0;
   m_ime = false;
   m_halted = false;
-  m_cycles = 0;
-  m_lastTimerCyclesIncrement = 0;
+  m_mcycles = 0;
+  m_lastMCycles = 0;
 }
 
 std::expected<std::size_t, std::string>
@@ -1387,7 +1390,7 @@ Cpu::runNextInstruction()
   if (m_halted) {
     if (!interruptRequestPending()) {
       constexpr std::size_t haltIdleCycles = 1;
-      m_cycles += haltIdleCycles;
+      m_mcycles += haltIdleCycles;
       return haltIdleCycles;
     }
     m_halted = false;
@@ -1419,7 +1422,14 @@ Cpu::runNextInstruction()
                 << " V:" << std::setw(2)
                 << static_cast<unsigned>(
                      m_mmu.get().readByte(lyRegisterAddress))
-                << " H:" << m_ppu.get().dot() << "\n";
+                << " H:" << m_ppu.get().dot() << " CYC:" << std::dec
+                << m_mcycles << " IF:" << std::hex
+                << static_cast<unsigned>(m_mmu.get().readByte(0xFF0F)) //NOLINT(readability-magic-numbers)
+                << " TIMA:"
+                << static_cast<unsigned>(m_mmu.get().readByte(0xFF05)) //NOLINT(readability-magic-numbers)
+                << " TAC:"
+                << static_cast<unsigned>(m_mmu.get().readByte(0xFF07)) //NOLINT(readability-magic-numbers)
+                << "\n";
     }
   }
 #endif
@@ -1430,7 +1440,7 @@ Cpu::runNextInstruction()
       std::format("Unimplemented opcode: {:#04x}", opcode));
   }
   const auto cycles = (this->*instruction.fun)();
-  m_cycles += cycles;
+  m_mcycles += cycles;
   return cycles + interruptCycles;
 }
 

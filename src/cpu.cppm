@@ -41,8 +41,8 @@ private:
   bool m_ime{ false };
   bool m_halted{ false };
 
-  std::size_t m_cycles{ 0 };
-  std::size_t m_lastTimerCyclesIncrement{ 0 };
+  std::size_t m_mcycles{ 0 };
+  std::size_t m_lastMCycles{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
   std::reference_wrapper<Ppu> m_ppu;
