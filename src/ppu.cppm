@@ -76,15 +76,20 @@ private:
   std::uint16_t m_dot{ 0 };
   Mode m_mode{ Mode::OAMSearch };
   std::uint8_t m_nextPixelXToRender{ 0 };
+  std::uint8_t m_scx3LowBits{ 0 };
+  std::uint8_t m_scxDiscardedCount{ 0 };
   Fifo m_bgWndFifo{};
   Fifo m_objFifo{};
+  // Placeholder for rendered pixels: raw 2bpp color indices (160x144), not
+  // yet palette-mapped to actual shades/colors.
+  std::array<std::uint8_t, std::size_t{ 160 } * 144> m_frameBuffer{}; // NOLINT(readability-magic-numbers)
   Fetcher m_fetcher{ m_mmu, *this };
 
   void incrementDot();
   void handleHBlank();
   void handleVBlank();
   void handleOAMSearch();
-  void handlePixelTransfer();
+  [[nodiscard]] bool handlePixelTransfer();
 };
 
 };

@@ -6,8 +6,8 @@ namespace {
 
 constexpr std::uint8_t TOTAL_SCANLINES = 154;
 constexpr std::uint8_t LAST_VISIBLE_SCANLINE = 143;
+constexpr std::uint8_t SCREEN_WIDTH = 160;
 constexpr std::uint16_t MODE_2_DOTS = 80;
-constexpr std::uint16_t MODE_3_DOTS = 172;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
 constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
@@ -143,7 +143,9 @@ Ppu::runNextTCycle()
       handleOAMSearch();
       break;
     case Mode::PixelTransfer:
-      handlePixelTransfer();
+      if (handlePixelTransfer()) {
+        m_mode = Mode::HBlank;
+      }
       break;
   }
 
@@ -175,8 +177,10 @@ Ppu::incrementDot()
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
       if (m_dot == MODE_2_DOTS) {
         m_mode = Mode::PixelTransfer;
-      } else if (m_dot == MODE_2_DOTS + MODE_3_DOTS) {
-        m_mode = Mode::HBlank;
+        constexpr std::uint8_t scxLow3BitsMask = 0x07;
+        m_scx3LowBits = static_cast<std::uint8_t>(
+          m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
+        m_scxDiscardedCount = 0;
       }
     }
   }
@@ -200,10 +204,29 @@ Ppu::handleOAMSearch() {
 
 };
 
-void
+bool
 Ppu::handlePixelTransfer()
 {
   m_fetcher.runNextTCycle();
+
+  if (m_bgWndFifo.empty()) {
+    return false;
+  }
+
+  if (m_scxDiscardedCount < m_scx3LowBits) {
+    m_bgWndFifo.pop();
+    ++m_scxDiscardedCount;
+    return false;
+  }
+
+  const auto colorIndex = m_bgWndFifo.pop();
+  const auto pixelIndex = (static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH)
+    + m_nextPixelXToRender;
+  m_frameBuffer.at(pixelIndex) = colorIndex; // Placeholder: raw 2bpp color
+                                              // index, not yet palette-mapped
+  ++m_nextPixelXToRender;
+
+  return m_nextPixelXToRender >= SCREEN_WIDTH;
 };
 
 };
