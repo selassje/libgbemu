@@ -21,7 +21,7 @@ struct Rgb
 struct EmulationFrame
 {
   std::mdspan<std::uint8_t,
-              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
+              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH>>
     pixels;
 };
 
@@ -37,7 +37,7 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
-  std::expected<void, std::string> runNextFrame();
+  std::expected<EmulationFrame, std::string> runNextFrame();
 
 private:
   Mmu m_mmu;

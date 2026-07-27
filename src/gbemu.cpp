@@ -26,9 +26,7 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   return result;
 }
 
-};
-
-std::expected<void, std::string>
+std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
   constexpr std::size_t mCyclesPerFrame = 17556;
@@ -44,5 +42,13 @@ gbemu::GameBoy::runNextFrame()
     }
     mCycles += cycles;
   }
-  return {};
+  const EmulationFrame frame = {
+    std::mdspan<std::uint8_t,
+                std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH>>(
+      m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH)
+  };
+
+  return { frame };
 }
+
+};
