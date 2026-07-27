@@ -19,6 +19,22 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
          ${CMAKE_CURRENT_LIST_DIR}/regs.cppm)
 
+if(MSVC)
+  # MSBuild's real build infers /interface per module-interface file from
+  # FILE_SET CXX_MODULES, but VS IntelliSense's own design-time build
+  # reconstruction drops it, misdiagnosing every `export` here as C3378
+  # ("can be exported only from a module interface unit"). Force it
+  # explicitly so IntelliSense's command line matches the real one.
+  set_source_files_properties(
+    ${MODULES}/gbemu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
+    PROPERTIES COMPILE_OPTIONS /interface)
+endif()
+
 target_sources(
   gbemu
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
