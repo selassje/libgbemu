@@ -10,6 +10,21 @@ export import :regs;
 
 export namespace gbemu {
 
+struct Rgb
+{
+  std::uint8_t r;
+  std::uint8_t g;
+  std::uint8_t b;
+};
+
+
+struct EmulationFrame
+{
+  std::mdspan<std::uint8_t,
+              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
+    pixels;
+};
+
 class GameBoy
 {
 public:
@@ -22,7 +37,7 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
-  std::expected<void, std::string> runNextFrame();
+  std::expected<EmulationFrame, std::string> runNextFrame();
 
 private:
   Mmu m_mmu;
