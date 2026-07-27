@@ -1,5 +1,3 @@
-module;
-#include <functional>
 export module gbemu:ppu;
 
 import :mmu;
