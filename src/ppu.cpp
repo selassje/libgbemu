@@ -14,6 +14,15 @@ constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
 constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
 constexpr std::uint8_t LCD_ENABLE_BIT = 0x80;
 
+// Standard grayscale mapping for the DMG's 4 shades, indexed by BGP-mapped
+// shade (0 = lightest, 3 = darkest).
+constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
+  { 0xFF, 0xFF, 0xFF },
+  { 0xAA, 0xAA, 0xAA },
+  { 0x55, 0x55, 0x55 },
+  { 0x00, 0x00, 0x00 },
+} };
+
 }
 
 namespace gbemu {
@@ -224,11 +233,20 @@ Ppu::handlePixelTransfer()
   }
 
   const auto colorIndex = m_bgWndFifo.pop();
+  const auto bgp = m_mmu.get().readByte(regs::BGP);
+  constexpr unsigned shadeMask = 0x03;
+  const auto shade = static_cast<std::uint8_t>(
+    (static_cast<unsigned>(bgp) >>
+     (static_cast<unsigned>(colorIndex) * 2U)) &
+    shadeMask);
+  const auto& rgb = DMG_PALETTE.at(shade);
   const auto pixelIndex =
-    (static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) +
-    m_nextPixelXToRender;
-  m_frameBuffer.at(pixelIndex) = colorIndex; // Placeholder: raw 2bpp color
-                                             // index, not yet palette-mapped
+    ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) +
+     m_nextPixelXToRender) *
+    3;
+  m_frameBuffer.at(pixelIndex) = rgb.at(0);
+  m_frameBuffer.at(pixelIndex + 1) = rgb.at(1);
+  m_frameBuffer.at(pixelIndex + 2) = rgb.at(2);
   ++m_nextPixelXToRender;
 
   return m_nextPixelXToRender >= SCREEN_WIDTH;

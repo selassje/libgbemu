@@ -17,8 +17,8 @@ public:
 
   [[nodiscard]] std::uint16_t dot() const { return m_dot; }
   using FrameBuffer =
-    std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT>;
-    
+    std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;
+
   FrameBuffer& frameBuffer();
 
 private:
@@ -84,9 +84,8 @@ private:
   std::uint8_t m_scxDiscardedCount{ 0 };
   Fifo m_bgWndFifo{};
   Fifo m_objFifo{};
-  // Placeholder for rendered pixels: raw 2bpp color indices (160x144), not
-  // yet palette-mapped to actual shades/colors.
-
+  // Rendered pixels (160x144), palette-mapped via BGP to grayscale RGB, laid
+  // out row-major with 3 bytes (R,G,B) per pixel.
   FrameBuffer m_frameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
 

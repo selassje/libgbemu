@@ -21,7 +21,7 @@ struct Rgb
 struct EmulationFrame
 {
   std::mdspan<std::uint8_t,
-              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH>>
+              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
     pixels;
 };
 

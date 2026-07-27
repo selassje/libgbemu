@@ -44,8 +44,8 @@ gbemu::GameBoy::runNextFrame()
   }
   const EmulationFrame frame = {
     std::mdspan<std::uint8_t,
-                std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH>>(
-      m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH)
+                std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>(
+      m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH, 3)
   };
 
   return { frame };
