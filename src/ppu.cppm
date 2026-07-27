@@ -4,6 +4,8 @@ import :mmu;
 
 namespace gbemu {
 
+export std::size_t constexpr SCREEN_WIDTH = 160;
+export std::size_t constexpr SCREEN_HEIGHT = 144;
 class Ppu // NOLINT(misc-use-internal-linkage)
 {
 public:
@@ -14,6 +16,10 @@ public:
   void runNextTCycle();
 
   [[nodiscard]] std::uint16_t dot() const { return m_dot; }
+  using FrameBuffer =
+    std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT>;
+    
+  FrameBuffer& frameBuffer();
 
 private:
   enum class Mode : std::uint8_t
@@ -46,8 +52,8 @@ private:
       , m_ppu(ppu)
     {
     }
-
     void runNextTCycle();
+
 
   private:
     enum class State : std::uint8_t
@@ -80,7 +86,8 @@ private:
   Fifo m_objFifo{};
   // Placeholder for rendered pixels: raw 2bpp color indices (160x144), not
   // yet palette-mapped to actual shades/colors.
-  std::array<std::uint8_t, std::size_t{ 160 } * 144> m_frameBuffer{}; // NOLINT(readability-magic-numbers)
+
+  FrameBuffer m_frameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
 
   void incrementDot();

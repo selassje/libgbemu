@@ -39,18 +39,22 @@ Ppu::Fetcher::runNextTCycle()
 {
   const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const auto currentState = m_mState;
-  constexpr std::uint16_t tileDataBlock0 = 0x8000; // NOLINT(readability-magic-numbers)
-  constexpr std::uint16_t tileDataBlock1 = 0x8800; // NOLINT(readability-magic-numbers) ]
-  constexpr std::uint16_t tileDataBlock2 = 0x9000; // NOLINT(readability-magic-numbers) ]
+  constexpr std::uint16_t tileDataBlock0 =
+    0x8000; // NOLINT(readability-magic-numbers)
+  constexpr std::uint16_t tileDataBlock1 =
+    0x8800; // NOLINT(readability-magic-numbers) ]
+  constexpr std::uint16_t tileDataBlock2 =
+    0x9000; // NOLINT(readability-magic-numbers) ]
 
   const auto pushTileRowToFifo = [this]() {
-    if (m_ppu.get().m_bgWndFifo.size() >= 8) { // NOLINT(readability-magic-numbers)
+    if (m_ppu.get().m_bgWndFifo.size() >=
+        8) { // NOLINT(readability-magic-numbers)
       return false;
     }
     for (unsigned bit = 8; bit-- > 0;) { // NOLINT(readability-magic-numbers)
       const auto colorIndex = static_cast<std::uint8_t>(
-        (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U)
-        | ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
+        (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U) |
+        ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
       m_ppu.get().m_bgWndFifo.push(colorIndex);
     }
     return true;
@@ -76,19 +80,19 @@ Ppu::Fetcher::runNextTCycle()
       if (elapsedDots >= 1) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         const auto rowOffset = static_cast<std::uint16_t>(
-          (((m_ppu.get().m_scanline + m_mmu.get().readByte(regs::SCY)) % 8)
-           * 2)
-          + (isHighByte ? 1 : 0));
+          (((m_ppu.get().m_scanline + m_mmu.get().readByte(regs::SCY)) % 8) *
+           2) +
+          (isHighByte ? 1 : 0));
         std::uint8_t tileByte{};
         if (m_mTileIndex >= 128) {
-          const auto tileOffset = static_cast<std::uint16_t>(
-            ((m_mTileIndex - 128) * 16) + rowOffset);
+          const auto tileOffset =
+            static_cast<std::uint16_t>(((m_mTileIndex - 128) * 16) + rowOffset);
           tileByte = m_mmu.get().readByte(tileDataBlock1 + tileOffset);
         } else {
-          const auto tileOffset = static_cast<std::uint16_t>(
-            (m_mTileIndex * 16) + rowOffset);
+          const auto tileOffset =
+            static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
           const auto lcdc = m_mmu.get().readByte(regs::LCDC);
-          if ( (lcdc & 0x10U) != 0) { // NOLINT(readability-magic-numbers)
+          if ((lcdc & 0x10U) != 0) { // NOLINT(readability-magic-numbers)
             tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
           } else {
             tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
@@ -220,13 +224,19 @@ Ppu::handlePixelTransfer()
   }
 
   const auto colorIndex = m_bgWndFifo.pop();
-  const auto pixelIndex = (static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH)
-    + m_nextPixelXToRender;
+  const auto pixelIndex =
+    (static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) +
+    m_nextPixelXToRender;
   m_frameBuffer.at(pixelIndex) = colorIndex; // Placeholder: raw 2bpp color
-                                              // index, not yet palette-mapped
+                                             // index, not yet palette-mapped
   ++m_nextPixelXToRender;
 
   return m_nextPixelXToRender >= SCREEN_WIDTH;
 };
 
+Ppu::FrameBuffer&
+Ppu::frameBuffer()
+{
+  return m_frameBuffer;
+}
 };

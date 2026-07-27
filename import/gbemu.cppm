@@ -10,6 +10,21 @@ export import :regs;
 
 export namespace gbemu {
 
+struct Rgb
+{
+  std::uint8_t r;
+  std::uint8_t g;
+  std::uint8_t b;
+};
+
+
+struct EmulationFrame
+{
+  std::mdspan<std::uint8_t,
+              std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
+    pixels;
+};
+
 class GameBoy
 {
 public:
