@@ -17,7 +17,6 @@ struct Rgb
   std::uint8_t b;
 };
 
-
 struct EmulationFrame
 {
   std::mdspan<std::uint8_t,

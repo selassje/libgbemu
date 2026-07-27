@@ -6,7 +6,6 @@ namespace {
 
 constexpr std::uint8_t TOTAL_SCANLINES = 154;
 constexpr std::uint8_t LAST_VISIBLE_SCANLINE = 143;
-constexpr std::uint8_t SCREEN_WIDTH = 160;
 constexpr std::uint16_t MODE_2_DOTS = 80;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
@@ -236,8 +235,7 @@ Ppu::handlePixelTransfer()
   const auto bgp = m_mmu.get().readByte(regs::BGP);
   constexpr unsigned shadeMask = 0x03;
   const auto shade = static_cast<std::uint8_t>(
-    (static_cast<unsigned>(bgp) >>
-     (static_cast<unsigned>(colorIndex) * 2U)) &
+    (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(colorIndex) * 2U)) &
     shadeMask);
   const auto& rgb = DMG_PALETTE.at(shade);
   const auto pixelIndex =

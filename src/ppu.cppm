@@ -54,7 +54,6 @@ private:
     }
     void runNextTCycle();
 
-
   private:
     enum class State : std::uint8_t
     {
