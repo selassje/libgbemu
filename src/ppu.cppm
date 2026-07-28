@@ -48,13 +48,19 @@ private:
   class Fetcher
   {
   public:
+    enum class Mode : std::uint8_t
+    {
+      Background,
+      Window,
+
+    };
     Fetcher(Mmu& mmu, Ppu& ppu)
       : m_mmu(mmu)
       , m_ppu(ppu)
     {
     }
     void runNextTCycle();
-    void reset();
+    void reset(Mode mode);
 
   private:
     enum class State : std::uint8_t
@@ -66,11 +72,15 @@ private:
       PushToFifo,
     };
 
+    void checkForWindow();
+
     std::reference_wrapper<Mmu> m_mmu;
     std::reference_wrapper<Ppu> m_ppu;
     State m_mState{ State::ReadTile };
+    Mode m_mode{ Mode::Background };
     bool m_rowPushed{ false };
-    std::uint8_t m_X{ 0 };
+    std::uint8_t m_tileX{ 0 };
+    std::uint8_t m_Y{ 0 };
     std::uint8_t m_mTileIndex{ 0 };
     std::uint16_t m_lastDotStateChange{ 0 };
     std::uint8_t m_tileDataLow{};
@@ -79,15 +89,15 @@ private:
 
   std::reference_wrapper<Mmu> m_mmu;
   std::uint8_t m_scanline{ 0 };
+  std::uint8_t m_activeWindowRow{ 0 };
   std::uint16_t m_dot{ 0 };
   Mode m_mode{ Mode::OAMSearch };
-  std::uint8_t m_nextPixelXToRender{ 0 };
+  std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
+  bool m_YCondition{ false };
   Fifo m_bgWndFifo{};
   Fifo m_objFifo{};
-  // Rendered pixels (160x144), palette-mapped via BGP to grayscale RGB, laid
-  // out row-major with 3 bytes (R,G,B) per pixel.
   FrameBuffer m_frameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
 

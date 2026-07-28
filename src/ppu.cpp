@@ -43,8 +43,27 @@ Ppu::Fifo::pop()
 }
 
 void
+Ppu::Fetcher::checkForWindow()
+{
+  if (m_mode == Mode::Window) {
+    return;
+  }
+  const auto wx = m_mmu.get().readByte(regs::WX);
+  const auto windowEnabled = (m_mmu.get().readByte(regs::LCDC) & 0x20U) !=
+                             0; // NOLINT(readability-magic-numbers)
+  const auto yCondition = m_ppu.get().m_YCondition;
+  const auto wxReached =
+    m_ppu.get().m_pixelsRendered + 7 == wx; // NOLINT(readability-magic-numbers)
+  if (windowEnabled && yCondition && wxReached) {
+    reset(Mode::Window);
+  }
+}
+
+void
 Ppu::Fetcher::runNextTCycle()
 {
+  checkForWindow();
+
   const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const auto currentState = m_mState;
   constexpr std::uint16_t tileDataBlock0 =
@@ -72,12 +91,32 @@ Ppu::Fetcher::runNextTCycle()
   switch (m_mState) {
     case State::ReadTile:
       if (elapsedDots >= 1) {
-        constexpr std::uint16_t tileMapBaseAddress =
-          0x9800; // NOLINT(readability-magic-numbers)
-        const std::uint8_t tileX =
-          (m_X + (m_mmu.get().readByte(regs::SCX) / 8)) % 32;
-        const std::uint8_t tileY =
-          (m_ppu.get().m_scanline + m_mmu.get().readByte(regs::SCY)) % 256;
+
+        const auto lcdc = m_mmu.get().readByte(regs::LCDC);
+        const auto lcdcBit3 =
+          (lcdc & 0x08U) != 0; // NOLINT(readability-magic-numbers)
+        const auto lcdcBit6 =
+          (lcdc & 0x40U) != 0; // NOLINT(readability-magic-numbers)
+        const auto isWindow = (m_mode == Mode::Window);
+        const std::uint16_t tileMapBaseAddress = [&]() -> std::uint16_t {
+          if ((isWindow && lcdcBit6) || (!isWindow && lcdcBit3)) {
+            return 0x9C00; // NOLINT(readability-magic-numbers)
+          }
+          return 0x9800; // NOLINT(readability-magic-numbers)
+        }();
+
+        const auto& [tileX,
+                     tileY] = [&]() -> std::pair<std::uint8_t, std::uint8_t> {
+          if (m_mode == Mode::Window) {
+            return { m_tileX % 32, m_Y % 256 };
+          }
+          const std::uint8_t tileXPrim =
+            (m_tileX + (m_mmu.get().readByte(regs::SCX) / 8)) % 32;
+          const std::uint8_t tileYPrim =
+            (m_Y + m_mmu.get().readByte(regs::SCY)) % 256;
+          return { tileXPrim, tileYPrim };
+        }();
+
         const auto tileMapAddress = static_cast<std::uint16_t>(
           tileMapBaseAddress + ((tileY / 8) * 32) + tileX);
         m_mTileIndex = m_mmu.get().readByte(tileMapAddress);
@@ -88,10 +127,10 @@ Ppu::Fetcher::runNextTCycle()
     case State::ReadTileDataHigh:
       if (elapsedDots >= 1) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
+        const auto scy =
+          m_mode == Mode::Window ? 0 : m_mmu.get().readByte(regs::SCY);
         const auto rowOffset = static_cast<std::uint16_t>(
-          (((m_ppu.get().m_scanline + m_mmu.get().readByte(regs::SCY)) % 8) *
-           2) +
-          (isHighByte ? 1 : 0));
+          (((m_Y + scy) % 8) * 2) + (isHighByte ? 1 : 0));
         std::uint8_t tileByte{};
         if (m_mTileIndex >= 128) {
           const auto tileOffset =
@@ -127,7 +166,7 @@ Ppu::Fetcher::runNextTCycle()
       if (m_rowPushed) {
         m_mState = State::ReadTile;
         m_rowPushed = false;
-        ++m_X;
+        ++m_tileX;
       }
       break;
   }
@@ -137,12 +176,21 @@ Ppu::Fetcher::runNextTCycle()
 };
 
 void
-Ppu::Fetcher::reset()
+Ppu::Fetcher::reset(Mode mode)
 {
   m_mState = State::ReadTile;
   m_rowPushed = false;
-  m_X = 0;
+  m_tileX = 0;
   m_lastDotStateChange = m_ppu.get().m_dot;
+  m_mode = mode;
+  if (m_mode == Mode::Window) {
+    m_Y = m_ppu.get().m_activeWindowRow;
+    m_ppu.get().m_activeWindowRow += 1;
+    m_ppu.get().m_scxDiscardedCount = m_ppu.get().m_scx3LowBits;
+  } else {
+    m_Y = m_ppu.get().m_scanline;
+  }
+  m_ppu.get().m_bgWndFifo.clear();
 }
 
 void
@@ -179,15 +227,16 @@ Ppu::runNextTCycle()
 void
 Ppu::incrementDot()
 {
-
   ++m_dot;
   if (m_dot >= DOTS_PER_SCANLINE) {
     m_dot = 0;
-    m_nextPixelXToRender = 0;
+    m_pixelsRendered = 0;
     m_scanline = static_cast<std::uint8_t>(m_scanline + 1) % TOTAL_SCANLINES;
     m_mmu.get().writeByte(regs::LY, m_scanline);
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
+      m_activeWindowRow = 0;
+      m_YCondition = false;
       if (m_scanline == FIRST_VBLANK_SCANLINE) {
         const auto interruptFlags = m_mmu.get().readByte(regs::IF);
         m_mmu.get().writeByte(
@@ -205,8 +254,10 @@ Ppu::incrementDot()
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
-        m_bgWndFifo.clear();
-        m_fetcher.reset();
+        m_fetcher.reset(Fetcher::Mode::Background);
+        if (!m_YCondition && m_scanline == m_mmu.get().readByte(regs::WY)) {
+          m_YCondition = true;
+        }
       }
     }
   }
@@ -253,15 +304,14 @@ Ppu::handlePixelTransfer()
     shadeMask);
   const auto& rgb = DMG_PALETTE.at(shade);
   const auto pixelIndex =
-    ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) +
-     m_nextPixelXToRender) *
+    ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) + m_pixelsRendered) *
     3;
   m_frameBuffer.at(pixelIndex) = rgb.at(0);
   m_frameBuffer.at(pixelIndex + 1) = rgb.at(1);
   m_frameBuffer.at(pixelIndex + 2) = rgb.at(2);
-  ++m_nextPixelXToRender;
+  ++m_pixelsRendered;
 
-  return m_nextPixelXToRender >= SCREEN_WIDTH;
+  return m_pixelsRendered >= SCREEN_WIDTH;
 };
 
 Ppu::FrameBuffer&

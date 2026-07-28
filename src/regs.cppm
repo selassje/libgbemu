@@ -15,5 +15,7 @@ export constexpr std::uint16_t BOOT_ROM_DISABLE = 0xFF50;
 export constexpr std::uint16_t IE = 0xFFFF;
 export constexpr std::uint16_t SCX = 0xFF43;
 export constexpr std::uint16_t SCY = 0xFF42;
+export constexpr std::uint16_t WX = 0xFF4B;
+export constexpr std::uint16_t WY = 0xFF4A;
 
 }
