@@ -148,7 +148,7 @@ against the GitHub API for anything beyond a quick unauthenticated read,
 since log downloads require auth even on this public repo.
 
 ```
-gh run list --branch master --limit 5
+gh run list --branch main --limit 5
 gh run view <run-id>                # job/step summary
 gh run view <run-id> --log-failed   # full logs of only the failed steps
 ```
