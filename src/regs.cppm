@@ -19,5 +19,6 @@ export constexpr std::uint16_t WX = 0xFF4B;
 export constexpr std::uint16_t WY = 0xFF4A;
 export constexpr std::uint16_t STAT = 0xFF41;
 export constexpr std::uint16_t LYC = 0xFF45;
+export constexpr std::uint16_t OAM_DMA = 0xFF46;
 
 }

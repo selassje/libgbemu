@@ -44,7 +44,22 @@ public:
   void updateStatMode(std::uint8_t mode);
   void updateStatCoincidence(bool coincidence);
 
+  // Advances an in-progress OAM DMA transfer (if any) by one T-cycle.
+  // Mirrors Ppu::runNextTCycle() - called once per T-cycle from
+  // GameBoy::runNextFrame()'s loop.
+  void runNextTCycle();
+
 private:
+  // Real hardware copies 1 byte per 4 T-cycles (160 bytes -> 640 T-cycles
+  // total), not all 160 at once - std::nullopt when no transfer is active.
+  struct DmaState
+  {
+    std::uint16_t sourceBase{ 0 };
+    std::uint8_t offset{ 0 };
+    std::uint8_t tCyclesSinceLastByte{ 0 };
+  };
+  std::optional<DmaState> m_dmaState;
+
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };
   std::vector<std::uint8_t> m_rom;

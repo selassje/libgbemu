@@ -186,7 +186,42 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
+  // Starts a new transfer, restarting any one already in progress - matches
+  // real hardware. The register itself still stores the written byte
+  // normally (falls through to getByteRef below), so reading 0xFF46 back
+  // returns the last source page written.
+  if (address == regs::OAM_DMA) {
+    m_dmaState = DmaState{ .sourceBase = static_cast<std::uint16_t>(
+                             static_cast<unsigned>(value) << 8U) };
+  }
+
   getByteRef(address) = value;
+}
+
+void
+Mmu::runNextTCycle()
+{
+  if (!m_dmaState.has_value()) {
+    return;
+  }
+
+  auto& dma = *m_dmaState;
+  constexpr std::uint8_t tCyclesPerByte = 4;
+  ++dma.tCyclesSinceLastByte;
+  if (dma.tCyclesSinceLastByte < tCyclesPerByte) {
+    return;
+  }
+  dma.tCyclesSinceLastByte = 0;
+
+  constexpr std::uint16_t oamBase = 0xFE00;
+  getByteRef(static_cast<std::uint16_t>(oamBase + dma.offset)) =
+    readByte(static_cast<std::uint16_t>(dma.sourceBase + dma.offset));
+
+  constexpr std::uint8_t totalBytes = 160;
+  ++dma.offset;
+  if (dma.offset >= totalBytes) {
+    m_dmaState.reset();
+  }
 }
 
 void
