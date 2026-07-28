@@ -56,7 +56,7 @@ Ppu::Fetcher::runNextTCycle()
 
   const auto pushTileRowToFifo = [this]() {
     if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >=
-                          8) { // NOLINT(readability-magic-numbers)
+                         8) { // NOLINT(readability-magic-numbers)
       return false;
     }
     for (unsigned bit = 8; bit-- > 0;) { // NOLINT(readability-magic-numbers)
