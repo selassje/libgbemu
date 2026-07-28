@@ -18,10 +18,19 @@ option(ENABLE_COVERAGE_REPORT "Enable Test Coverage Report" OFF)
 option(ENABLE_SANITIZERS "Enable Sanitizers" OFF)
 
 include(cmake/compiler_and_linker_flags.cmake)
-include(cmake/clang_format.cmake)
-include(cmake/cmake_format.cmake)
 include(cmake/setup_static_analysis.cmake)
-include(cmake/coverage_report.cmake)
+
+# clang-format/cmake-format define fixed-name global targets, and
+# coverage_report.cmake's target walks tests/ via CMAKE_SOURCE_DIR - both only
+# make sense (and only resolve paths correctly) when libgbemu is the outermost
+# project being configured, not when it's add_subdirectory()'d into something
+# else's build (e.g. gbemu-frontend), which would otherwise collide with that
+# project's own same-named targets.
+if(PROJECT_IS_TOP_LEVEL)
+  include(cmake/clang_format.cmake)
+  include(cmake/cmake_format.cmake)
+  include(cmake/coverage_report.cmake)
+endif()
 
 add_subdirectory(src)
 
@@ -31,4 +40,6 @@ if(ENABLE_TESTS)
   add_subdirectory(tests)
 endif()
 
-setup_coverage_report_target()
+if(PROJECT_IS_TOP_LEVEL)
+  setup_coverage_report_target()
+endif()
