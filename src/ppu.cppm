@@ -87,6 +87,17 @@ private:
     std::uint8_t m_tileDataHigh{};
   };
 
+  struct Object {
+    std::uint16_t oamAdress{};
+    std::uint8_t yPos{};
+    std::uint8_t xPos{};
+    std::uint8_t tileIndex{};
+    std::uint8_t attributes{};
+  };
+
+  std::array<Object, 10> m_objects{}; // NOLINT(readability-magic-numbers)
+  std::size_t m_objectCount{ 0 };
+
   std::reference_wrapper<Mmu> m_mmu;
   std::uint8_t m_scanline{ 0 };
   std::uint8_t m_activeWindowRow{ 0 };

@@ -1,3 +1,5 @@
+module;
+#include <cstddef>
 module gbemu;
 
 import :regs;
@@ -283,11 +285,34 @@ Ppu::handleVBlank() {
 };
 
 void
-Ppu::handleOAMSearch() {
-  // OAM Search logic can be implemented here
+Ppu::handleOAMSearch()
+{
+  if (m_dot == 0) {
+    m_objectCount = 0;
+  }
+  if (m_objectCount >= 10) { // NOLINT(readability-magic-numbers)
+    return;
+  }
 
-};
-
+  if (m_dot % 2 == 1) {
+    constexpr std::uint16_t oamBase = 0xFE00;
+    const auto oamAddress = static_cast<std::uint16_t>(
+      oamBase + ((m_dot / 2) * 4)); // NOLINT(readability-magic-numbers)
+    const bool is8x16Mode = (m_mmu.get().readByte(regs::LCDC) & 0x04U) !=
+                            0; // NOLINT(readability-magic-numbers)
+    const unsigned objectHeight = is8x16Mode ? 16 : 8;
+    const auto yPos = m_mmu.get().readByte(oamAddress);
+    const auto xPos = m_mmu.get().readByte(oamAddress + 1);
+    const auto tileIndex = m_mmu.get().readByte(oamAddress + 2);
+    const auto attributes = m_mmu.get().readByte(oamAddress + 3);
+    const unsigned scanlinePlus16 = static_cast<unsigned>(m_scanline) + 16;
+    if (scanlinePlus16 >= yPos && scanlinePlus16 < yPos + objectHeight) {
+      m_objects.at(
+        m_objectCount) = { oamAddress, yPos, xPos, tileIndex, attributes };
+      ++m_objectCount;
+    }
+  }
+}
 bool
 Ppu::handlePixelTransfer()
 {
