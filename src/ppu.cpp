@@ -218,6 +218,7 @@ Ppu::runNextTCycle()
     case Mode::PixelTransfer:
       if (handlePixelTransfer()) {
         m_mode = Mode::HBlank;
+        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
       }
       break;
   }
@@ -234,8 +235,11 @@ Ppu::incrementDot()
     m_pixelsRendered = 0;
     m_scanline = static_cast<std::uint8_t>(m_scanline + 1) % TOTAL_SCANLINES;
     m_mmu.get().writeByte(regs::LY, m_scanline);
+    m_mmu.get().updateStatCoincidence(m_scanline ==
+                                      m_mmu.get().readByte(regs::LYC));
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
+      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
       m_activeWindowRow = 0;
       m_YCondition = false;
       if (m_scanline == FIRST_VBLANK_SCANLINE) {
@@ -246,11 +250,13 @@ Ppu::incrementDot()
       }
     } else {
       m_mode = Mode::OAMSearch;
+      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
     }
   } else {
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
       if (m_dot == MODE_2_DOTS) {
         m_mode = Mode::PixelTransfer;
+        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
         constexpr std::uint8_t scxLow3BitsMask = 0x07;
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);

@@ -79,6 +79,8 @@ constexpr unsigned MBC1_ROM_BANK_MASK = 0x1FU;
 constexpr unsigned MBC1_BANK_HIGH_MASK = 0x03U;
 constexpr unsigned MBC1_BANKING_MODE_MASK = 0x01U;
 
+constexpr unsigned STAT_INTERRUPT_FLAG_BIT = 0b0000'0010U;
+
 }
 
 std::uint8_t
@@ -171,7 +173,75 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     m_bootRomActive = false;
   }
 
+  // STAT bits 0-2 (PPU mode, LYC==LY coincidence) are read-only and driven
+  // by Ppu via updateStatMode()/updateStatCoincidence(), not by the CPU -
+  // only bits 3-6 (the per-source interrupt enables) are actually
+  // CPU-writable.
+  if (address == regs::STAT) {
+    constexpr unsigned statWritableMask = 0b0111'1000U;
+    auto& stat = getByteRef(address);
+    stat = static_cast<std::uint8_t>(
+      (static_cast<unsigned>(stat) & ~statWritableMask) |
+      (static_cast<unsigned>(value) & statWritableMask));
+    return;
+  }
+
   getByteRef(address) = value;
+}
+
+void
+Mmu::updateStatMode(std::uint8_t mode)
+{
+  constexpr unsigned modeMask = 0b0000'0011U;
+  constexpr std::uint8_t hblankMode = 0;
+  constexpr std::uint8_t vblankMode = 1;
+  constexpr std::uint8_t oamMode = 2;
+  constexpr unsigned hblankInterruptEnableBit = 0b0000'1000U;
+  constexpr unsigned vblankInterruptEnableBit = 0b0001'0000U;
+  constexpr unsigned oamInterruptEnableBit = 0b0010'0000U;
+
+  auto& stat = getByteRef(regs::STAT);
+  stat = static_cast<std::uint8_t>((static_cast<unsigned>(stat) & ~modeMask) |
+                                   (static_cast<unsigned>(mode) & modeMask));
+
+  // Mode 3 (PixelTransfer) has no STAT interrupt source on real hardware.
+  unsigned modeInterruptEnableBit = 0;
+  if (mode == hblankMode) {
+    modeInterruptEnableBit = hblankInterruptEnableBit;
+  } else if (mode == vblankMode) {
+    modeInterruptEnableBit = vblankInterruptEnableBit;
+  } else if (mode == oamMode) {
+    modeInterruptEnableBit = oamInterruptEnableBit;
+  }
+
+  if (modeInterruptEnableBit != 0 &&
+      (static_cast<unsigned>(stat) & modeInterruptEnableBit) != 0) {
+    auto& interruptFlags = getByteRef(regs::IF);
+    interruptFlags = static_cast<std::uint8_t>(
+      static_cast<unsigned>(interruptFlags) | STAT_INTERRUPT_FLAG_BIT);
+  }
+}
+
+void
+Mmu::updateStatCoincidence(bool coincidence)
+{
+  constexpr unsigned coincidenceBit = 0b0000'0100U;
+  constexpr unsigned lycInterruptEnableBit = 0b0100'0000U;
+
+  auto& stat = getByteRef(regs::STAT);
+  if (!coincidence) {
+    stat =
+      static_cast<std::uint8_t>(static_cast<unsigned>(stat) & ~coincidenceBit);
+    return;
+  }
+
+  stat =
+    static_cast<std::uint8_t>(static_cast<unsigned>(stat) | coincidenceBit);
+  if ((static_cast<unsigned>(stat) & lycInterruptEnableBit) != 0) {
+    auto& interruptFlags = getByteRef(regs::IF);
+    interruptFlags = static_cast<std::uint8_t>(
+      static_cast<unsigned>(interruptFlags) | STAT_INTERRUPT_FLAG_BIT);
+  }
 }
 
 void

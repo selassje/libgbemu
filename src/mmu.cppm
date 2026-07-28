@@ -37,6 +37,13 @@ public:
 
   void enableBootRom(std::span<const std::uint8_t> bootRom);
 
+  // PPU-only: bypass the CPU-facing write mask on STAT's read-only bits
+  // (0-2). Not reachable through writeByte(), same reasoning as
+  // enableBootRom() being a dedicated method rather than a writeByte()
+  // special case.
+  void updateStatMode(std::uint8_t mode);
+  void updateStatCoincidence(bool coincidence);
+
 private:
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };
