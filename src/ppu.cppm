@@ -69,6 +69,7 @@ private:
     std::reference_wrapper<Mmu> m_mmu;
     std::reference_wrapper<Ppu> m_ppu;
     State m_mState{ State::ReadTile };
+    bool m_rowPushed{ false };
     std::uint8_t m_X{ 0 };
     std::uint8_t m_mTileIndex{ 0 };
     std::uint16_t m_lastDotStateChange{ 0 };

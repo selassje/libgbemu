@@ -55,8 +55,8 @@ Ppu::Fetcher::runNextTCycle()
     0x9000; // NOLINT(readability-magic-numbers) ]
 
   const auto pushTileRowToFifo = [this]() {
-    if (m_ppu.get().m_bgWndFifo.size() >=
-        8) { // NOLINT(readability-magic-numbers)
+    if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >=
+                          8) { // NOLINT(readability-magic-numbers)
       return false;
     }
     for (unsigned bit = 8; bit-- > 0;) { // NOLINT(readability-magic-numbers)
@@ -65,6 +65,7 @@ Ppu::Fetcher::runNextTCycle()
         ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
       m_ppu.get().m_bgWndFifo.push(colorIndex);
     }
+    m_rowPushed = true;
     return true;
   };
 
@@ -122,8 +123,10 @@ Ppu::Fetcher::runNextTCycle()
       }
       break;
     case State::PushToFifo:
-      if (pushTileRowToFifo()) {
+      pushTileRowToFifo();
+      if (m_rowPushed) {
         m_mState = State::ReadTile;
+        m_rowPushed = false;
         ++m_X;
       }
       break;
@@ -137,6 +140,7 @@ void
 Ppu::Fetcher::reset()
 {
   m_mState = State::ReadTile;
+  m_rowPushed = false;
   m_X = 0;
   m_lastDotStateChange = m_ppu.get().m_dot;
 }
