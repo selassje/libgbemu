@@ -35,6 +35,7 @@ private:
   public:
     void push(std::uint8_t pixel);
     std::uint8_t pop();
+    void clear() { m_head = m_size = 0; }
     [[nodiscard]] bool empty() const { return m_size == 0; }
     [[nodiscard]] std::size_t size() const { return m_size; }
 
@@ -53,6 +54,7 @@ private:
     {
     }
     void runNextTCycle();
+    void reset();
 
   private:
     enum class State : std::uint8_t

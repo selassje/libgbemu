@@ -134,6 +134,14 @@ Ppu::Fetcher::runNextTCycle()
 };
 
 void
+Ppu::Fetcher::reset()
+{
+  m_mState = State::ReadTile;
+  m_X = 0;
+  m_lastDotStateChange = m_ppu.get().m_dot;
+}
+
+void
 Ppu::runNextTCycle()
 {
   // Real hardware: the PPU is completely inert while LCDC bit 7 is clear -
@@ -193,6 +201,8 @@ Ppu::incrementDot()
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
+        m_bgWndFifo.clear();
+        m_fetcher.reset();
       }
     }
   }
