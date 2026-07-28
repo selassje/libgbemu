@@ -1,9 +1,9 @@
 set(MODULES ${CMAKE_CURRENT_LIST_DIR}/../import)
 
-add_library(gbemu STATIC)
+add_library(libgbemu STATIC)
 
 target_sources(
-  gbemu
+  libgbemu
   PUBLIC FILE_SET
          public_modules
          TYPE
@@ -33,7 +33,7 @@ if(MSVC)
 endif()
 
 target_sources(
-  gbemu
+  libgbemu
   PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp)
@@ -52,7 +52,7 @@ if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
   set(STD_MODULE ${STD_MODULE_DIR}/std.ixx)
 
   target_sources(
-    gbemu
+    libgbemu
     PUBLIC FILE_SET
            std_module
            TYPE
@@ -67,10 +67,10 @@ if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
                                                                    ON)
 endif()
 
-setup_compiler_warnings(gbemu)
-setup_clang_tidy(gbemu)
-setup_msvc_analysis(gbemu)
-setup_coverage_report_flags(gbemu)
-setup_sanitizers(gbemu)
-setup_std_lib(gbemu)
-setup_tests_flags(gbemu)
+setup_compiler_warnings(libgbemu)
+setup_clang_tidy(libgbemu)
+setup_msvc_analysis(libgbemu)
+setup_coverage_report_flags(libgbemu)
+setup_sanitizers(libgbemu)
+setup_std_lib(libgbemu)
+setup_tests_flags(libgbemu)

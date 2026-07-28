@@ -24,8 +24,8 @@ include(cmake/setup_static_analysis.cmake)
 # coverage_report.cmake's target walks tests/ via CMAKE_SOURCE_DIR - both only
 # make sense (and only resolve paths correctly) when libgbemu is the outermost
 # project being configured, not when it's add_subdirectory()'d into something
-# else's build (e.g. gbemu-frontend), which would otherwise collide with that
-# project's own same-named targets.
+# else's build (e.g. the gbemu frontend), which would otherwise collide with
+# that project's own same-named targets.
 if(PROJECT_IS_TOP_LEVEL)
   include(cmake/clang_format.cmake)
   include(cmake/cmake_format.cmake)

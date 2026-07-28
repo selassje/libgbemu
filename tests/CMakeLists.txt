@@ -4,7 +4,7 @@ add_executable(gbemu-tests)
 
 target_sources(gbemu-tests PRIVATE gameboy_test.cpp)
 
-target_link_libraries(gbemu-tests PRIVATE gbemu Catch2::Catch2WithMain)
+target_link_libraries(gbemu-tests PRIVATE libgbemu Catch2::Catch2WithMain)
 
 target_compile_definitions(
   gbemu-tests
