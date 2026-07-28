@@ -108,7 +108,8 @@ Ppu::Fetcher::runNextTCycle()
         const auto& [tileX,
                      tileY] = [&]() -> std::pair<std::uint8_t, std::uint8_t> {
           if (m_mode == Mode::Window) {
-            return { m_tileX % 32, m_Y % 256 };
+            return { static_cast<std::uint8_t>(m_tileX % 32),
+                     static_cast<std::uint8_t>(m_Y % 256) };
           }
           const std::uint8_t tileXPrim =
             (m_tileX + (m_mmu.get().readByte(regs::SCX) / 8)) % 32;
