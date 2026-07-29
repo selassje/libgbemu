@@ -95,6 +95,22 @@ private:
     std::uint8_t attributes{};
   };
 
+  // A decoded object-FIFO pixel. objectX and oamIndex exist purely for
+  // drawing-priority resolution when two opaque object pixels overlap
+  // (DMG: smaller objectX wins, tie-broken by oamIndex; CGB: oamIndex
+  // alone) - deliberately not relying on sprite fetch order matching
+  // priority order, which would be correct today but fragile against
+  // future changes to fetch scheduling. objectX stores the raw OAM byte
+  // (X+8) unmodified - priority is a relative comparison, so the +8
+  // offset never changes which pixel wins.
+  struct ObjectPixel {
+    std::uint8_t colorIndex{};
+    std::uint8_t palette{};
+    std::uint8_t objectX{};
+    std::uint8_t oamIndex{};
+    bool behindBackground{};
+  };
+
   std::array<Object, 10> m_objects{}; // NOLINT(readability-magic-numbers)
   std::size_t m_objectCount{ 0 };
 
