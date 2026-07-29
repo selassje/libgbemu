@@ -41,13 +41,19 @@ private:
   public:
     void push(T pixel)
     {
+      if (m_size >= m_buffer.size()) {
+        throw std::out_of_range("Fifo::push: already at capacity");
+      }
       m_buffer.at((m_head + m_size) % m_buffer.size()) = std::move(pixel);
       ++m_size;
     }
 
     T pop()
     {
-      const auto pixel = m_buffer.at(m_head);
+      if (m_size == 0) {
+        throw std::out_of_range("Fifo::pop: empty");
+      }
+      auto pixel = std::move(m_buffer.at(m_head));
       m_head = (m_head + 1) % m_buffer.size();
       --m_size;
       return pixel;
@@ -80,6 +86,9 @@ private:
   private:
     [[nodiscard]] T& at(std::size_t index)
     {
+      if (index >= m_size) {
+        throw std::out_of_range("Fifo::at: index >= logical size");
+      }
       return m_buffer.at((m_head + index) % m_buffer.size());
     }
 
