@@ -29,22 +29,6 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
 namespace gbemu {
 
 void
-Ppu::Fifo::push(std::uint8_t pixel)
-{
-  m_buffer.at((m_head + m_size) % m_buffer.size()) = pixel;
-  ++m_size;
-}
-
-std::uint8_t
-Ppu::Fifo::pop()
-{
-  const auto pixel = m_buffer.at(m_head);
-  m_head = (m_head + 1) % m_buffer.size();
-  --m_size;
-  return pixel;
-}
-
-void
 Ppu::Fetcher::checkForWindow()
 {
   if (m_mode == Mode::Window) {
