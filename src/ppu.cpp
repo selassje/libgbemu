@@ -311,24 +311,50 @@ Ppu::handlePixelTransfer()
     ++m_scxDiscardedCount;
     return false;
   }
-
-  const auto colorIndex = m_bgWndFifo.pop();
-  const auto bgp = m_mmu.get().readByte(regs::BGP);
-  constexpr unsigned shadeMask = 0x03;
-  const auto shade = static_cast<std::uint8_t>(
-    (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(colorIndex) * 2U)) &
-    shadeMask);
-  const auto& rgb = DMG_PALETTE.at(shade);
   const auto pixelIndex =
     ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) + m_pixelsRendered) *
     3;
+
+  auto bgColorIndex = m_bgWndFifo.pop();
+  constexpr std::uint8_t bgWindowEnableMask = 0x01;
+  if ((m_mmu.get().readByte(regs::LCDC) & bgWindowEnableMask) == 0) {
+    bgColorIndex = 0;
+  }
+
+  const auto bgp = m_mmu.get().readByte(regs::BGP);
+  constexpr unsigned shadeMask = 0x03;
+  const auto shade = static_cast<std::uint8_t>(
+    (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
+    shadeMask);
+  auto rgb = DMG_PALETTE.at(shade);
+
+  if (!m_objFifo.empty()) {
+    const auto objPixel = m_objFifo.pop();
+    const auto objectBehindBackground = objPixel.behindBackground;
+    constexpr std::uint8_t objEnableMask = 0x02;
+    const bool objEnabled =
+      (m_mmu.get().readByte(regs::LCDC) & objEnableMask) != 0;
+    if (objPixel.colorIndex != 0 && objEnabled &&
+        (bgColorIndex == 0 || !objectBehindBackground)) {
+      const auto objPaletteAddress = static_cast<std::uint16_t>(
+        objPixel.palette == 0 ? regs::OBP0 : regs::OBP1);
+      const auto obp = m_mmu.get().readByte(objPaletteAddress);
+      const auto objShade = static_cast<std::uint8_t>(
+        (static_cast<unsigned>(obp) >>
+         (static_cast<unsigned>(objPixel.colorIndex) * 2U)) &
+        shadeMask);
+      const auto objRgb = DMG_PALETTE.at(objShade);
+
+      rgb = objRgb;
+    }
+  }
   m_frameBuffer.at(pixelIndex) = rgb.at(0);
   m_frameBuffer.at(pixelIndex + 1) = rgb.at(1);
   m_frameBuffer.at(pixelIndex + 2) = rgb.at(2);
   ++m_pixelsRendered;
 
   return m_pixelsRendered >= SCREEN_WIDTH;
-};
+}
 
 Ppu::FrameBuffer&
 Ppu::frameBuffer()

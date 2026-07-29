@@ -111,7 +111,7 @@ private:
     {
       Background,
       Window,
-
+      Object,
     };
     Fetcher(Mmu& mmu, Ppu& ppu)
       : m_mmu(mmu)
@@ -131,6 +131,7 @@ private:
       PushToFifo,
     };
 
+    void checkForObject();
     void checkForWindow();
 
     std::reference_wrapper<Mmu> m_mmu;
