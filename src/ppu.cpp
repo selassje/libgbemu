@@ -1,5 +1,3 @@
-module;
-#include <cstddef>
 module gbemu;
 
 import :regs;
@@ -378,5 +376,17 @@ Ppu::FrameBuffer&
 Ppu::frameBuffer()
 {
   return m_frameBuffer;
+}
+
+void
+Ppu::saveFetcherState()
+{
+  m_savedFetcherState = m_fetcher;
+}
+
+void
+Ppu::restoreFetcherState()
+{
+  m_fetcher = m_savedFetcherState;
 }
 };

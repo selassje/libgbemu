@@ -190,12 +190,20 @@ private:
   Fifo<ObjectPixel> m_objFifo{};
   FrameBuffer m_frameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
+  // Snapshot of m_fetcher's state, captured/restored around an object fetch
+  // pausing/resuming the background/window fetch it interrupted. Never run
+  // itself (runNextTCycle() is never called on it) - purely a storage slot,
+  // copy-assigned to/from m_fetcher by saveFetcherState()/
+  // restoreFetcherState().
+  Fetcher m_savedFetcherState{ m_mmu, *this };
 
   void incrementDot();
   void handleHBlank();
   void handleVBlank();
   void handleOAMSearch();
   [[nodiscard]] bool handlePixelTransfer();
+  void saveFetcherState();
+  void restoreFetcherState();
 };
 
 };
