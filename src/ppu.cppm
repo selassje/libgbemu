@@ -41,11 +41,12 @@ private:
   public:
     void push(T pixel)
     {
+      // MSVC STL's std::out_of_range base-class chain isn't visible to
+      // clang-tidy through `import std;`'s module boundary; not
+      // reproducible on libc++ (dev_ninja_clang_tidy_linux builds this
+      // file clean).
       if (m_size >= m_buffer.size()) {
-        // NOLINTNEXTLINE(hicpp-exception-baseclass) - MSVC STL's
-        // std::out_of_range base-class chain isn't visible to clang-tidy
-        // through `import std;`'s module boundary; not reproducible on
-        // libc++ (dev_ninja_clang_tidy_linux builds this file clean).
+        // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::out_of_range("Fifo::push: already at capacity");
       }
       m_buffer.at((m_head + m_size) % m_buffer.size()) = std::move(pixel);
