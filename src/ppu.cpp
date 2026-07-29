@@ -91,6 +91,51 @@ Ppu::Fetcher::runNextTCycle()
     return true;
   };
 
+  // Pads the object FIFO up to 8 pixels (transparent, lowest priority) if it
+  // was short, then merges the just-fetched object row into it, one pixel
+  // at a time: an opaque incoming pixel always replaces an existing
+  // transparent one; between two opaque pixels, DMG priority (smaller
+  // objectX wins, tied objectX broken by smaller oamIndex) decides.
+  const auto mergeObjectRowIntoFifo = [this]() {
+    constexpr std::uint8_t xFlipMask = 0x20;
+    constexpr std::uint8_t paletteMask = 0x10;
+    constexpr std::uint8_t priorityMask = 0x80;
+
+    const bool xFlip = (m_currentObject.attributes & xFlipMask) != 0;
+    const auto palette = static_cast<std::uint8_t>(
+      (m_currentObject.attributes & paletteMask) != 0 ? 1 : 0);
+    const bool behindBackground =
+      (m_currentObject.attributes & priorityMask) != 0;
+
+    std::array<ObjectPixel, 8> pixels{}; // NOLINT(readability-magic-numbers)
+    for (unsigned i = 0; i < 8; ++i) {   // NOLINT(readability-magic-numbers)
+      const unsigned bit = xFlip ? i : (7 - i);
+      const auto colorIndex = static_cast<std::uint8_t>(
+        (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U) |
+        ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
+      pixels.at(i) = { colorIndex,
+                       palette,
+                       m_currentObject.xPos,
+                       m_currentObject.oamIndex,
+                       behindBackground };
+    }
+
+    auto& objFifo = m_ppu.get().m_objFifo;
+    while (objFifo.size() < 8) { // NOLINT(readability-magic-numbers)
+      objFifo.push({});
+    }
+    objFifo.merge(0, pixels, [](const auto& incoming, const auto& existing) {
+      if (incoming.colorIndex == 0) {
+        return false;
+      }
+      if (existing.colorIndex == 0) {
+        return true;
+      }
+      return std::tie(incoming.objectX, incoming.oamIndex) <
+             std::tie(existing.objectX, existing.oamIndex);
+    });
+  };
+
   switch (m_mState) {
     case State::ReadTile:
       if (elapsedDots >= 1) {
@@ -131,30 +176,65 @@ Ppu::Fetcher::runNextTCycle()
     case State::ReadTileDataHigh:
       if (elapsedDots >= 1) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
-        const auto scy =
-          m_mode == Mode::Window ? 0 : m_mmu.get().readByte(regs::SCY);
-        const auto rowOffset = static_cast<std::uint16_t>(
-          (((m_Y + scy) % 8) * 2) + (isHighByte ? 1 : 0));
         std::uint8_t tileByte{};
-        if (m_mTileIndex >= 128) {
-          const auto tileOffset =
-            static_cast<std::uint16_t>(((m_mTileIndex - 128) * 16) + rowOffset);
-          tileByte = m_mmu.get().readByte(tileDataBlock1 + tileOffset);
-        } else {
-          const auto tileOffset =
-            static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
+        if (m_mode == Mode::Object) {
+          // Objects always use unsigned tile indexing out of tile block 0
+          // ($8000-8FFF) - unlike background/window, there's no LCDC.4
+          // dependent signed/$9000-relative addressing for objects.
+          constexpr std::uint8_t objectSizeMask = 0x04;
+          constexpr std::uint8_t yFlipMask = 0x40;
+          constexpr std::uint8_t topTileMask = 0xFE;
+          constexpr std::uint8_t bottomTileBit = 0x01;
           const auto lcdc = m_mmu.get().readByte(regs::LCDC);
-          if ((lcdc & 0x10U) != 0) { // NOLINT(readability-magic-numbers)
-            tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+          const bool is8x16 = (lcdc & objectSizeMask) != 0;
+          const unsigned objectHeight = is8x16 ? 16 : 8;
+          const bool yFlip = (m_currentObject.attributes & yFlipMask) != 0;
+          const auto scanlinePlus16 =
+            static_cast<unsigned>(m_ppu.get().m_scanline) + 16;
+          const unsigned objectRow = scanlinePlus16 - m_currentObject.yPos;
+          const unsigned effectiveRow =
+            yFlip ? (objectHeight - 1 - objectRow) : objectRow;
+          auto tileIndex = m_currentObject.tileIndex;
+          unsigned rowWithinTile = effectiveRow;
+          if (is8x16) {
+            if (effectiveRow < 8) {
+              tileIndex = static_cast<std::uint8_t>(tileIndex & topTileMask);
+            } else {
+              tileIndex = static_cast<std::uint8_t>(tileIndex | bottomTileBit);
+              rowWithinTile = effectiveRow - 8;
+            }
+          }
+          const auto rowOffset = static_cast<std::uint16_t>(
+            (rowWithinTile * 2) + (isHighByte ? 1 : 0));
+          const auto tileOffset =
+            static_cast<std::uint16_t>((tileIndex * 16) + rowOffset);
+          tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+        } else {
+          const auto scy =
+            m_mode == Mode::Window ? 0 : m_mmu.get().readByte(regs::SCY);
+          const auto rowOffset = static_cast<std::uint16_t>(
+            (((m_Y + scy) % 8) * 2) + (isHighByte ? 1 : 0));
+          if (m_mTileIndex >= 128) {
+            const auto tileOffset = static_cast<std::uint16_t>(
+              ((m_mTileIndex - 128) * 16) + rowOffset);
+            tileByte = m_mmu.get().readByte(tileDataBlock1 + tileOffset);
           } else {
-            tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
+            const auto tileOffset =
+              static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
+            const auto lcdc = m_mmu.get().readByte(regs::LCDC);
+            if ((lcdc & 0x10U) != 0) { // NOLINT(readability-magic-numbers)
+              tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+            } else {
+              tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
+            }
           }
         }
         if (isHighByte) {
           m_tileDataHigh = tileByte;
           if (m_mode == Mode::Object) {
-            // TODO : Merge/padding/push logic for Objects
+            mergeObjectRowIntoFifo();
             m_ppu.get().restoreFetcherState();
+            m_lastDotStateChange = m_ppu.get().m_dot;
           } else {
             m_mState = State::Sleep;
             pushTileRowToFifo();
