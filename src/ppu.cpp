@@ -37,6 +37,8 @@ Ppu::Fetcher::checkForObject()
     if (m_ppu.get().m_pixelsRendered + 8 >= xPos) {
       object.isFetched = true;
       m_currentObject = object;
+      m_ppu.get().saveFetcherState();
+      reset(Mode::Object);
       break;
     }
   }
@@ -150,8 +152,13 @@ Ppu::Fetcher::runNextTCycle()
         }
         if (isHighByte) {
           m_tileDataHigh = tileByte;
-          m_mState = State::Sleep;
-          pushTileRowToFifo();
+          if (m_mode == Mode::Object) {
+            // TODO : Merge/padding/push logic for Objects
+            m_ppu.get().restoreFetcherState();
+          } else {
+            m_mState = State::Sleep;
+            pushTileRowToFifo();
+          }
         } else {
           m_tileDataLow = tileByte;
           m_mState = State::ReadTileDataHigh;
@@ -192,7 +199,11 @@ Ppu::Fetcher::reset(Mode mode)
   } else {
     m_Y = m_ppu.get().m_scanline;
   }
-  m_ppu.get().m_bgWndFifo.clear();
+  if (m_mode == Mode::Object) {
+    m_mState = State::ReadTileDataLow;
+  } else {
+    m_ppu.get().m_bgWndFifo.clear();
+  }
 }
 
 void
