@@ -8,7 +8,8 @@ target_link_libraries(gbemu-tests PRIVATE libgbemu Catch2::Catch2WithMain)
 
 target_compile_definitions(
   gbemu-tests
-  PRIVATE GB_TEST_ROMS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gb-test-roms")
+  PRIVATE GB_TEST_ROMS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gb-test-roms"
+          DMG_ACID2_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2")
 
 setup_compiler_warnings(gbemu-tests)
 setup_clang_tidy(gbemu-tests)

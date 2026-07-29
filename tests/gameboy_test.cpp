@@ -426,6 +426,43 @@ TEST_CASE("interrupt_time", "[GameBoy]")
   gbemu::gSerialOutput.clear();
 }
 
+TEST_CASE("dmg-acid2", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
+  auto reference =
+    readFile(std::filesystem::path(DMG_ACID2_DIR) / "reference.rgb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+  REQUIRE(result.has_value());
+
+  // The ROM's own source schedules a debugger breakpoint 10 frames after
+  // Main: starts, at which point its animation has settled and it's meant
+  // to be compared against the reference image - see dmg-acid2.asm's frame
+  // counter. That count doesn't include the real DMG boot ROM sequence
+  // (Nintendo logo scroll + chime) that runs first, though - empirically,
+  // the first byte-exact match against the reference happens at frame 93
+  // measured from GameBoy::loadRom(), and every frame from there through
+  // at least 150 matches too (the ROM's own animation is fully periodic
+  // once Main: is running), so 120 gives a comfortable stable margin.
+  constexpr int framesToStabilize = 120;
+  for (int i = 0; i < framesToStabilize - 1; ++i) {
+    const auto frameResult = gb.runNextFrame();
+    if (!frameResult) {
+      FAIL("Error : " + frameResult.error());
+    }
+  }
+  const auto frame = gb.runNextFrame();
+  if (!frame) {
+    FAIL("Error : " + frame.error());
+  }
+  REQUIRE(frame.has_value());
+
+  REQUIRE(reference.size() == frame->pixels.size());
+  REQUIRE(std::equal(
+    reference.begin(), reference.end(), frame->pixels.data_handle()));
+}
+
 TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
