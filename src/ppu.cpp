@@ -29,6 +29,22 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
 namespace gbemu {
 
 void
+Ppu::Fetcher::checkForObject()
+{
+  for (auto& object : m_ppu.get().m_objects) {
+    if (object.isFetched) {
+      continue;
+    }
+    const auto xPos = object.xPos;
+    if (m_ppu.get().m_pixelsRendered + 8 >= xPos) {
+      object.isFetched = true;
+      m_currentObject = object;
+      break;
+    }
+  }
+}
+
+void
 Ppu::Fetcher::checkForWindow()
 {
   if (m_mode == Mode::Window) {
@@ -48,6 +64,7 @@ Ppu::Fetcher::checkForWindow()
 void
 Ppu::Fetcher::runNextTCycle()
 {
+  checkForObject();
   checkForWindow();
 
   const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
@@ -280,8 +297,9 @@ Ppu::handleOAMSearch()
 
   if (m_dot % 2 == 1) {
     constexpr std::uint16_t oamBase = 0xFE00;
+    const auto oamIndex = static_cast<std::uint8_t>(m_dot / 2);
     const auto oamAddress = static_cast<std::uint16_t>(
-      oamBase + ((m_dot / 2) * 4)); // NOLINT(readability-magic-numbers)
+      oamBase + (oamIndex * 4)); // NOLINT(readability-magic-numbers)
     const bool is8x16Mode = (m_mmu.get().readByte(regs::LCDC) & 0x04U) !=
                             0; // NOLINT(readability-magic-numbers)
     const unsigned objectHeight = is8x16Mode ? 16 : 8;
@@ -291,8 +309,8 @@ Ppu::handleOAMSearch()
     const auto attributes = m_mmu.get().readByte(oamAddress + 3);
     const unsigned scanlinePlus16 = static_cast<unsigned>(m_scanline) + 16;
     if (scanlinePlus16 >= yPos && scanlinePlus16 < yPos + objectHeight) {
-      m_objects.at(
-        m_objectCount) = { oamAddress, yPos, xPos, tileIndex, attributes };
+      m_objects.at(m_objectCount) = { oamIndex,  yPos,       xPos,
+                                      tileIndex, attributes, false };
       ++m_objectCount;
     }
   }

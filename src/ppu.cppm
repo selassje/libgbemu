@@ -104,6 +104,15 @@ private:
     std::size_t m_size{ 0 };
   };
 
+  struct Object
+  {
+    std::uint8_t oamIndex{};
+    std::uint8_t yPos{};
+    std::uint8_t xPos{};
+    std::uint8_t tileIndex{};
+    std::uint8_t attributes{};
+    bool isFetched{ false };
+  };
   class Fetcher
   {
   public:
@@ -145,15 +154,7 @@ private:
     std::uint16_t m_lastDotStateChange{ 0 };
     std::uint8_t m_tileDataLow{};
     std::uint8_t m_tileDataHigh{};
-  };
-
-  struct Object
-  {
-    std::uint16_t oamAdress{};
-    std::uint8_t yPos{};
-    std::uint8_t xPos{};
-    std::uint8_t tileIndex{};
-    std::uint8_t attributes{};
+    Object m_currentObject{};
   };
 
   // A decoded object-FIFO pixel. objectX and oamIndex exist purely for
