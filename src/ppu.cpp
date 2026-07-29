@@ -29,7 +29,11 @@ namespace gbemu {
 void
 Ppu::Fetcher::checkForObject()
 {
-  for (auto& object : m_ppu.get().m_objects) {
+  if (m_mode == Mode::Object) {
+    return;
+  }
+  for (std::size_t i = 0; i < m_ppu.get().m_objectCount; ++i) {
+    auto& object = m_ppu.get().m_objects.at(i);
     if (object.isFetched) {
       continue;
     }
@@ -47,7 +51,7 @@ Ppu::Fetcher::checkForObject()
 void
 Ppu::Fetcher::checkForWindow()
 {
-  if (m_mode == Mode::Window) {
+  if (m_mode == Mode::Window || m_mode == Mode::Object) {
     return;
   }
   const auto wx = m_mmu.get().readByte(regs::WX);
@@ -64,8 +68,16 @@ Ppu::Fetcher::checkForWindow()
 void
 Ppu::Fetcher::runNextTCycle()
 {
-  checkForObject();
+  // Window must be checked first: its trigger is an exact-equality check
+  // on m_pixelsRendered (unlike the object trigger, which is deliberately
+  // >= so it survives being stalled). If an object's fetch claimed this
+  // dot first, output stalls until the fetch completes, m_pixelsRendered
+  // has already moved past the window's trigger point by the time control
+  // returns, and the window would never enter for this scanline. Checking
+  // window first lets it switch mode (and get correctly snapshotted by the
+  // object's saveFetcherState()) before an object fetch can steal the dot.
   checkForWindow();
+  checkForObject();
 
   const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const auto currentState = m_mState;
@@ -353,6 +365,7 @@ Ppu::incrementDot()
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
+        m_objFifo.clear();
         m_fetcher.reset(Fetcher::Mode::Background);
         if (!m_YCondition && m_scanline == m_mmu.get().readByte(regs::WY)) {
           m_YCondition = true;
@@ -408,6 +421,10 @@ bool
 Ppu::handlePixelTransfer()
 {
   m_fetcher.runNextTCycle();
+
+  if (m_fetcher.isFetchingObject()) {
+    return false;
+  }
 
   if (m_bgWndFifo.empty()) {
     return false;

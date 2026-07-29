@@ -129,6 +129,10 @@ private:
     }
     void runNextTCycle();
     void reset(Mode mode);
+    [[nodiscard]] bool isFetchingObject() const
+    {
+      return m_mode == Mode::Object;
+    }
 
   private:
     enum class State : std::uint8_t
