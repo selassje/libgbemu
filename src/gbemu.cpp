@@ -40,7 +40,12 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::reset()
 {
-  m_mmu = Mmu{};
+  // Not m_mmu = Mmu{} - that constructs a ~58KB temporary Mmu on the stack
+  // before assigning it in, which trips MSVC /analyze's C6262 (excessive
+  // stack usage) treated as an error under /WX. Destroying and
+  // reconstructing in-place avoids the temporary entirely.
+  m_mmu.~Mmu();
+  new (&m_mmu) Mmu();
   // Not m_ppu = Ppu(m_mmu) - Ppu's Fetcher members capture *this in their
   // default member initializers, so constructing a temporary Ppu and
   // assigning it in would leave those bound to the temporary's (about to
