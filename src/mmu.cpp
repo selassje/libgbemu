@@ -106,6 +106,14 @@ Mmu::readByte(std::uint16_t address) const
       static_cast<unsigned>(value) |
       static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
   }
+  // Bits 6-7 are unused (always 1); bits 0-3 are active-low button inputs
+  // - no frontend input is wired up yet, so they always read 1 (released),
+  // regardless of which group (if any) bits 4-5 select.
+  if (address == regs::JOYP) {
+    constexpr unsigned unselectedAndReleasedBits = 0b1100'1111U;
+    return static_cast<std::uint8_t>(static_cast<unsigned>(value) |
+                                     unselectedAndReleasedBits);
+  }
   return value;
 }
 
@@ -171,6 +179,18 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   // by writing 0 afterward - only a power cycle (a fresh Mmu) undoes this.
   if (address == regs::BOOT_ROM_DISABLE && value != 0) {
     m_bootRomActive = false;
+  }
+
+  // JOYP bits 0-3 are inputs (button state), not writable by the CPU -
+  // only bits 4-5 (which of the two button groups is selected) actually
+  // are.
+  if (address == regs::JOYP) {
+    constexpr unsigned joypWritableMask = 0b0011'0000U;
+    auto& joyp = getByteRef(address);
+    joyp = static_cast<std::uint8_t>(
+      (static_cast<unsigned>(joyp) & ~joypWritableMask) |
+      (static_cast<unsigned>(value) & joypWritableMask));
+    return;
   }
 
   // STAT bits 0-2 (PPU mode, LYC==LY coincidence) are read-only and driven

@@ -4,6 +4,7 @@ import std;
 
 namespace gbemu::regs {
 
+export constexpr std::uint16_t JOYP = 0xFF00;
 export constexpr std::uint16_t TIMA = 0xFF05;
 export constexpr std::uint16_t TMA = 0xFF06;
 export constexpr std::uint16_t TAC = 0xFF07;
