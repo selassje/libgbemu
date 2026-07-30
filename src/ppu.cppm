@@ -208,8 +208,6 @@ private:
   Fetcher m_savedFetcherState{ m_mmu, *this };
 
   void incrementDot();
-  void handleHBlank();
-  void handleVBlank();
   void handleOAMSearch();
   [[nodiscard]] bool handlePixelTransfer();
   void saveFetcherState();

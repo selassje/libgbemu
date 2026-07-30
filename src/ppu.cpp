@@ -345,10 +345,10 @@ Ppu::runNextTCycle()
 
   switch (m_mode) {
     case Mode::HBlank:
-      handleHBlank();
-      break;
     case Mode::VBlank:
-      handleVBlank();
+      // Both are genuinely idle time on real hardware - no fetcher/FIFO
+      // activity, nothing to render. Mode transitions, LY updates, and the
+      // VBlank interrupt are all already handled by incrementDot().
       break;
     case Mode::OAMSearch:
       handleOAMSearch();
@@ -408,18 +408,6 @@ Ppu::incrementDot()
     }
   }
 }
-
-void
-Ppu::handleHBlank() {
-  // HBlank logic can be implemented here
-
-};
-
-void
-Ppu::handleVBlank() {
-  // VBlank logic can be implemented here
-
-};
 
 void
 Ppu::handleOAMSearch()
