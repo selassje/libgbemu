@@ -15,6 +15,7 @@ Checks: "*,
          -readability-function-cognitive-complexity,
          -modernize-use-designated-initializers,
          -llvm-prefer-static-over-anonymous-namespace,
+         -readability-redundant-declaration,
          -misc-include-cleaner,
          "
 CheckOptions:
