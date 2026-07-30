@@ -22,15 +22,20 @@ export enum class Button : std::uint8_t {
 };
 
 #ifdef ENABLE_TESTS
-export inline std::string
-  gSerialOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+// Function-local statics, not plain exported globals: sidesteps a
+// reproducible clang codegen crash (in this toolchain's experimental
+// snapshot) in the llvm.global_ctors list machinery that non-trivially-
+// initialized module-exported globals need - a local static instead uses
+// the unrelated (C++11 thread-safe) guarded-initialization codegen path.
+export std::string&
+serialOutput();
 // Some test ROMs (e.g. blargg's interrupt_time.gb) report their result via a
 // zero-terminated string written to cartridge RAM at $A004 instead of over
 // the serial port. Captured positionally (indexed by address, not
 // append-on-write) so the interleaved null-terminator writes each character
 // print performs land in the right place.
-export inline std::string
-  gMemoryOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+export std::string&
+memoryOutput();
 #endif
 
 class Mmu // NOLINT(misc-use-internal-linkage)

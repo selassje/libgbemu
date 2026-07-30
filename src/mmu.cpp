@@ -8,6 +8,22 @@ constexpr unsigned MBC1_BANK_HIGH_SHIFT = 5U;
 
 namespace gbemu {
 
+#ifdef ENABLE_TESTS
+std::string&
+serialOutput()
+{
+  static std::string value;
+  return value;
+}
+
+std::string&
+memoryOutput()
+{
+  static std::string value;
+  return value;
+}
+#endif
+
 std::uint8_t&
 Mmu::getByteRef(std::uint16_t address)
 {
@@ -149,7 +165,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   if (address == 0xFF02 && value == 0x81) { // NOLINT(readability-magic-numbers)
     const auto serialChar =
       static_cast<char>(readByte(0xFF01)); // NOLINT(readability-magic-numbers)
-    gSerialOutput += serialChar;
+    serialOutput() += serialChar;
   }
   constexpr std::uint16_t textOutBase =
     0xA004; // NOLINT(readability-magic-numbers)
@@ -157,10 +173,10 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     0xC000; // NOLINT(readability-magic-numbers)
   if (address >= textOutBase && address < textOutEnd) {
     const auto offset = static_cast<std::size_t>(address - textOutBase);
-    if (gMemoryOutput.size() <= offset) {
-      gMemoryOutput.resize(offset + 1, '\0');
+    if (memoryOutput().size() <= offset) {
+      memoryOutput().resize(offset + 1, '\0');
     }
-    gMemoryOutput.at(offset) = static_cast<char>(value);
+    memoryOutput().at(offset) = static_cast<char>(value);
   }
 #endif
 
