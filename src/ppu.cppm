@@ -186,6 +186,12 @@ private:
   std::uint8_t m_activeWindowRow{ 0 };
   std::uint16_t m_dot{ 0 };
   Mode m_mode{ Mode::OAMSearch };
+  // Real hardware: LCDC.7 off forces LY=0/STAT mode=HBlank for as long as
+  // it stays off, and re-enabling always restarts a fresh frame at
+  // scanline 0/mode 2 - never resumes wherever the PPU was paused. Tracked
+  // here so runNextTCycle() can detect the edge (not just the level) and
+  // apply that reset/restart exactly once per transition.
+  bool m_lcdEnabled{ false };
   std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };

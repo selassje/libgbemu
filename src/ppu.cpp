@@ -301,12 +301,46 @@ Ppu::Fetcher::reset(Mode mode)
 void
 Ppu::runNextTCycle()
 {
-  // Real hardware: the PPU is completely inert while LCDC bit 7 is clear -
-  // no dot/scanline/mode advancement, no interrupts. LY stays wherever it
-  // was left (0 at boot, since the CPU/PPU/MMU all reset to zero) until the
-  // boot ROM (or a game) explicitly enables the LCD.
-  if ((m_mmu.get().readByte(regs::LCDC) & LCD_ENABLE_BIT) == 0) {
+  const bool lcdEnabled =
+    (m_mmu.get().readByte(regs::LCDC) & LCD_ENABLE_BIT) != 0;
+
+  if (!lcdEnabled) {
+    if (m_lcdEnabled) {
+      // Real hardware: disabling the LCD immediately forces LY=0 and STAT
+      // mode=HBlank, not "stay wherever it was" - a game (e.g. Tetris,
+      // which disables mid-VBlank at LY=148) can rely on this to reset
+      // scanline/mode state before reinitializing VRAM/OAM.
+      m_lcdEnabled = false;
+      m_dot = 0;
+      m_scanline = 0;
+      m_mode = Mode::HBlank;
+      m_pixelsRendered = 0;
+      m_activeWindowRow = 0;
+      m_YCondition = false;
+      m_bgWndFifo.clear();
+      m_objFifo.clear();
+      m_mmu.get().writeByte(regs::LY, m_scanline);
+      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+      m_mmu.get().updateStatCoincidence(m_scanline ==
+                                        m_mmu.get().readByte(regs::LYC));
+    }
+    // The PPU is completely inert while LCDC bit 7 stays clear - no
+    // dot/scanline/mode advancement, no interrupts.
     return;
+  }
+
+  if (!m_lcdEnabled) {
+    // Real hardware: re-enabling the LCD always restarts a fresh frame at
+    // scanline 0/mode 2 - never resumes whatever mode/scanline it was
+    // paused at before being disabled.
+    m_lcdEnabled = true;
+    m_dot = 0;
+    m_scanline = 0;
+    m_mode = Mode::OAMSearch;
+    m_mmu.get().writeByte(regs::LY, m_scanline);
+    m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+    m_mmu.get().updateStatCoincidence(m_scanline ==
+                                      m_mmu.get().readByte(regs::LYC));
   }
 
   switch (m_mode) {
