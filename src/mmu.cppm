@@ -79,6 +79,15 @@ private:
   };
   std::optional<DmaState> m_dmaState;
 
+  // An internally-clocked transfer (SC bit 0 set) completes on its own
+  // fixed timing regardless of whether a real link partner is present -
+  // real hardware shifts 8 bits at ~8192 Hz (512 T-cycles/bit), so 4096
+  // T-cycles for the whole byte. An externally-clocked transfer (bit 0
+  // clear) has no local timer driving it and is deliberately left to just
+  // sit there forever with nothing to advance it - that's genuinely
+  // correct behavior with no partner connected, not a bug.
+  std::optional<std::uint16_t> m_serialTCyclesRemaining;
+
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };
   std::vector<std::uint8_t> m_rom;

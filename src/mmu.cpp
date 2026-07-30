@@ -231,32 +231,61 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
                              static_cast<unsigned>(value) << 8U) };
   }
 
+  // Only an internally-clocked transfer (bit 0 set) has a local timer to
+  // complete it - see m_serialTCyclesRemaining's comment. The register
+  // itself still stores the written byte normally (falls through to
+  // getByteRef below) either way.
+  constexpr unsigned transferStartBit = 0b1000'0000U;
+  constexpr unsigned internalClockBit = 0b0000'0001U;
+  if (address == regs::SC &&
+      (static_cast<unsigned>(value) & transferStartBit) != 0 &&
+      (static_cast<unsigned>(value) & internalClockBit) != 0) {
+    constexpr std::uint16_t tCyclesPerByte = 4096;
+    m_serialTCyclesRemaining = tCyclesPerByte;
+  }
+
   getByteRef(address) = value;
 }
 
 void
 Mmu::runNextTCycle()
 {
-  if (!m_dmaState.has_value()) {
-    return;
+  if (m_dmaState.has_value()) {
+    auto& dma = *m_dmaState;
+    constexpr std::uint8_t tCyclesPerByte = 4;
+    ++dma.tCyclesSinceLastByte;
+    if (dma.tCyclesSinceLastByte >= tCyclesPerByte) {
+      dma.tCyclesSinceLastByte = 0;
+
+      constexpr std::uint16_t oamBase = 0xFE00;
+      getByteRef(static_cast<std::uint16_t>(oamBase + dma.offset)) =
+        readByte(static_cast<std::uint16_t>(dma.sourceBase + dma.offset));
+
+      constexpr std::uint8_t totalBytes = 160;
+      ++dma.offset;
+      if (dma.offset >= totalBytes) {
+        m_dmaState.reset();
+      }
+    }
   }
 
-  auto& dma = *m_dmaState;
-  constexpr std::uint8_t tCyclesPerByte = 4;
-  ++dma.tCyclesSinceLastByte;
-  if (dma.tCyclesSinceLastByte < tCyclesPerByte) {
-    return;
-  }
-  dma.tCyclesSinceLastByte = 0;
+  if (m_serialTCyclesRemaining.has_value()) {
+    --(*m_serialTCyclesRemaining);
+    if (*m_serialTCyclesRemaining == 0) {
+      m_serialTCyclesRemaining.reset();
 
-  constexpr std::uint16_t oamBase = 0xFE00;
-  getByteRef(static_cast<std::uint16_t>(oamBase + dma.offset)) =
-    readByte(static_cast<std::uint16_t>(dma.sourceBase + dma.offset));
+      constexpr std::uint8_t noPartnerConnectedByte = 0xFF;
+      constexpr unsigned transferStartBit = 0b1000'0000U;
+      constexpr unsigned serialInterruptBit = 0b0000'1000U;
 
-  constexpr std::uint8_t totalBytes = 160;
-  ++dma.offset;
-  if (dma.offset >= totalBytes) {
-    m_dmaState.reset();
+      getByteRef(regs::SB) = noPartnerConnectedByte;
+      auto& sc = getByteRef(regs::SC);
+      sc = static_cast<std::uint8_t>(static_cast<unsigned>(sc) &
+                                     ~transferStartBit);
+      auto& interruptFlags = getByteRef(regs::IF);
+      interruptFlags = static_cast<std::uint8_t>(
+        static_cast<unsigned>(interruptFlags) | serialInterruptBit);
+    }
   }
 }
 
