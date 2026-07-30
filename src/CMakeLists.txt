@@ -13,6 +13,7 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}
          FILES
          ${MODULES}/gbemu.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
@@ -26,16 +27,23 @@ if(MSVC)
   # exported only from a module interface unit"). Force it explicitly so
   # IntelliSense's command line matches the real one.
   set_source_files_properties(
-    ${MODULES}/gbemu.cppm ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
+    ${MODULES}/gbemu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
     PROPERTIES COMPILE_OPTIONS /interface)
 endif()
 
 target_sources(
   libgbemu
-  PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
-          ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
+  PRIVATE ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/apu.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp)
 
 # cl.exe already gets a working `std` module from CMake's own CXX_MODULE_STD=ON

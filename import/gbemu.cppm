@@ -2,6 +2,7 @@ export module gbemu;
 
 import std;
 
+export import :apu;
 export import :cpu;
 export import :mmu;
 export import :ppu;
@@ -22,6 +23,13 @@ struct EmulationFrame
   std::mdspan<std::uint8_t,
               std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
     pixels;
+  // Interleaved stereo (L, R, L, R, ...) - dynamic in the sample-frame
+  // count (the Game Boy's clock doesn't divide evenly into any standard
+  // sample rate, so this varies by a sample or two frame to frame), fixed
+  // at 2 channels.
+  std::mdspan<const std::int16_t,
+              std::extents<std::size_t, std::dynamic_extent, 2>>
+    audio;
 };
 
 class GameBoy
@@ -58,6 +66,7 @@ private:
   // constructor receives a reference to it.
   Ppu m_ppu;
   Cpu m_cpu;
+  Apu m_apu;
   // Whether the cartridge itself declares CGB awareness (header byte
   // 0x0143, bit 7) - kept for gating actual CGB-exclusive hardware
   // features (VRAM banking, palette RAM, double speed, ...) once those

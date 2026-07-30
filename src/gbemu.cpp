@@ -55,6 +55,7 @@ GameBoy::reset()
   m_ppu.~Ppu();
   new (&m_ppu) Ppu(m_mmu);
   m_cpu = Cpu(m_mmu, m_ppu);
+  m_apu = Apu{};
   return initializeFromRom();
 }
 
@@ -62,6 +63,7 @@ std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
   constexpr std::size_t mCyclesPerFrame = 17556;
+  m_apu.startFrame();
   std::size_t mCycles = 0;
   while (mCycles < mCyclesPerFrame) {
     const auto result = m_cpu.runNextInstruction();
@@ -72,13 +74,18 @@ gbemu::GameBoy::runNextFrame()
     for (std::size_t i = 0; i < cycles * 4; ++i) {
       m_ppu.runNextTCycle();
       m_mmu.runNextTCycle();
+      m_apu.runNextTCycle();
     }
     mCycles += cycles;
   }
+  const auto& audioBuffer = m_apu.buffer();
   const EmulationFrame frame = {
     std::mdspan<std::uint8_t,
                 std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>(
-      m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH, 3)
+      m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH, 3),
+    std::mdspan<const std::int16_t,
+                std::extents<std::size_t, std::dynamic_extent, 2>>(
+      audioBuffer.data(), audioBuffer.size() / 2, 2)
   };
 
   return { frame };
