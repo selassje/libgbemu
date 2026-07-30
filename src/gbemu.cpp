@@ -52,4 +52,10 @@ gbemu::GameBoy::runNextFrame()
   return { frame };
 }
 
+void
+GameBoy::setButtonState(Button button, bool pressed)
+{
+  m_mmu.setButtonState(button, pressed);
+}
+
 };

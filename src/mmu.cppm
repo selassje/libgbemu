@@ -6,6 +6,21 @@ namespace gbemu {
 
 export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
 
+// Values match JOYP's bit-position convention: Right/Left/Up/Down occupy
+// bits 0-3 of the directional-key group, A/B/Select/Start occupy bits 0-3
+// of the button-key group - stored here shifted into one uint8_t (buttons
+// in the upper nibble) so both groups fit in a single m_buttonState byte.
+export enum class Button : std::uint8_t {
+  Right,
+  Left,
+  Up,
+  Down,
+  A,
+  B,
+  Select,
+  Start
+};
+
 #ifdef ENABLE_TESTS
 export inline std::string
   gSerialOutput; // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -44,6 +59,10 @@ public:
   void updateStatMode(std::uint8_t mode);
   void updateStatCoincidence(bool coincidence);
 
+  // Frontend-facing: records real button state, combined with whichever
+  // group(s) JOYP currently selects at read time (see readByte()).
+  void setButtonState(Button button, bool pressed);
+
   // Advances an in-progress OAM DMA transfer (if any) by one T-cycle.
   // Mirrors Ppu::runNextTCycle() - called once per T-cycle from
   // GameBoy::runNextFrame()'s loop.
@@ -78,6 +97,9 @@ private:
   std::size_t m_switchableWRamBank{ 1 };
   std::uint8_t m_interruptEnableRegister{ 0 };
   std::uint8_t m_unusable{ 0 };
+  // 1 = pressed, one bit per Button - directional keys in bits 0-3, button
+  // keys in bits 4-7 (matching Button's own enumerator order/values).
+  std::uint8_t m_buttonState{ 0 };
 
   [[nodiscard]] std::uint8_t& getByteRef(std::uint16_t address);
 };

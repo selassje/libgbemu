@@ -106,13 +106,29 @@ Mmu::readByte(std::uint16_t address) const
       static_cast<unsigned>(value) |
       static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
   }
-  // Bits 6-7 are unused (always 1); bits 0-3 are active-low button inputs
-  // - no frontend input is wired up yet, so they always read 1 (released),
-  // regardless of which group (if any) bits 4-5 select.
+  // Bits 6-7 are unused (always 1). Bits 0-3 are active-low button inputs:
+  // start with all released (1) and clear a bit for each pressed button in
+  // whichever group(s) bits 4-5 currently select - real hardware wire-ANDs
+  // both groups together if both are selected simultaneously, which this
+  // sequential clearing naturally reproduces.
   if (address == regs::JOYP) {
-    constexpr unsigned unselectedAndReleasedBits = 0b1100'1111U;
-    return static_cast<std::uint8_t>(static_cast<unsigned>(value) |
-                                     unselectedAndReleasedBits);
+    constexpr unsigned dpadSelectBit = 0b0001'0000U;
+    constexpr unsigned buttonSelectBit = 0b0010'0000U;
+    constexpr unsigned selectionBits = 0b0011'0000U;
+    constexpr unsigned unusedBits = 0b1100'0000U;
+    constexpr unsigned lowNibbleMask = 0b0000'1111U;
+
+    unsigned releasedBits = lowNibbleMask;
+    const auto pressed = static_cast<unsigned>(m_buttonState);
+    if ((static_cast<unsigned>(value) & dpadSelectBit) == 0) {
+      releasedBits &= ~(pressed & lowNibbleMask);
+    }
+    if ((static_cast<unsigned>(value) & buttonSelectBit) == 0) {
+      releasedBits &= ~((pressed >> 4U) & lowNibbleMask);
+    }
+    return static_cast<std::uint8_t>(
+      unusedBits | (static_cast<unsigned>(value) & selectionBits) |
+      releasedBits);
   }
   return value;
 }
@@ -297,6 +313,15 @@ Mmu::updateStatCoincidence(bool coincidence)
     interruptFlags = static_cast<std::uint8_t>(
       static_cast<unsigned>(interruptFlags) | STAT_INTERRUPT_FLAG_BIT);
   }
+}
+
+void
+Mmu::setButtonState(Button button, bool pressed)
+{
+  const auto bit = 1U << static_cast<unsigned>(button);
+  m_buttonState = static_cast<std::uint8_t>(
+    pressed ? (static_cast<unsigned>(m_buttonState) | bit)
+            : (static_cast<unsigned>(m_buttonState) & ~bit));
 }
 
 void

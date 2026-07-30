@@ -37,6 +37,7 @@ public:
     std::span<const std::uint8_t> rom);
 
   std::expected<EmulationFrame, std::string> runNextFrame();
+  void setButtonState(Button button, bool pressed);
 
 private:
   Mmu m_mmu;
