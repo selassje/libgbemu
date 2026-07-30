@@ -36,10 +36,23 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
+  // Power-cycle equivalent: re-runs the exact same boot sequence against
+  // the already-loaded cartridge, without needing it re-supplied - the
+  // same cartridge stays "inserted", same as a real Game Boy's power
+  // switch off/on.
+  [[nodiscard]] std::expected<void, std::string> reset();
+
   std::expected<EmulationFrame, std::string> runNextFrame();
   void setButtonState(Button button, bool pressed);
 
 private:
+  // Reconstructs Mmu/Ppu/Cpu from scratch (guaranteeing every field
+  // returns to its true declared default, rather than a hand-maintained
+  // per-field reset that could silently miss one) and re-runs the same
+  // load sequence loadRom()/reset() both need, operating on whatever's
+  // currently in m_romBytes.
+  [[nodiscard]] std::expected<void, std::string> initializeFromRom();
+
   Mmu m_mmu;
   // Declared before m_cpu so it's fully constructed before Cpu's
   // constructor receives a reference to it.
@@ -51,8 +64,11 @@ private:
   // exist. Deliberately not used to decide which boot ROM runs: real
   // hardware always boots as whichever console it physically is, and lets
   // the boot ROM itself branch on this same flag to decide compatibility
-  // vs. native mode - see GameBoy::loadRom().
+  // vs. native mode - see GameBoy::initializeFromRom().
   bool m_isCgb{ false };
+  // Kept so reset() can re-run initializeFromRom() without the caller
+  // needing to re-supply the same ROM bytes.
+  std::vector<std::uint8_t> m_romBytes;
 };
 
 }

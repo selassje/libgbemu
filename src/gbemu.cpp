@@ -10,10 +10,9 @@ constexpr std::uint8_t CGB_FLAG_MASK = 0x80;
 namespace gbemu {
 
 [[nodiscard]] std::expected<void, std::string>
-GameBoy::loadRom(std::span<const std::uint8_t> rom)
-
+GameBoy::initializeFromRom()
 {
-  auto result = m_mmu.loadRom(rom);
+  auto result = m_mmu.loadRom(m_romBytes);
   if (!result) {
     return result;
   }
@@ -29,6 +28,29 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   m_cpu.reset();
 
   return result;
+}
+
+[[nodiscard]] std::expected<void, std::string>
+GameBoy::loadRom(std::span<const std::uint8_t> rom)
+{
+  m_romBytes.assign(rom.begin(), rom.end());
+  return initializeFromRom();
+}
+
+[[nodiscard]] std::expected<void, std::string>
+GameBoy::reset()
+{
+  m_mmu = Mmu{};
+  // Not m_ppu = Ppu(m_mmu) - Ppu's Fetcher members capture *this in their
+  // default member initializers, so constructing a temporary Ppu and
+  // assigning it in would leave those bound to the temporary's (about to
+  // be destroyed) address, not m_ppu's. Destroying and reconstructing
+  // in-place ensures *this inside the constructor is the real, persistent
+  // m_ppu.
+  m_ppu.~Ppu();
+  new (&m_ppu) Ppu(m_mmu);
+  m_cpu = Cpu(m_mmu, m_ppu);
+  return initializeFromRom();
 }
 
 std::expected<EmulationFrame, std::string>
