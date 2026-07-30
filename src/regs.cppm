@@ -25,5 +25,31 @@ export constexpr std::uint16_t WY = 0xFF4A;
 export constexpr std::uint16_t STAT = 0xFF41;
 export constexpr std::uint16_t LYC = 0xFF45;
 export constexpr std::uint16_t OAM_DMA = 0xFF46;
+export constexpr std::uint16_t NR10 = 0xFF10;
+export constexpr std::uint16_t NR11 = 0xFF11;
+export constexpr std::uint16_t NR12 = 0xFF12;
+export constexpr std::uint16_t NR13 = 0xFF13;
+export constexpr std::uint16_t NR14 = 0xFF14;
+export constexpr std::uint16_t NR21 = 0xFF16;
+export constexpr std::uint16_t NR22 = 0xFF17;
+export constexpr std::uint16_t NR23 = 0xFF18;
+export constexpr std::uint16_t NR24 = 0xFF19;
+export constexpr std::uint16_t NR30 = 0xFF1A;
+export constexpr std::uint16_t NR31 = 0xFF1B;
+export constexpr std::uint16_t NR32 = 0xFF1C;
+export constexpr std::uint16_t NR33 = 0xFF1D;
+export constexpr std::uint16_t NR34 = 0xFF1E;
+export constexpr std::uint16_t NR41 = 0xFF20;
+export constexpr std::uint16_t NR42 = 0xFF21;
+export constexpr std::uint16_t NR43 = 0xFF22;
+export constexpr std::uint16_t NR44 = 0xFF23;
+export constexpr std::uint16_t NR50 = 0xFF24;
+export constexpr std::uint16_t NR51 = 0xFF25;
+export constexpr std::uint16_t NR52 = 0xFF26;
+// 16 bytes (0xFF30-0xFF3F), channel 3's waveform sample data - unlike the
+// registers above, always readable/writable regardless of APU power state
+// (see Mmu::writeByte()'s NR52 handling), so it's just a plain storage
+// range with no register-specific behavior of its own to name individually.
+export constexpr std::uint16_t WAVE_RAM_START = 0xFF30;
 
 }

@@ -114,6 +114,12 @@ private:
   // 1 = pressed, one bit per Button - directional keys in bits 0-3, button
   // keys in bits 4-7 (matching Button's own enumerator order/values).
   std::uint8_t m_buttonState{ 0 };
+  // Mirrors NR52 bit 7 (APU power). Starts true since m_io - and so NR52 -
+  // starts zeroed, matching real hardware's power-on-reset state before the
+  // boot ROM writes NR52=0x80 to turn the APU on. While true, writes to
+  // NR10-NR51 (0xFF10-0xFF25) are dropped - see writeByte(). Wave RAM
+  // (0xFF30-0xFF3F) and NR52 itself are unaffected either way.
+  bool m_apuRegistersReadOnly{ true };
 
   [[nodiscard]] std::uint8_t& getByteRef(std::uint16_t address);
 };

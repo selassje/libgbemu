@@ -95,6 +95,8 @@ constexpr unsigned MBC1_BANKING_MODE_MASK = 0x01U;
 
 constexpr unsigned STAT_INTERRUPT_FLAG_BIT = 0b0000'0010U;
 
+constexpr std::uint16_t APU_REGISTERS_START = 0xFF10;
+
 }
 
 std::uint8_t
@@ -143,6 +145,66 @@ Mmu::readByte(std::uint16_t address) const
     return static_cast<std::uint8_t>(
       unusedBits | (static_cast<unsigned>(value) & selectionBits) |
       releasedBits);
+  }
+  // NR14/NR24/NR34/NR44 ("period high & control", or plain "control" for
+  // ch4, which has no period bits of its own): trigger (bit 7) and, where
+  // present, period-high (bits 2-0) are write-only, bits 5-3 are unused -
+  // only length enable (bit 6) is ever readable back.
+  if (address == regs::NR14 || address == regs::NR24 || address == regs::NR34 ||
+      address == regs::NR44) {
+    constexpr unsigned lengthEnableBit = 0b0100'0000U;
+    constexpr unsigned everythingElseReadsAsOne = 0b1011'1111U;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & lengthEnableBit) |
+      everythingElseReadsAsOne);
+  }
+  // NR11/NR21 ("length timer & duty cycle"): duty (bits 7-6) is readable,
+  // the initial length timer (bits 5-0) is write-only.
+  if (address == regs::NR11 || address == regs::NR21) {
+    constexpr unsigned dutyBits = 0b1100'0000U;
+    constexpr unsigned lengthBitsReadAsOne = 0b0011'1111U;
+    return static_cast<std::uint8_t>((static_cast<unsigned>(value) & dutyBits) |
+                                     lengthBitsReadAsOne);
+  }
+  // NR13/NR23/NR33 (period low) and NR31/NR41 (length timer) are entirely
+  // write-only.
+  if (address == regs::NR13 || address == regs::NR23 || address == regs::NR33 ||
+      address == regs::NR31 || address == regs::NR41) {
+    constexpr std::uint8_t writeOnlyReadsAsAllOnes = 0xFF;
+    return writeOnlyReadsAsAllOnes;
+  }
+  // NR10: only sweep pace/direction/step (bits 6-0) are meaningful; bit 7
+  // is unused.
+  if (address == regs::NR10) {
+    constexpr unsigned unusedBit = 0b1000'0000U;
+    return static_cast<std::uint8_t>(static_cast<unsigned>(value) | unusedBit);
+  }
+  // NR30: only DAC on/off (bit 7) is meaningful; bits 6-0 are unused.
+  if (address == regs::NR30) {
+    constexpr unsigned dacEnabledBit = 0b1000'0000U;
+    constexpr unsigned unusedBits = 0b0111'1111U;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & dacEnabledBit) | unusedBits);
+  }
+  // NR32: only output level (bits 6-5) is meaningful; bit 7 and bits 4-0
+  // are unused.
+  if (address == regs::NR32) {
+    constexpr unsigned outputLevelBits = 0b0110'0000U;
+    constexpr unsigned unusedBits = 0b1001'1111U;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & outputLevelBits) | unusedBits);
+  }
+  // Bit 7 is APU power (the only bit actually stored - see writeByte()).
+  // Bits 4-6 are unused (always 1). Bits 0-3 would report each channel's
+  // active status, but always read 0 for now since no channels are
+  // implemented yet - real hardware, and this once channels exist, drives
+  // them from actual channel state, not from what was last written (that's
+  // read-only, see the NR52 comment in writeByte()).
+  if (address == regs::NR52) {
+    constexpr unsigned powerBit = 0b1000'0000U;
+    constexpr unsigned unusedBits = 0b0111'0000U;
+    return static_cast<std::uint8_t>((static_cast<unsigned>(value) & powerBit) |
+                                     unusedBits);
   }
   return value;
 }
@@ -230,6 +292,35 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     stat = static_cast<std::uint8_t>(
       (static_cast<unsigned>(stat) & ~statWritableMask) |
       (static_cast<unsigned>(value) & statWritableMask));
+    return;
+  }
+
+  // NR52 bit 7 gates the APU's power. Only that bit is actually stored -
+  // bits 0-3 (channel status) are read-only and bits 4-6 are unused, so
+  // writes to them are silently discarded rather than stored, matching real
+  // hardware ("writing to those does not enable or disable the channels").
+  // Powering off clears NR10-NR51 (0xFF10-0xFF25) and makes them read-only
+  // until powered back on; Wave RAM and NR52 itself are unaffected.
+  if (address == regs::NR52) {
+    constexpr unsigned powerBit = 0b1000'0000U;
+    const bool poweringOn = (static_cast<unsigned>(value) & powerBit) != 0;
+    m_apuRegistersReadOnly = !poweringOn;
+    if (!poweringOn) {
+      for (std::uint16_t reg = APU_REGISTERS_START; reg < regs::NR52; ++reg) {
+        getByteRef(reg) = 0;
+      }
+    }
+    auto& nr52 = getByteRef(regs::NR52);
+    nr52 = static_cast<std::uint8_t>((static_cast<unsigned>(nr52) & ~powerBit) |
+                                     (static_cast<unsigned>(value) & powerBit));
+    return;
+  }
+
+  // While the APU is powered off, NR10-NR51 are read-only (see the NR52
+  // handling above) - Wave RAM (0xFF30-0xFF3F) is deliberately excluded,
+  // it's always writable regardless of APU power state.
+  if (address >= APU_REGISTERS_START && address < regs::NR52 &&
+      m_apuRegistersReadOnly) {
     return;
   }
 
