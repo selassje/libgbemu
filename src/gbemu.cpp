@@ -19,8 +19,13 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   }
 
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
-  const bool isCgb = (cgbFlag & CGB_FLAG_MASK) != 0;
-  m_mmu.enableBootRom(isCgb ? cgbBootRom() : dmgBootRom());
+  m_isCgb = (cgbFlag & CGB_FLAG_MASK) != 0;
+  // Always boot as CGB hardware, matching how a real CGB console always
+  // runs its one fixed boot ROM regardless of what's inserted - the boot
+  // ROM itself reads this same header flag to decide whether to enter
+  // DMG-compatibility mode or native CGB mode for this cartridge, not
+  // something selected from outside by which binary we choose to run.
+  m_mmu.enableBootRom(cgbBootRom());
   m_cpu.reset();
 
   return result;

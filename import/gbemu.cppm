@@ -45,6 +45,14 @@ private:
   // constructor receives a reference to it.
   Ppu m_ppu;
   Cpu m_cpu;
+  // Whether the cartridge itself declares CGB awareness (header byte
+  // 0x0143, bit 7) - kept for gating actual CGB-exclusive hardware
+  // features (VRAM banking, palette RAM, double speed, ...) once those
+  // exist. Deliberately not used to decide which boot ROM runs: real
+  // hardware always boots as whichever console it physically is, and lets
+  // the boot ROM itself branch on this same flag to decide compatibility
+  // vs. native mode - see GameBoy::loadRom().
+  bool m_isCgb{ false };
 };
 
 }
