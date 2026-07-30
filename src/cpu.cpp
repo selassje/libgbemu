@@ -5,18 +5,18 @@ namespace gbemu {
 constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
   std::array<Instruction, 256> result{};
   result.at(0x00) = { &Cpu::nop };
-  result.at(0xC2) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
-  result.at(0xC3) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
-  result.at(0xCA) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
-  result.at(0xD2) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
-  result.at(0xDA) = { &Cpu::jpcc };  // NOLINT(readability-magic-numbers)
-  result.at(0xE9) = { &Cpu::jphl };  // NOLINT(readability-magic-numbers)
-  result.at(0xC0) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
-  result.at(0xC8) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
-  result.at(0xD0) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
-  result.at(0xD8) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
-  result.at(0xC9) = { &Cpu::retcc }; // NOLINT(readability-magic-numbers)
-  result.at(0xD9) = { &Cpu::reti };  // NOLINT(readability-magic-numbers)
+  result.at(0xC2) = { &Cpu::jpcc };
+  result.at(0xC3) = { &Cpu::jpcc };
+  result.at(0xCA) = { &Cpu::jpcc };
+  result.at(0xD2) = { &Cpu::jpcc };
+  result.at(0xDA) = { &Cpu::jpcc };
+  result.at(0xE9) = { &Cpu::jphl };
+  result.at(0xC0) = { &Cpu::retcc };
+  result.at(0xC8) = { &Cpu::retcc };
+  result.at(0xD0) = { &Cpu::retcc };
+  result.at(0xD8) = { &Cpu::retcc };
+  result.at(0xC9) = { &Cpu::retcc };
+  result.at(0xD9) = { &Cpu::reti };
   constexpr std::size_t rstFirst = 0xC7;
   constexpr std::size_t rstLast = 0xFF;
   constexpr std::size_t rstStep = 0x08;
@@ -46,14 +46,14 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
        opcode += ldRd8Step) {
     result.at(opcode) = { &Cpu::ldRd8 };
   }
-  result.at(0x22) = { &Cpu::ldhlia };  // NOLINT(readability-magic-numbers)
-  result.at(0x2A) = { &Cpu::ldhlia };  // NOLINT(readability-magic-numbers)
-  result.at(0x32) = { &Cpu::ldhlia };  // NOLINT(readability-magic-numbers)
-  result.at(0x3A) = { &Cpu::ldhlia };  // NOLINT(readability-magic-numbers)
-  result.at(0x02) = { &Cpu::ldbcdea }; // NOLINT(readability-magic-numbers)
-  result.at(0x12) = { &Cpu::ldbcdea }; // NOLINT(readability-magic-numbers)
-  result.at(0x0A) = { &Cpu::ldbcdea }; // NOLINT(readability-magic-numbers)
-  result.at(0x1A) = { &Cpu::ldbcdea }; // NOLINT(readability-magic-numbers)
+  result.at(0x22) = { &Cpu::ldhlia };
+  result.at(0x2A) = { &Cpu::ldhlia };
+  result.at(0x32) = { &Cpu::ldhlia };
+  result.at(0x3A) = { &Cpu::ldhlia };
+  result.at(0x02) = { &Cpu::ldbcdea };
+  result.at(0x12) = { &Cpu::ldbcdea };
+  result.at(0x0A) = { &Cpu::ldbcdea };
+  result.at(0x1A) = { &Cpu::ldbcdea };
   constexpr std::size_t incr8First = 0x04;
   constexpr std::size_t incr8Last = 0x3C;
   constexpr std::size_t incr8Step = 0x08;
@@ -68,34 +68,34 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
        opcode += decr8Step) {
     result.at(opcode) = { &Cpu::decr8 };
   }
-  result.at(0x18) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
-  result.at(0x20) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
-  result.at(0x28) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
-  result.at(0x30) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
-  result.at(0x38) = { &Cpu::jrcc };         // NOLINT(readability-magic-numbers)
-  result.at(0x10) = { &Cpu::stop };         // NOLINT(readability-magic-numbers)
-  result.at(0xF3) = { &Cpu::di };           // NOLINT(readability-magic-numbers)
-  result.at(0xFB) = { &Cpu::ei };           // NOLINT(readability-magic-numbers)
-  result.at(0xEA) = { &Cpu::ldaa16 };       // NOLINT(readability-magic-numbers)
-  result.at(0xFA) = { &Cpu::ldaa16 };       // NOLINT(readability-magic-numbers)
-  result.at(0xE0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
-  result.at(0xF0) = { &Cpu::ldha8 };        // NOLINT(readability-magic-numbers)
-  result.at(0xE2) = { &Cpu::ldhca };        // NOLINT(readability-magic-numbers)
-  result.at(0xF2) = { &Cpu::ldhca };        // NOLINT(readability-magic-numbers)
-  result.at(0xCB) = { &Cpu::cbPrefixed };   // NOLINT(readability-magic-numbers)
-  result.at(0x07) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
-  result.at(0x0F) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
-  result.at(0x17) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
-  result.at(0x1F) = { &Cpu::rotateA };      // NOLINT(readability-magic-numbers)
-  result.at(0x27) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
-  result.at(0x2F) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
-  result.at(0x37) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
-  result.at(0x3F) = { &Cpu::daaCplScfCcf }; // NOLINT(readability-magic-numbers)
-  result.at(0xC4) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
-  result.at(0xCC) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
-  result.at(0xD4) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
-  result.at(0xDC) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
-  result.at(0xCD) = { &Cpu::callcc };       // NOLINT(readability-magic-numbers)
+  result.at(0x18) = { &Cpu::jrcc };
+  result.at(0x20) = { &Cpu::jrcc };
+  result.at(0x28) = { &Cpu::jrcc };
+  result.at(0x30) = { &Cpu::jrcc };
+  result.at(0x38) = { &Cpu::jrcc };
+  result.at(0x10) = { &Cpu::stop };
+  result.at(0xF3) = { &Cpu::di };
+  result.at(0xFB) = { &Cpu::ei };
+  result.at(0xEA) = { &Cpu::ldaa16 };
+  result.at(0xFA) = { &Cpu::ldaa16 };
+  result.at(0xE0) = { &Cpu::ldha8 };
+  result.at(0xF0) = { &Cpu::ldha8 };
+  result.at(0xE2) = { &Cpu::ldhca };
+  result.at(0xF2) = { &Cpu::ldhca };
+  result.at(0xCB) = { &Cpu::cbPrefixed };
+  result.at(0x07) = { &Cpu::rotateA };
+  result.at(0x0F) = { &Cpu::rotateA };
+  result.at(0x17) = { &Cpu::rotateA };
+  result.at(0x1F) = { &Cpu::rotateA };
+  result.at(0x27) = { &Cpu::daaCplScfCcf };
+  result.at(0x2F) = { &Cpu::daaCplScfCcf };
+  result.at(0x37) = { &Cpu::daaCplScfCcf };
+  result.at(0x3F) = { &Cpu::daaCplScfCcf };
+  result.at(0xC4) = { &Cpu::callcc };
+  result.at(0xCC) = { &Cpu::callcc };
+  result.at(0xD4) = { &Cpu::callcc };
+  result.at(0xDC) = { &Cpu::callcc };
+  result.at(0xCD) = { &Cpu::callcc };
   constexpr std::size_t pushFirst = 0xC5;
   constexpr std::size_t pushLast = 0xF5;
   constexpr std::size_t popFirst = 0xC1;
@@ -129,10 +129,10 @@ constexpr std::array<Cpu::Instruction, 256> Cpu::INSTRUCTIONS = [] {
        opcode += addhlr16Step) {
     result.at(opcode) = { &Cpu::addhlr16 };
   }
-  result.at(0x08) = { &Cpu::ldA16Sp };   // NOLINT(readability-magic-numbers)
-  result.at(0xE8) = { &Cpu::addSpHlE8 }; // NOLINT(readability-magic-numbers)
-  result.at(0xF8) = { &Cpu::addSpHlE8 }; // NOLINT(readability-magic-numbers)
-  result.at(0xF9) = { &Cpu::ldSpHl };    // NOLINT(readability-magic-numbers)
+  result.at(0x08) = { &Cpu::ldA16Sp };
+  result.at(0xE8) = { &Cpu::addSpHlE8 };
+  result.at(0xF8) = { &Cpu::addSpHlE8 };
+  result.at(0xF9) = { &Cpu::ldSpHl };
   constexpr std::size_t aluR8First = 0x80;
   constexpr std::size_t aluR8Last = 0xBF;
   for (std::size_t opcode = aluR8First; opcode <= aluR8Last; ++opcode) {
@@ -292,10 +292,10 @@ Cpu::jpcc()
 
   if (takeBranch) {
     m_PC = target;
-    return 4; // NOLINT(readability-magic-numbers)
+    return 4;
   }
   m_PC += 3;
-  return 3; // NOLINT(readability-magic-numbers)
+  return 3;
 }
 
 std::size_t
@@ -330,9 +330,7 @@ Cpu::retcc()
   if (takeBranch) {
     m_PC = m_mmu.get().readWord(m_SP);
     m_SP += 2;
-    return opcode == unconditionalOpcode
-             ? 4
-             : 5; // NOLINT(readability-magic-numbers)
+    return opcode == unconditionalOpcode ? 4 : 5;
   }
   m_PC += 1;
   return 2;
@@ -378,17 +376,17 @@ Cpu::ldRR()
 
   std::uint8_t value = 0;
   if (src == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     value = m_mmu.get().readByte(m_HL);
-    cycles = 2; // NOLINT(readability-magic-numbers)
+    cycles = 2;
   } else {
     value = getR8(src);
   }
 
   if (dst == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     m_mmu.get().writeByte(m_HL, value);
-    cycles = 2; // NOLINT(readability-magic-numbers)
+    cycles = 2;
   } else {
     setR8(dst, value);
   }
@@ -405,11 +403,11 @@ Cpu::ldRd8()
     static_cast<std::uint8_t>((static_cast<unsigned>(opcode) >> 3U) & 0x07U);
   const auto value = m_mmu.get().readByte(m_PC + 1);
 
-  std::size_t cycles = 2; // NOLINT(readability-magic-numbers)
+  std::size_t cycles = 2;
   if (dst == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
     m_mmu.get().writeByte(m_HL, value);
-    cycles = 3; // NOLINT(readability-magic-numbers)
+    cycles = 3;
   } else {
     setR8(dst, value);
   }
@@ -426,10 +424,10 @@ Cpu::ldhlia()
   const bool decrement = (static_cast<unsigned>(opcode) & 0x10U) != 0;
 
   if (load) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     setR8(REG_A, m_mmu.get().readByte(m_HL));
   } else {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     m_mmu.get().writeByte(m_HL, getR8(REG_A));
   }
 
@@ -448,10 +446,10 @@ Cpu::ldbcdea()
   const auto address = useDE ? m_DE : m_BC;
 
   if (load) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -469,9 +467,9 @@ Cpu::incr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     oldValue = m_mmu.get().readByte(m_HL);
-    cycles = 3; // NOLINT(readability-magic-numbers)
+    cycles = 3;
   } else {
     oldValue = getR8(reg);
   }
@@ -479,7 +477,7 @@ Cpu::incr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue + 1);
 
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -509,9 +507,9 @@ Cpu::decr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     oldValue = m_mmu.get().readByte(m_HL);
-    cycles = 3; // NOLINT(readability-magic-numbers)
+    cycles = 3;
   } else {
     oldValue = getR8(reg);
   }
@@ -519,7 +517,7 @@ Cpu::decr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue - 1);
 
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -573,7 +571,7 @@ Cpu::jrcc()
 
   if (takeBranch) {
     m_PC = static_cast<std::uint16_t>(static_cast<int>(m_PC) + offset);
-    return 3; // NOLINT(readability-magic-numbers)
+    return 3;
   }
   return 2;
 }
@@ -591,7 +589,7 @@ std::size_t
 Cpu::ei()
 {
   // EI takes effect only after the instruction following it completes.
-  m_imeEnableDelay = 2; // NOLINT(readability-magic-numbers)
+  m_imeEnableDelay = 2;
   m_PC += 1;
   return 1;
 }
@@ -603,7 +601,7 @@ Cpu::reti()
   m_SP += 2;
   m_ime = true;
   m_imeEnableDelay = 0;
-  return 4; // NOLINT(readability-magic-numbers)
+  return 4;
 }
 
 std::size_t
@@ -620,7 +618,7 @@ Cpu::rst()
   m_mmu.get().writeWord(m_SP, returnAddress);
   m_PC = target;
 
-  return 4; // NOLINT(readability-magic-numbers)
+  return 4;
 }
 
 std::size_t
@@ -641,15 +639,15 @@ Cpu::ldaa16()
   const auto address = m_mmu.get().readWord(m_PC + 1);
 
   if (load) {
-    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 4);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
   m_PC += 3;
-  return 4; // NOLINT(readability-magic-numbers)
+  return 4;
 }
 
 std::size_t
@@ -661,15 +659,15 @@ Cpu::ldha8()
   const auto address = static_cast<std::uint16_t>(IO_REGISTERS_BASE + offset);
 
   if (load) {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
   m_PC += 2;
-  return 3; // NOLINT(readability-magic-numbers)
+  return 3;
 }
 
 std::size_t
@@ -681,10 +679,10 @@ Cpu::ldhca()
     static_cast<std::uint16_t>(IO_REGISTERS_BASE + getR8(REG_C));
 
   if (load) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -727,10 +725,10 @@ Cpu::callcc()
     m_SP -= 2;
     m_mmu.get().writeWord(m_SP, returnAddress);
     m_PC = target;
-    return 6; // NOLINT(readability-magic-numbers)
+    return 6;
   }
   m_PC = returnAddress;
-  return 3; // NOLINT(readability-magic-numbers)
+  return 3;
 }
 
 std::size_t
@@ -760,7 +758,7 @@ Cpu::pushr16()
   m_mmu.get().writeWord(m_SP, value);
 
   m_PC += 1;
-  return 4; // NOLINT(readability-magic-numbers)
+  return 4;
 }
 
 std::size_t
@@ -790,7 +788,7 @@ Cpu::popr16()
   }
 
   m_PC += 1;
-  return 3; // NOLINT(readability-magic-numbers)
+  return 3;
 }
 
 std::size_t
@@ -930,9 +928,9 @@ Cpu::aluR8()
   std::size_t cycles = 1;
   std::uint8_t operand = 0;
   if (srcCode == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 2);
     operand = m_mmu.get().readByte(m_HL);
-    cycles = 2; // NOLINT(readability-magic-numbers)
+    cycles = 2;
   } else {
     operand = getR8(srcCode);
   }
@@ -954,7 +952,7 @@ Cpu::aluD8()
   applyAluOp(op, operand);
 
   m_PC += 2;
-  return 2; // NOLINT(readability-magic-numbers)
+  return 2;
 }
 
 std::size_t
@@ -986,11 +984,11 @@ Cpu::cbPrefixed()
 
   const bool isMemory = (regCode == REG_HL_INDIRECT);
   if (isMemory) {
-    handleTimer(m_mcycles + 3); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 3);
   }
   auto value = isMemory ? m_mmu.get().readByte(m_HL) : getR8(regCode);
 
-  std::size_t cycles = isMemory ? 4 : 2; // NOLINT(readability-magic-numbers)
+  std::size_t cycles = isMemory ? 4 : 2;
 
   if (group == groupBit) {
     const auto bitMask = 1U << middle;
@@ -1003,7 +1001,7 @@ Cpu::cbPrefixed()
     m_AF = static_cast<std::uint16_t>(
       (static_cast<unsigned>(m_AF) & HIGH_BYTE_MASK) | flags);
     if (isMemory) {
-      cycles = 3; // NOLINT(readability-magic-numbers)
+      cycles = 3;
     }
     m_PC += 2;
     return cycles;
@@ -1072,7 +1070,7 @@ Cpu::cbPrefixed()
   }
 
   if (isMemory) {
-    handleTimer(m_mcycles + 4); // NOLINT(readability-magic-numbers)
+    handleTimer(m_mcycles + 4);
     m_mmu.get().writeByte(m_HL, value);
   } else {
     setR8(regCode, value);
@@ -1195,7 +1193,7 @@ Cpu::ldA16Sp()
   m_mmu.get().writeWord(address, m_SP);
 
   m_PC += 3;
-  return 5; // NOLINT(readability-magic-numbers)
+  return 5;
 }
 
 std::size_t
@@ -1234,7 +1232,7 @@ Cpu::addSpHlE8()
     (static_cast<unsigned>(m_AF) & HIGH_BYTE_MASK) | flags);
 
   m_PC += 2;
-  return opcode == opcodeAddSp ? 4 : 3; // NOLINT(readability-magic-numbers)
+  return opcode == opcodeAddSp ? 4 : 3;
 }
 
 std::size_t
@@ -1355,7 +1353,7 @@ Cpu::handleInterrupts()
       m_SP -= 2;
       m_mmu.get().writeWord(m_SP, m_PC);
       m_PC = INTERRUPT_VECTORS.at(i);
-      m_mcycles += 5; // NOLINT(readability-magic-numbers)
+      m_mcycles += 5;
       return;
     }
   }
@@ -1376,13 +1374,12 @@ Cpu::handleTimer(std::size_t currentMCycles)
     const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
     for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
       const auto tima = m_mmu.get().readByte(regs::TIMA);
-      if (tima == 0xFF) { // NOLINT(readability-magic-numbers)
+      if (tima == 0xFF) {
         m_mmu.get().writeByte(regs::TIMA, m_mmu.get().readByte(regs::TMA));
         const auto interruptFlags = m_mmu.get().readByte(regs::IF);
         m_mmu.get().writeByte(regs::IF,
                               static_cast<std::uint8_t>(
-                                static_cast<unsigned>(interruptFlags) |
-                                0x04U)); // NOLINT(readability-magic-numbers)
+                                static_cast<unsigned>(interruptFlags) | 0x04U));
       } else {
         m_mmu.get().writeByte(regs::TIMA, tima + 1);
       }
@@ -1398,7 +1395,7 @@ Cpu::reset()
   m_BC = 0;
   m_DE = 0;
   m_HL = 0;
-  m_SP = 0xFFFF; // NOLINT(readability-magic-numbers)
+  m_SP = 0xFFFF;
   m_PC = 0;
   m_ime = false;
   m_halted = false;

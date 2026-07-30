@@ -99,9 +99,9 @@ private:
   std::array<std::uint8_t, KB16> m_vram{};
   std::array<std::uint8_t, KB8> m_extRam{};
   std::array<std::uint8_t, KB4 * 8> m_wram{};
-  std::array<std::uint8_t, 0xA0> m_oam{};  // NOLINT(readability-magic-numbers)
-  std::array<std::uint8_t, 0x80> m_io{};   // NOLINT(readability-magic-numbers)
-  std::array<std::uint8_t, 0x7F> m_hram{}; // NOLINT(readability-magic-numbers)
+  std::array<std::uint8_t, 0xA0> m_oam{};
+  std::array<std::uint8_t, 0x80> m_io{};
+  std::array<std::uint8_t, 0x7F> m_hram{};
   std::size_t m_switchableRomBank{ 1 };
   std::uint8_t m_mbc1RomBankLow{ 1 };
   std::uint8_t m_mbc1BankHigh{ 0 };

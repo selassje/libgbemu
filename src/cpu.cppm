@@ -36,7 +36,7 @@ private:
   std::uint16_t m_BC{ 0 };
   std::uint16_t m_DE{ 0 };
   std::uint16_t m_HL{ 0 };
-  std::uint16_t m_SP{ 0xFFFF }; // NOLINT(readability-magic-numbers)
+  std::uint16_t m_SP{ 0xFFFF };
   std::uint16_t m_PC{ 0 };
   bool m_ime{ false };
   bool m_halted{ false };

@@ -42,41 +42,39 @@ Mmu::getByteRef(std::uint16_t address)
     const std::size_t bankedAddress = (bank * KB16) + (address - KB16);
     return m_rom.at(bankedAddress);
   }
-  if (address < 0xA000) { // NOLINT(readability-magic-numbers)
+  if (address < 0xA000) {
     return m_vram.at(address - (2 * KB16) + (m_switchableVRamBank * KB8));
   }
-  if (address < 0xC000) {                 // NOLINT(readability-magic-numbers)
-    return m_extRam.at(address - 0xA000); // NOLINT(readability-magic-numbers)
+  if (address < 0xC000) {
+    return m_extRam.at(address - 0xA000);
   }
 
-  if (address < 0xD000) {               // NOLINT(readability-magic-numbers)
-    return m_wram.at(address - 0xC000); // NOLINT(readability-magic-numbers)
+  if (address < 0xD000) {
+    return m_wram.at(address - 0xC000);
   }
 
-  if (address < 0xE000) {             // NOLINT(readability-magic-numbers)
-    return m_wram.at(address - 0xD000 // NOLINT(readability-magic-numbers)
-                     + (m_switchableWRamBank * KB4));
+  if (address < 0xE000) {
+    return m_wram.at(address - 0xD000 + (m_switchableWRamBank * KB4));
   }
 
-  if (address < 0xFE00) { // NOLINT(readability-magic-numbers)
-    return getByteRef(address -
-                      (0xE000 - 0xC000)); // NOLINT(readability-magic-numbers)
+  if (address < 0xFE00) {
+    return getByteRef(address - (0xE000 - 0xC000));
   }
 
-  if (address < 0xFEA0) {              // NOLINT(readability-magic-numbers)
-    return m_oam.at(address - 0xFE00); // NOLINT(readability-magic-numbers)
+  if (address < 0xFEA0) {
+    return m_oam.at(address - 0xFE00);
   }
 
-  if (address < 0xFF00) { // NOLINT(readability-magic-numbers)
+  if (address < 0xFF00) {
     return m_unusable;
   }
 
-  if (address < 0xFF80) {             // NOLINT(readability-magic-numbers)
-    return m_io.at(address - 0xFF00); // NOLINT(readability-magic-numbers)
+  if (address < 0xFF80) {
+    return m_io.at(address - 0xFF00);
   }
 
-  if (address < 0xFFFF) {               // NOLINT(readability-magic-numbers)
-    return m_hram.at(address - 0xFF80); // NOLINT(readability-magic-numbers)
+  if (address < 0xFFFF) {
+    return m_hram.at(address - 0xFF80);
   }
   return m_interruptEnableRegister;
 }
@@ -162,15 +160,12 @@ void
 Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 {
 #ifdef ENABLE_TESTS
-  if (address == 0xFF02 && value == 0x81) { // NOLINT(readability-magic-numbers)
-    const auto serialChar =
-      static_cast<char>(readByte(0xFF01)); // NOLINT(readability-magic-numbers)
+  if (address == 0xFF02 && value == 0x81) {
+    const auto serialChar = static_cast<char>(readByte(0xFF01));
     serialOutput() += serialChar;
   }
-  constexpr std::uint16_t textOutBase =
-    0xA004; // NOLINT(readability-magic-numbers)
-  constexpr std::uint16_t textOutEnd =
-    0xC000; // NOLINT(readability-magic-numbers)
+  constexpr std::uint16_t textOutBase = 0xA004;
+  constexpr std::uint16_t textOutEnd = 0xC000;
   if (address >= textOutBase && address < textOutEnd) {
     const auto offset = static_cast<std::size_t>(address - textOutBase);
     if (memoryOutput().size() <= offset) {

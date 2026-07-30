@@ -76,7 +76,7 @@ private:
                const std::array<T, 8>& pixels,
                Predicate shouldReplace)
     {
-      for (std::size_t i = 0; i < 8; ++i) { // NOLINT(readability-magic-numbers)
+      for (std::size_t i = 0; i < 8; ++i) {
         auto& existing = at(offset + i);
         const auto& incoming = pixels.at(i);
         if (shouldReplace(incoming, existing)) {
@@ -99,7 +99,7 @@ private:
       return m_buffer.at((m_head + index) % m_buffer.size());
     }
 
-    std::array<T, 16> m_buffer{}; // NOLINT(readability-magic-numbers)
+    std::array<T, 16> m_buffer{};
     std::size_t m_head{ 0 };
     std::size_t m_size{ 0 };
   };
@@ -178,7 +178,7 @@ private:
     bool behindBackground{};
   };
 
-  std::array<Object, 10> m_objects{}; // NOLINT(readability-magic-numbers)
+  std::array<Object, 10> m_objects{};
   std::size_t m_objectCount{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;

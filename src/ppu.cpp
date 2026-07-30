@@ -55,11 +55,9 @@ Ppu::Fetcher::checkForWindow()
     return;
   }
   const auto wx = m_mmu.get().readByte(regs::WX);
-  const auto windowEnabled = (m_mmu.get().readByte(regs::LCDC) & 0x20U) !=
-                             0; // NOLINT(readability-magic-numbers)
+  const auto windowEnabled = (m_mmu.get().readByte(regs::LCDC) & 0x20U) != 0;
   const auto yCondition = m_ppu.get().m_YCondition;
-  const auto wxReached =
-    m_ppu.get().m_pixelsRendered + 7 == wx; // NOLINT(readability-magic-numbers)
+  const auto wxReached = m_ppu.get().m_pixelsRendered + 7 == wx;
   if (windowEnabled && yCondition && wxReached) {
     reset(Mode::Window);
   }
@@ -81,19 +79,15 @@ Ppu::Fetcher::runNextTCycle()
 
   const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const auto currentState = m_mState;
-  constexpr std::uint16_t tileDataBlock0 =
-    0x8000; // NOLINT(readability-magic-numbers)
-  constexpr std::uint16_t tileDataBlock1 =
-    0x8800; // NOLINT(readability-magic-numbers) ]
-  constexpr std::uint16_t tileDataBlock2 =
-    0x9000; // NOLINT(readability-magic-numbers) ]
+  constexpr std::uint16_t tileDataBlock0 = 0x8000;
+  constexpr std::uint16_t tileDataBlock1 = 0x8800;
+  constexpr std::uint16_t tileDataBlock2 = 0x9000;
 
   const auto pushTileRowToFifo = [this]() {
-    if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >=
-                         8) { // NOLINT(readability-magic-numbers)
+    if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >= 8) {
       return false;
     }
-    for (unsigned bit = 8; bit-- > 0;) { // NOLINT(readability-magic-numbers)
+    for (unsigned bit = 8; bit-- > 0;) {
       const auto colorIndex = static_cast<std::uint8_t>(
         (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U) |
         ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
@@ -119,8 +113,8 @@ Ppu::Fetcher::runNextTCycle()
     const bool behindBackground =
       (m_currentObject.attributes & priorityMask) != 0;
 
-    std::array<ObjectPixel, 8> pixels{}; // NOLINT(readability-magic-numbers)
-    for (unsigned i = 0; i < 8; ++i) {   // NOLINT(readability-magic-numbers)
+    std::array<ObjectPixel, 8> pixels{};
+    for (unsigned i = 0; i < 8; ++i) {
       const unsigned bit = xFlip ? i : (7 - i);
       const auto colorIndex = static_cast<std::uint8_t>(
         (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U) |
@@ -133,7 +127,7 @@ Ppu::Fetcher::runNextTCycle()
     }
 
     auto& objFifo = m_ppu.get().m_objFifo;
-    while (objFifo.size() < 8) { // NOLINT(readability-magic-numbers)
+    while (objFifo.size() < 8) {
       objFifo.push({});
     }
     objFifo.merge(0, pixels, [](const auto& incoming, const auto& existing) {
@@ -153,16 +147,14 @@ Ppu::Fetcher::runNextTCycle()
       if (elapsedDots >= 1) {
 
         const auto lcdc = m_mmu.get().readByte(regs::LCDC);
-        const auto lcdcBit3 =
-          (lcdc & 0x08U) != 0; // NOLINT(readability-magic-numbers)
-        const auto lcdcBit6 =
-          (lcdc & 0x40U) != 0; // NOLINT(readability-magic-numbers)
+        const auto lcdcBit3 = (lcdc & 0x08U) != 0;
+        const auto lcdcBit6 = (lcdc & 0x40U) != 0;
         const auto isWindow = (m_mode == Mode::Window);
         const std::uint16_t tileMapBaseAddress = [&]() -> std::uint16_t {
           if ((isWindow && lcdcBit6) || (!isWindow && lcdcBit3)) {
-            return 0x9C00; // NOLINT(readability-magic-numbers)
+            return 0x9C00;
           }
-          return 0x9800; // NOLINT(readability-magic-numbers)
+          return 0x9800;
         }();
 
         const auto& [tileX,
@@ -234,7 +226,7 @@ Ppu::Fetcher::runNextTCycle()
             const auto tileOffset =
               static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
             const auto lcdc = m_mmu.get().readByte(regs::LCDC);
-            if ((lcdc & 0x10U) != 0) { // NOLINT(readability-magic-numbers)
+            if ((lcdc & 0x10U) != 0) {
               tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
             } else {
               tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
@@ -415,17 +407,16 @@ Ppu::handleOAMSearch()
   if (m_dot == 0) {
     m_objectCount = 0;
   }
-  if (m_objectCount >= 10) { // NOLINT(readability-magic-numbers)
+  if (m_objectCount >= 10) {
     return;
   }
 
   if (m_dot % 2 == 1) {
     constexpr std::uint16_t oamBase = 0xFE00;
     const auto oamIndex = static_cast<std::uint8_t>(m_dot / 2);
-    const auto oamAddress = static_cast<std::uint16_t>(
-      oamBase + (oamIndex * 4)); // NOLINT(readability-magic-numbers)
-    const bool is8x16Mode = (m_mmu.get().readByte(regs::LCDC) & 0x04U) !=
-                            0; // NOLINT(readability-magic-numbers)
+    const auto oamAddress =
+      static_cast<std::uint16_t>(oamBase + (oamIndex * 4));
+    const bool is8x16Mode = (m_mmu.get().readByte(regs::LCDC) & 0x04U) != 0;
     const unsigned objectHeight = is8x16Mode ? 16 : 8;
     const auto yPos = m_mmu.get().readByte(oamAddress);
     const auto xPos = m_mmu.get().readByte(oamAddress + 1);

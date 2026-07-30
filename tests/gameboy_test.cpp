@@ -63,9 +63,7 @@ TEST_CASE("06-ld r,r", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result =
-    runFor(std::chrono::milliseconds(1000), // NOLINT(readability-magic-numbers)
-           gb);
+  result = runFor(std::chrono::milliseconds(1000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -85,9 +83,7 @@ TEST_CASE("04-op r,imm", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -107,9 +103,7 @@ TEST_CASE("03-op sp,hl", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -129,9 +123,7 @@ TEST_CASE("01-special", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -151,9 +143,7 @@ TEST_CASE("05-op rp", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -173,9 +163,7 @@ TEST_CASE("07-jr,jp,call,ret,rst", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -195,9 +183,7 @@ TEST_CASE("08-misc instrs", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -217,9 +203,7 @@ TEST_CASE("09-op r,r", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -239,9 +223,7 @@ TEST_CASE("10-bit ops", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -261,9 +243,7 @@ TEST_CASE("11-op a,(hl)", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -283,9 +263,7 @@ TEST_CASE("02-interrupts", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -305,9 +283,7 @@ TEST_CASE("instr_timing", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -327,9 +303,7 @@ TEST_CASE("mem_timing", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -348,9 +322,7 @@ TEST_CASE("halt_bug", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(50000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(50000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -373,9 +345,7 @@ TEST_CASE("mem_timing-2", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -398,9 +368,7 @@ TEST_CASE("interrupt_time", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(20000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(20000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
@@ -512,9 +480,7 @@ TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
 
   REQUIRE(result.has_value());
 
-  result = runFor(
-    std::chrono::milliseconds(55000), // NOLINT(readability-magic-numbers)
-    gb);
+  result = runFor(std::chrono::milliseconds(55000), gb);
   if (!result.has_value()) {
     FAIL("Error : " + result.error());
   }
