@@ -70,6 +70,13 @@ private:
   // channel being actively on) - this is the APU as a whole.
   bool m_powered{ false };
 
+  // NR50 bits 6-4/2-0 - raw 0-7 register values; effective volume is
+  // value+1 (1-8), applied in mix(). VIN (bits 7/3, external cartridge
+  // audio pass-through) is deliberately not modeled - vanishingly rare in
+  // real games and not implemented by essentially any mainstream emulator.
+  std::uint8_t m_leftVolume{ 0 };
+  std::uint8_t m_rightVolume{ 0 };
+
   // Frame sequencer (drives length counter/envelope/sweep timing at
   // 512 Hz) - clocked not by a fixed T-cycle divisor but by watching bit 4
   // of DIV (bit 12 of the full 16-bit counter Mmu passes into
@@ -279,6 +286,25 @@ private:
     return envelope.initialVolume != 0 || envelope.increase;
   }
   static void writeEnvelope(EnvelopeConfig& envelope, std::uint8_t value);
+
+  // Converts a channel's raw 0-15 digital amplitude (any of the 4
+  // channels' PlaybackState::output) to the DAC's normalized [-1, 1]
+  // range.
+  [[nodiscard]] static float toDacOutput(std::uint8_t amplitude);
+
+  // TODO: not implemented yet - will mix all 4 channels' DAC outputs into
+  // (left, right) per NR51 panning and NR50 master volume.
+  [[nodiscard]] std::pair<float, float> mix() const;
+
+  // Final stage before a sample is pushed to the buffer - removes the DC
+  // bias a channel's DAC leaves behind while it's enabled (see
+  // runNextTCycle()'s call site). Not const: a real high-pass filter needs
+  // to remember the previous input/output per channel.
+  // TODO: not implemented yet - currently a pass-through. Real hardware's
+  // filter is an analog RC circuit whose time constant depends on how many
+  // DACs are currently active, not a fixed-coefficient digital filter;
+  // most emulators approximate it with a single-pole IIR instead.
+  [[nodiscard]] std::pair<float, float> applyHpf(std::pair<float, float> input);
 
   PulseChannel1 m_pulse1;
   PulseChannel m_pulse2;

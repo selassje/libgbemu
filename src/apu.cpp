@@ -81,10 +81,14 @@ Apu::runNextTCycle(std::uint16_t divCounter)
   }
   m_sampleAccumulator -= CLOCK_RATE_HZ;
 
-  // TODO: silence - channel mixing (per-channel output -> DAC -> NR50/NR51
-  // -> HPF) isn't implemented yet.
-  m_buffer.at(m_sampleCount++) = 0.0F;
-  m_buffer.at(m_sampleCount++) = 0.0F;
+  // TODO: mix() itself is still a stub (returns silence) and applyHpf() is
+  // a pass-through - see each one's own TODO for what's missing. Kept as
+  // separate statements (not applyHpf(mix())) so the pre-filter mixed
+  // output stays inspectable on its own.
+  const auto mixed = mix();
+  const auto [left, right] = applyHpf(mixed);
+  m_buffer.at(m_sampleCount++) = left;
+  m_buffer.at(m_sampleCount++) = right;
 }
 
 void
@@ -100,6 +104,43 @@ Apu::writeEnvelope(EnvelopeConfig& envelope, std::uint8_t value)
     (unsignedValue >> initialVolumeShift) & initialVolumeMask);
   envelope.increase = (unsignedValue & increaseBit) != 0;
   envelope.pace = static_cast<std::uint8_t>(unsignedValue & paceMask);
+}
+
+float
+Apu::toDacOutput(std::uint8_t amplitude)
+{
+  static constexpr float divisor = 7.5F;
+  return (static_cast<float>(amplitude) / divisor) - 1.0F;
+}
+
+std::pair<float, float>
+Apu::mix() const
+{
+  // TODO: not implemented yet - still missing summing
+  // toDacOutput(m_pulse1.playback.output)/m_pulse2/m_wave/m_noise per NR51
+  // panning. NR50 master volume is applied below (a value of 0 is volume
+  // 1/8, not silence - the amplifier never mutes a non-silent input), but
+  // there's nothing but silence to scale until panning exists.
+  float left = 0.0F;
+  float right = 0.0F;
+
+  static constexpr float maxVolume = 8.0F;
+  left *= static_cast<float>(m_leftVolume + 1) / maxVolume;
+  right *= static_cast<float>(m_rightVolume + 1) / maxVolume;
+
+  return { left, right };
+}
+
+// TODO: not implemented yet - pass-through until the high-pass filter
+// itself exists (see the class comment on what real hardware does here).
+// Deliberately not static despite the stub body not touching instance
+// state: the real filter will need to (previous input/output per
+// channel), so the signature is already what it'll need to be.
+std::pair<float, float>
+// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
+Apu::applyHpf(std::pair<float, float> input)
+{
+  return input;
 }
 
 // address/value is this file's (and Mmu::writeByte()'s) established
@@ -284,6 +325,17 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       break;
     }
 
+    case regs::NR50: {
+      static constexpr unsigned leftVolumeShift = 4U;
+      static constexpr unsigned volumeMask = 0b111U;
+
+      const auto unsignedValue = static_cast<unsigned>(value);
+      m_leftVolume = static_cast<std::uint8_t>(
+        (unsignedValue >> leftVolumeShift) & volumeMask);
+      m_rightVolume = static_cast<std::uint8_t>(unsignedValue & volumeMask);
+      break;
+    }
+
     case regs::NR52: {
       static constexpr unsigned powerBit = 0b1000'0000U;
       m_powered = (static_cast<unsigned>(value) & powerBit) != 0;
@@ -295,6 +347,8 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_pulse2 = PulseChannel{};
         m_wave = WaveChannel{};
         m_noise = NoiseChannel{};
+        m_leftVolume = 0;
+        m_rightVolume = 0;
       }
       break;
     }
