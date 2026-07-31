@@ -132,6 +132,10 @@ private:
       // cleared by length expiry, sweep overflow (CH1 only), or the DAC
       // turning off.
       bool enabled{ false };
+      // Live length-timer countdown, in 256 Hz ticks - reloaded on trigger
+      // (if expired) from 64 - configuration.lengthTimer, decremented by
+      // clockLength(); hitting 0 disables the channel.
+      std::uint16_t remainingLengthTicks{ 0 };
       // Counts down from 4*(2048-period) to 0 every T-cycle; hitting 0
       // advances dutyStep and reloads from configuration.period's current
       // value (which can change live via NR13/NR14 while playing).
@@ -211,6 +215,11 @@ private:
     struct PlaybackState
     {
       bool enabled{ false };
+      // Live length-timer countdown, in 256 Hz ticks - reloaded on trigger
+      // (if expired) from 256 - configuration.lengthTimer (the full 8
+      // bits, unlike the pulse/noise channels' 64), decremented by
+      // clockLength(); hitting 0 disables the channel.
+      std::uint16_t remainingLengthTicks{ 0 };
       // Counts down from 2*(2048-period) to 0 every T-cycle - twice the
       // pulse channels' rate, per Wave RAM's own frequency formula.
       std::uint16_t periodCounter{ 0 };
@@ -252,6 +261,10 @@ private:
     struct PlaybackState
     {
       bool enabled{ false };
+      // Live length-timer countdown, in 256 Hz ticks - reloaded on trigger
+      // (if expired) from 64 - configuration.lengthTimer, decremented by
+      // clockLength(); hitting 0 disables the channel.
+      std::uint16_t remainingLengthTicks{ 0 };
       // The actual running 15/7-bit linear feedback shift register.
       std::uint16_t lfsr{ 0 };
       // Counts down to 0 per NR43's clock shift/divider formula, shifting

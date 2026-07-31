@@ -234,6 +234,11 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         ((unsignedValue & periodHighMask) << periodHighShift));
       if ((unsignedValue & triggerBit) != 0) {
         pulse.playback.enabled = isDacEnabled(pulse.configuration.envelope);
+        if (pulse.playback.remainingLengthTicks == 0) {
+          static constexpr std::uint16_t maxLengthTicks = 64;
+          pulse.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+            maxLengthTicks - pulse.configuration.lengthTimer);
+        }
       }
       break;
     }
@@ -286,6 +291,11 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         ((unsignedValue & periodHighMask) << periodHighShift));
       if ((unsignedValue & triggerBit) != 0) {
         m_wave.playback.enabled = m_wave.configuration.dacEnabled;
+        if (m_wave.playback.remainingLengthTicks == 0) {
+          static constexpr std::uint16_t maxLengthTicks = 256;
+          m_wave.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+            maxLengthTicks - m_wave.configuration.lengthTimer);
+        }
       }
       break;
     }
@@ -321,6 +331,11 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         (unsignedValue & lengthEnableBit) != 0;
       if ((unsignedValue & triggerBit) != 0) {
         m_noise.playback.enabled = isDacEnabled(m_noise.configuration.envelope);
+        if (m_noise.playback.remainingLengthTicks == 0) {
+          static constexpr std::uint16_t maxLengthTicks = 64;
+          m_noise.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+            maxLengthTicks - m_noise.configuration.lengthTimer);
+        }
       }
       break;
     }
@@ -393,6 +408,10 @@ Apu::readRegister(std::uint16_t address) const
 void
 Apu::PulseChannel::runNextTCycle()
 {
+  if (!playback.enabled) {
+    playback.output = 0;
+    return;
+  }
   if (playback.periodCounter == 0) {
     static constexpr std::uint16_t periodBase = 2048;
     static constexpr std::uint16_t periodMultiplier = 4;
@@ -412,7 +431,13 @@ Apu::PulseChannel::runNextTCycle()
 void
 Apu::PulseChannel::clockLength()
 {
-  // TODO: not implemented yet.
+  if (!configuration.isLengthEnabled || playback.remainingLengthTicks == 0) {
+    return;
+  }
+  --playback.remainingLengthTicks;
+  if (playback.remainingLengthTicks == 0) {
+    playback.enabled = false;
+  }
 }
 
 void
@@ -436,7 +461,13 @@ Apu::WaveChannel::runNextTCycle()
 void
 Apu::WaveChannel::clockLength()
 {
-  // TODO: not implemented yet.
+  if (!configuration.isLengthEnabled || playback.remainingLengthTicks == 0) {
+    return;
+  }
+  --playback.remainingLengthTicks;
+  if (playback.remainingLengthTicks == 0) {
+    playback.enabled = false;
+  }
 }
 
 void
@@ -448,7 +479,13 @@ Apu::NoiseChannel::runNextTCycle()
 void
 Apu::NoiseChannel::clockLength()
 {
-  // TODO: not implemented yet.
+  if (!configuration.isLengthEnabled || playback.remainingLengthTicks == 0) {
+    return;
+  }
+  --playback.remainingLengthTicks;
+  if (playback.remainingLengthTicks == 0) {
+    playback.enabled = false;
+  }
 }
 
 void
