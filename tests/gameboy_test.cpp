@@ -559,4 +559,26 @@ TEST_CASE("dmg_sound 03-trigger", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
+TEST_CASE("dmg_sound 04-sweep", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
+                      "rom_singles" / "04-sweep.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(std::chrono::milliseconds(20000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
 }
