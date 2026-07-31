@@ -72,6 +72,18 @@ private:
   // channel being actively on) - this is the APU as a whole.
   bool m_powered{ false };
 
+  // Frame sequencer (drives length counter/envelope/sweep timing at
+  // 512 Hz) - clocked not by a fixed T-cycle divisor but by watching bit 4
+  // of DIV (bit 12 of the full 16-bit counter Mmu passes into
+  // runNextTCycle()) for a 1->0 transition. CGB double speed mode watches
+  // bit 5 of DIV instead - not handled yet, since double speed mode itself
+  // isn't implemented anywhere in this codebase yet.
+  bool m_previousFrameSequencerBit{ false };
+  // Increments (wrapping 0-7) on each falling edge detected above - which
+  // of length/envelope/sweep actually gets clocked on a given step isn't
+  // wired up yet, this only tracks the step index itself.
+  std::uint8_t m_frameSequencerStep{ 0 };
+
   // NRx2's volume-envelope layout (initial volume/direction/pace) is
   // identical across CH1, CH2, and CH4 - CH3's wave channel has no
   // envelope at all, just a coarser output-level shift instead (see

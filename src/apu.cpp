@@ -4,6 +4,11 @@ namespace {
 
 constexpr std::uint32_t CLOCK_RATE_HZ = 4194304;
 
+// DIV bit 4 - bit 12 of the full 16-bit counter Mmu::divCounter() exposes.
+// The frame sequencer steps on a 1->0 transition of this bit, not on a
+// fixed T-cycle divisor - see Apu::runNextTCycle().
+constexpr std::uint16_t FRAME_SEQUENCER_BIT_MASK = 0b0001'0000'0000'0000U;
+
 // NR11/NR21 bits 7-6 (duty) select one of these 4 waveforms - each row is
 // one full 8-step cycle read left to right, 1 = high, 0 = low. Duty 3 is
 // the exact element-wise complement of duty 1 (25% and 75% are
@@ -26,8 +31,17 @@ Apu::startFrame()
 }
 
 void
-Apu::runNextTCycle(std::uint16_t /*divCounter*/)
+Apu::runNextTCycle(std::uint16_t divCounter)
 {
+  const bool currentFrameSequencerBit =
+    (divCounter & FRAME_SEQUENCER_BIT_MASK) != 0;
+  if (m_previousFrameSequencerBit && !currentFrameSequencerBit) {
+    constexpr std::uint8_t frameSequencerStepCount = 8;
+    m_frameSequencerStep = static_cast<std::uint8_t>(
+      (m_frameSequencerStep + 1) % frameSequencerStepCount);
+  }
+  m_previousFrameSequencerBit = currentFrameSequencerBit;
+
   m_sampleAccumulator += static_cast<std::uint32_t>(SAMPLE_RATE);
   if (m_sampleAccumulator < CLOCK_RATE_HZ) {
     return;
