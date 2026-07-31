@@ -242,6 +242,19 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         pulse.playback.volume = pulse.configuration.envelope.initialVolume;
         pulse.playback.envelopeTicksRemaining =
           pulse.configuration.envelope.pace;
+        if (address == regs::NR14) {
+          m_pulse1.shadowPeriod = m_pulse1.configuration.period;
+          static constexpr std::uint8_t sweepTimerReloadWhenPaceZero = 8;
+          m_pulse1.sweepTimer = (m_pulse1.sweep.pace != 0)
+                                  ? m_pulse1.sweep.pace
+                                  : sweepTimerReloadWhenPaceZero;
+          m_pulse1.sweepEnabled =
+            (m_pulse1.sweep.pace != 0) || (m_pulse1.sweep.shift != 0);
+          if (m_pulse1.sweep.shift != 0) {
+            // Overflow-only check - the result itself isn't used here.
+            (void)m_pulse1.calculateSweepFrequency();
+          }
+        }
       }
       break;
     }
@@ -471,7 +484,40 @@ Apu::PulseChannel::clockEnvelope()
 void
 Apu::PulseChannel1::clockSweep()
 {
-  // TODO: not implemented yet.
+  if (sweepTimer > 0) {
+    --sweepTimer;
+  }
+  if (sweepTimer != 0) {
+    return;
+  }
+  static constexpr std::uint8_t sweepTimerReloadWhenPaceZero = 8;
+  sweepTimer = (sweep.pace != 0) ? sweep.pace : sweepTimerReloadWhenPaceZero;
+  if (!sweepEnabled || sweep.pace == 0) {
+    return;
+  }
+  const std::uint16_t newPeriod = calculateSweepFrequency();
+  static constexpr std::uint16_t maxPeriod = 2047;
+  if (newPeriod <= maxPeriod && sweep.shift != 0) {
+    shadowPeriod = newPeriod;
+    configuration.period = newPeriod;
+    // Quirk: a second overflow-only check, result discarded - real
+    // hardware performs this recalculation even though nothing further
+    // gets written back.
+    (void)calculateSweepFrequency();
+  }
+}
+
+std::uint16_t
+Apu::PulseChannel1::calculateSweepFrequency()
+{
+  const auto delta = static_cast<std::uint16_t>(shadowPeriod >> sweep.shift);
+  const auto newPeriod = static_cast<std::uint16_t>(
+    sweep.isIncrease ? shadowPeriod + delta : shadowPeriod - delta);
+  static constexpr std::uint16_t maxPeriod = 2047;
+  if (newPeriod > maxPeriod) {
+    playback.enabled = false;
+  }
+  return newPeriod;
 }
 
 void

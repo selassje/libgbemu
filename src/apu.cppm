@@ -167,9 +167,10 @@ private:
     void clockEnvelope();
   };
 
-  // CH1-only. Operates on PulseChannel1::period (inherited) directly -
-  // real hardware reads/writes NR13/NR14 in place on each sweep iteration,
-  // there's no separate period value of its own here.
+  // CH1-only, NR10's register layout - what a register write directly set.
+  // The live sweep iteration state (shadow period/timer/enabled) lives on
+  // PulseChannel1 itself instead, below - see its comment for why that's
+  // separate from configuration.period.
   struct PeriodSweep
   {
     // NR10 bits 6-4 - how often sweep iterations happen, in units of
@@ -188,9 +189,29 @@ private:
   {
     PeriodSweep sweep;
 
+    // Live sweep iteration state, reset on trigger (see writeRegister()'s
+    // CH1-only NR14 handling) - deliberately NOT the same as
+    // configuration.period: real hardware's sweep math reads/writes this
+    // shadow copy each iteration, so a direct NR13/NR14 write between
+    // sweep iterations doesn't retroactively perturb an iteration already
+    // in progress.
+    std::uint16_t shadowPeriod{ 0 };
+    // Counts down from sweep.pace (or 8, if pace is 0 - a timing-only
+    // substitution, sweep stays inert either way) to 0 every 128 Hz tick.
+    std::uint8_t sweepTimer{ 0 };
+    // Whether the sweep unit does anything at all this trigger - distinct
+    // from playback.enabled (the channel as a whole). False when both
+    // sweep.pace and sweep.shift are 0.
+    bool sweepEnabled{ false };
+
     // CH1-only frame-sequencer event - steps 2/6 (128 Hz).
-    // TODO: not implemented yet.
     void clockSweep();
+
+    // Shared by clockSweep()'s real update and the trigger-time/
+    // second-per-iteration overflow-only checks (see clockSweep()) -
+    // computes shadowPeriod +/- shadowPeriod >> sweep.shift and disables
+    // the channel if the result overflows the 11-bit period range (2047).
+    [[nodiscard]] std::uint16_t calculateSweepFrequency();
   };
 
   // CH3 - plays back Wave RAM (see regs::WAVE_RAM_START) instead of a
