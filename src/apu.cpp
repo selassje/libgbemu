@@ -26,7 +26,7 @@ Apu::startFrame()
 }
 
 void
-Apu::runNextTCycle()
+Apu::runNextTCycle(std::uint16_t /*divCounter*/)
 {
   m_sampleAccumulator += static_cast<std::uint32_t>(SAMPLE_RATE);
   if (m_sampleAccumulator < CLOCK_RATE_HZ) {

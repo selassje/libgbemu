@@ -7,6 +7,7 @@ namespace gbemu::regs {
 export constexpr std::uint16_t JOYP = 0xFF00;
 export constexpr std::uint16_t SB = 0xFF01;
 export constexpr std::uint16_t SC = 0xFF02;
+export constexpr std::uint16_t DIV = 0xFF04;
 export constexpr std::uint16_t TIMA = 0xFF05;
 export constexpr std::uint16_t TMA = 0xFF06;
 export constexpr std::uint16_t TAC = 0xFF07;

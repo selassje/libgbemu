@@ -79,6 +79,14 @@ public:
   // GameBoy::runNextFrame()'s loop.
   void runNextTCycle();
 
+  // The real 16-bit free-running divider counter DIV (0xFF04) is just the
+  // upper 8 bits of - incremented every T-cycle, reset (in full, not just
+  // the CPU-visible byte) by a write to DIV, see writeByte(). Exposed for
+  // Apu's frame sequencer (and eventually Cpu's timer handling) to watch
+  // specific bits of directly, bypassing readByte()'s 8-bit CPU-facing
+  // view - those subsystems tap bits below DIV's own visible range.
+  [[nodiscard]] std::uint16_t divCounter() const { return m_divCounter; }
+
 private:
   std::reference_wrapper<Apu> m_apu;
 
@@ -100,6 +108,10 @@ private:
   // sit there forever with nothing to advance it - that's genuinely
   // correct behavior with no partner connected, not a bug.
   std::optional<std::uint16_t> m_serialTCyclesRemaining;
+
+  // See divCounter(). Wraps naturally on overflow (plain unsigned
+  // arithmetic) - exactly the free-running behavior real hardware has.
+  std::uint16_t m_divCounter{ 0 };
 
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };

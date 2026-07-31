@@ -20,7 +20,14 @@ public:
   // across frame boundaries to avoid long-term drift.
   void startFrame();
 
-  void runNextTCycle();
+  // divCounter is Mmu's real 16-bit DIV counter (see Mmu::divCounter()) for
+  // this same T-cycle - not read back via a stored Mmu& (that would make
+  // Mmu and Apu circularly reference each other, since Mmu already holds
+  // an Apu& for channel-register write forwarding); GameBoy::runNextFrame()
+  // just passes it through each cycle instead. Not used yet - wiring for
+  // the frame sequencer (length/envelope/sweep timing), which watches a
+  // specific bit of this counter for a falling edge, not implemented yet.
+  void runNextTCycle(std::uint16_t divCounter);
 
   // Interleaved stereo samples (L, R, L, R, ...) accumulated so far this
   // frame - size() / 2 sample-frames. Normalized float in [-1, 1] (the DAC's

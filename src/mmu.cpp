@@ -122,6 +122,14 @@ Mmu::readByte(std::uint16_t address) const
       static_cast<unsigned>(value) |
       static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
   }
+  // DIV is just the upper 8 bits of the real 16-bit divider counter - see
+  // divCounter(). Not stored in m_io at all (unlike most registers), so
+  // this ignores the generic getByteRef()-derived value entirely.
+  if (address == regs::DIV) {
+    constexpr unsigned divCounterHighByteShift = 8U;
+    return static_cast<std::uint8_t>(static_cast<unsigned>(m_divCounter) >>
+                                     divCounterHighByteShift);
+  }
   // Bits 6-7 are unused (always 1). Bits 0-3 are active-low button inputs:
   // start with all released (1) and clear a bit for each pressed button in
   // whichever group(s) bits 4-5 currently select - real hardware wire-ANDs
@@ -263,6 +271,17 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     m_bootRomActive = false;
   }
 
+  // Writing any value to DIV resets the entire 16-bit divider counter to 0
+  // - not just the CPU-visible upper byte. The written value itself is
+  // irrelevant. This is also the real mechanism behind the well-known
+  // "DIV write glitch": TIMA/the frame sequencer watch specific bits of
+  // this same counter for a falling edge, so forcing the whole thing to 0
+  // counts as one if the watched bit happened to be set beforehand.
+  if (address == regs::DIV) {
+    m_divCounter = 0;
+    return;
+  }
+
   // JOYP bits 0-3 are inputs (button state), not writable by the CPU -
   // only bits 4-5 (which of the two button groups is selected) actually
   // are.
@@ -352,6 +371,8 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 void
 Mmu::runNextTCycle()
 {
+  ++m_divCounter;
+
   if (m_dmaState.has_value()) {
     auto& dma = *m_dmaState;
     constexpr std::uint8_t tCyclesPerByte = 4;

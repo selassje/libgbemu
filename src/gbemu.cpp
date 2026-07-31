@@ -75,7 +75,7 @@ gbemu::GameBoy::runNextFrame()
     for (std::size_t i = 0; i < cycles * 4; ++i) {
       m_ppu.runNextTCycle();
       m_mmu.runNextTCycle();
-      m_apu.runNextTCycle();
+      m_apu.runNextTCycle(m_mmu.divCounter());
     }
     mCycles += cycles;
   }
