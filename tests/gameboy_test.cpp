@@ -603,4 +603,26 @@ TEST_CASE("dmg_sound 05-sweep details", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
+TEST_CASE("dmg_sound 06-overflow on trigger", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
+                      "rom_singles" / "06-overflow on trigger.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(std::chrono::milliseconds(20000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
 }
