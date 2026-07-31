@@ -81,10 +81,8 @@ Apu::runNextTCycle(std::uint16_t divCounter)
   }
   m_sampleAccumulator -= CLOCK_RATE_HZ;
 
-  // TODO: mix() itself is still a stub (returns silence) and applyHpf() is
-  // a pass-through - see each one's own TODO for what's missing. Kept as
-  // separate statements (not applyHpf(mix())) so the pre-filter mixed
-  // output stays inspectable on its own.
+  // Kept as separate statements (not applyHpf(mix())) so the pre-filter
+  // mixed output stays inspectable on its own.
   const auto mixed = mix();
   const auto [left, right] = applyHpf(mixed);
   m_buffer.at(m_sampleCount++) = left;
@@ -116,13 +114,59 @@ Apu::toDacOutput(std::uint8_t amplitude)
 std::pair<float, float>
 Apu::mix() const
 {
-  // TODO: not implemented yet - still missing summing
-  // toDacOutput(m_pulse1.playback.output)/m_pulse2/m_wave/m_noise per NR51
-  // panning. NR50 master volume is applied below (a value of 0 is volume
-  // 1/8, not silence - the amplifier never mutes a non-silent input), but
-  // there's nothing but silence to scale until panning exists.
+  // A channel whose DAC is off contributes nothing at all - not even
+  // toDacOutput(0)'s -1.0 bias, since real hardware disconnects it from
+  // the mixer entirely. One whose DAC is on but not currently playing
+  // (length-expired, untriggered, ...) still contributes that bias,
+  // which is exactly what applyHpf() exists to remove.
+  const float pulse1Output = isDacEnabled(m_pulse1.configuration.envelope)
+                               ? toDacOutput(m_pulse1.playback.output)
+                               : 0.0F;
+  const float pulse2Output = isDacEnabled(m_pulse2.configuration.envelope)
+                               ? toDacOutput(m_pulse2.playback.output)
+                               : 0.0F;
+  const float waveOutput = m_wave.configuration.dacEnabled
+                             ? toDacOutput(m_wave.playback.output)
+                             : 0.0F;
+  const float noiseOutput = isDacEnabled(m_noise.configuration.envelope)
+                              ? toDacOutput(m_noise.playback.output)
+                              : 0.0F;
+
+  // NR51 bit N (channel N+1) selects whether that channel is routed to
+  // this side - summed, not averaged, matching real hardware (see the
+  // class comment on mix()'s wider-than-[-1,1] intermediate range).
+  static constexpr unsigned ch1Bit = 0b0001U;
+  static constexpr unsigned ch2Bit = 0b0010U;
+  static constexpr unsigned ch3Bit = 0b0100U;
+  static constexpr unsigned ch4Bit = 0b1000U;
+
   float left = 0.0F;
+  if ((m_leftPanning & ch1Bit) != 0) {
+    left += pulse1Output;
+  }
+  if ((m_leftPanning & ch2Bit) != 0) {
+    left += pulse2Output;
+  }
+  if ((m_leftPanning & ch3Bit) != 0) {
+    left += waveOutput;
+  }
+  if ((m_leftPanning & ch4Bit) != 0) {
+    left += noiseOutput;
+  }
+
   float right = 0.0F;
+  if ((m_rightPanning & ch1Bit) != 0) {
+    right += pulse1Output;
+  }
+  if ((m_rightPanning & ch2Bit) != 0) {
+    right += pulse2Output;
+  }
+  if ((m_rightPanning & ch3Bit) != 0) {
+    right += waveOutput;
+  }
+  if ((m_rightPanning & ch4Bit) != 0) {
+    right += noiseOutput;
+  }
 
   static constexpr float maxVolume = 8.0F;
   left *= static_cast<float>(m_leftVolume + 1) / maxVolume;
@@ -131,16 +175,35 @@ Apu::mix() const
   return { left, right };
 }
 
-// TODO: not implemented yet - pass-through until the high-pass filter
-// itself exists (see the class comment on what real hardware does here).
-// Deliberately not static despite the stub body not touching instance
-// state: the real filter will need to (previous input/output per
-// channel), so the signature is already what it'll need to be.
 std::pair<float, float>
-// NOLINTNEXTLINE(readability-convert-member-functions-to-static)
 Apu::applyHpf(std::pair<float, float> input)
 {
-  return input;
+  const bool anyDacEnabled = isDacEnabled(m_pulse1.configuration.envelope) ||
+                             isDacEnabled(m_pulse2.configuration.envelope) ||
+                             m_wave.configuration.dacEnabled ||
+                             isDacEnabled(m_noise.configuration.envelope);
+  if (!anyDacEnabled) {
+    // Real hardware's capacitor holds its charge indefinitely while
+    // disconnected, rather than decaying toward 0 - freeze it here so a
+    // DAC reactivating later doesn't see a spurious jump/pop.
+    return { 0.0F, 0.0F };
+  }
+
+  // Charge factor for the canonical single-pole "DAC capacitor" model,
+  // by convention tuned to 0.999958 per T-cycle (CLOCK_RATE_HZ); since
+  // this runs once per output sample (SAMPLE_RATE) instead, the
+  // equivalent per-sample coefficient is that value raised to the
+  // T-cycles-per-sample power - precomputed offline rather than calling
+  // std::pow() every time (both rates are compile-time constants).
+  static constexpr float chargeFactor = 0.9960133F;
+
+  const auto [inLeft, inRight] = input;
+  const float outLeft = inLeft - m_leftCapacitor;
+  m_leftCapacitor = inLeft - (outLeft * chargeFactor);
+  const float outRight = inRight - m_rightCapacitor;
+  m_rightCapacitor = inRight - (outRight * chargeFactor);
+
+  return { outLeft, outRight };
 }
 
 // address/value is this file's (and Mmu::writeByte()'s) established
@@ -376,6 +439,19 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       break;
     }
 
+    case regs::NR51: {
+      static constexpr unsigned rightPanningMask = 0b0000'1111U;
+      static constexpr unsigned leftPanningShift = 4U;
+      static constexpr unsigned leftPanningMask = 0b0000'1111U;
+
+      const auto unsignedValue = static_cast<unsigned>(value);
+      m_rightPanning =
+        static_cast<std::uint8_t>(unsignedValue & rightPanningMask);
+      m_leftPanning = static_cast<std::uint8_t>(
+        (unsignedValue >> leftPanningShift) & leftPanningMask);
+      break;
+    }
+
     case regs::NR52: {
       static constexpr unsigned powerBit = 0b1000'0000U;
       m_powered = (static_cast<unsigned>(value) & powerBit) != 0;
@@ -393,6 +469,8 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_noise = NoiseChannel{};
         m_leftVolume = 0;
         m_rightVolume = 0;
+        m_leftPanning = 0;
+        m_rightPanning = 0;
       }
       break;
     }

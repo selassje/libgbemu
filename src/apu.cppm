@@ -41,8 +41,9 @@ public:
   // Called by Mmu::writeByte() for every write to a channel register
   // (NR10-NR44) that actually took effect (i.e. not dropped by the
   // APU-powered-off read-only guard) - parses the byte into whichever
-  // channel struct's fields it belongs to. Also handles NR52 (power) -
-  // Mmu still owns NR51 directly.
+  // channel struct's fields it belongs to. Also handles NR51 (panning)
+  // and NR52 (power); Mmu keeps its own raw copy of every register for
+  // CPU reads regardless (see readRegister() for the one exception).
   void writeRegister(std::uint16_t address, std::uint8_t value);
 
   // Called by Mmu::readByte() for NR52 - the only register whose
@@ -85,6 +86,17 @@ private:
   // real games and not implemented by essentially any mainstream emulator.
   std::uint8_t m_leftVolume{ 0 };
   std::uint8_t m_rightVolume{ 0 };
+
+  // NR51 bits 3-0/7-4 - which of CH1-CH4 (bit N = CH(N+1)) are routed to
+  // the right/left mixer, respectively. Checked directly as a bitmask
+  // against each channel's index in mix().
+  std::uint8_t m_rightPanning{ 0 };
+  std::uint8_t m_leftPanning{ 0 };
+
+  // applyHpf()'s persistent one-pole filter state, independent per stereo
+  // channel (left/right output) - not per Game Boy sound channel.
+  float m_leftCapacitor{ 0.0F };
+  float m_rightCapacitor{ 0.0F };
 
   // Frame sequencer (drives length counter/envelope/sweep timing at
   // 512 Hz) - clocked not by a fixed T-cycle divisor but by watching bit 4
@@ -346,18 +358,24 @@ private:
   // range.
   [[nodiscard]] static float toDacOutput(std::uint8_t amplitude);
 
-  // TODO: not implemented yet - will mix all 4 channels' DAC outputs into
-  // (left, right) per NR51 panning and NR50 master volume.
+  // Sums each channel's DAC output (see toDacOutput()) into (left, right)
+  // per NR51 panning (m_leftPanning/m_rightPanning), then scales by NR50
+  // master volume. A channel whose DAC is off contributes nothing at all
+  // (not even a silent 0 amplitude's DC bias) - real hardware disconnects
+  // it from the mixer entirely; one whose DAC is on but that's simply not
+  // currently playing (length-expired, untriggered, ...) still
+  // contributes toDacOutput(0)'s constant bias, which is exactly what
+  // applyHpf() exists to remove.
   [[nodiscard]] std::pair<float, float> mix() const;
 
   // Final stage before a sample is pushed to the buffer - removes the DC
-  // bias a channel's DAC leaves behind while it's enabled (see
-  // runNextTCycle()'s call site). Not const: a real high-pass filter needs
-  // to remember the previous input/output per channel.
-  // TODO: not implemented yet - currently a pass-through. Real hardware's
-  // filter is an analog RC circuit whose time constant depends on how many
-  // DACs are currently active, not a fixed-coefficient digital filter;
-  // most emulators approximate it with a single-pole IIR instead.
+  // bias mix() leaves behind while any DAC is active (see mix()'s own
+  // comment). The canonical "DAC capacitor" model most emulators use:
+  // a single-pole filter with its own persistent state per stereo channel
+  // (m_leftCapacitor/m_rightCapacitor below), not a fixed-cutoff design -
+  // real hardware's actual time constant depends on how many DACs are
+  // currently active, which (like most emulators) this doesn't model.
+  // Not const: mutates that persistent state.
   [[nodiscard]] std::pair<float, float> applyHpf(std::pair<float, float> input);
 
   PulseChannel1 m_pulse1;

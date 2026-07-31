@@ -337,11 +337,11 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
-  // Forward channel-register writes (NR10-NR44) and NR50 (master volume -
-  // Apu needs it for its own mixing) to Apu - only reached once we know
-  // the write wasn't just dropped by the read-only guard above. NR51
-  // (panning) stays Mmu's own responsibility for now.
-  if (address >= APU_REGISTERS_START && address < regs::NR51) {
+  // Forward channel-register writes (NR10-NR44), NR50 (master volume) and
+  // NR51 (panning) to Apu - it needs both for its own mixing - only
+  // reached once we know the write wasn't just dropped by the read-only
+  // guard above.
+  if (address >= APU_REGISTERS_START && address < regs::NR52) {
     m_apu.get().writeRegister(address, value);
   }
 
