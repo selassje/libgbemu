@@ -235,11 +235,20 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       static constexpr unsigned shiftMask = 0b111U;
 
       const auto unsignedValue = static_cast<unsigned>(value);
+      const bool wasIncrease = m_pulse1.sweep.isIncrease;
       m_pulse1.sweep.pace =
         static_cast<std::uint8_t>((unsignedValue >> paceShift) & paceMask);
       m_pulse1.sweep.isIncrease = (unsignedValue & directionBit) == 0;
       m_pulse1.sweep.shift =
         static_cast<std::uint8_t>(unsignedValue & shiftMask);
+      // Real hardware quirk: switching out of negate/subtract mode after
+      // it's actually been used to calculate (not just selected) since
+      // the last trigger immediately disables the channel - see
+      // PulseChannel1::negateModeUsedSinceTrigger's comment.
+      if (!wasIncrease && m_pulse1.sweep.isIncrease &&
+          m_pulse1.negateModeUsedSinceTrigger) {
+        m_pulse1.playback.enabled = false;
+      }
       break;
     }
 
@@ -347,6 +356,7 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           pulse.configuration.envelope.pace;
         if (address == regs::NR14) {
           m_pulse1.shadowPeriod = m_pulse1.configuration.period;
+          m_pulse1.negateModeUsedSinceTrigger = false;
           static constexpr std::uint8_t sweepTimerReloadWhenPaceZero = 8;
           m_pulse1.sweepTimer = (m_pulse1.sweep.pace != 0)
                                   ? m_pulse1.sweep.pace
@@ -690,6 +700,9 @@ Apu::PulseChannel1::calculateSweepFrequency()
   const auto delta = static_cast<std::uint16_t>(shadowPeriod >> sweep.shift);
   const auto newPeriod = static_cast<std::uint16_t>(
     sweep.isIncrease ? shadowPeriod + delta : shadowPeriod - delta);
+  if (!sweep.isIncrease) {
+    negateModeUsedSinceTrigger = true;
+  }
   static constexpr std::uint16_t maxPeriod = 2047;
   if (newPeriod > maxPeriod) {
     playback.enabled = false;

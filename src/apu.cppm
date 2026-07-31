@@ -224,6 +224,14 @@ private:
     // from playback.enabled (the channel as a whole). False when both
     // sweep.pace and sweep.shift are 0.
     bool sweepEnabled{ false };
+    // Whether calculateSweepFrequency() has actually run in subtract
+    // (negate) mode since the last trigger - reset on trigger, set
+    // whenever a calculation executes with sweep.isIncrease == false.
+    // Real hardware quirk: switching sweep.isIncrease from false to true
+    // (subtract -> add) while this is set immediately disables the
+    // channel, regardless of the resulting period - see
+    // dmg_sound/05-sweep details.gb.
+    bool negateModeUsedSinceTrigger{ false };
 
     // CH1-only frame-sequencer event - steps 2/6 (128 Hz).
     void clockSweep();
