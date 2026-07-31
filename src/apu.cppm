@@ -42,7 +42,7 @@ public:
   // (NR10-NR44) that actually took effect (i.e. not dropped by the
   // APU-powered-off read-only guard) - parses the byte into whichever
   // channel struct's fields it belongs to. Also handles NR52 (power) -
-  // Mmu still owns NR50/NR51 and Wave RAM directly.
+  // Mmu still owns NR51 directly.
   void writeRegister(std::uint16_t address, std::uint8_t value);
 
   // Called by Mmu::readByte() for NR52 - the only register whose
@@ -50,6 +50,15 @@ public:
   // real active status) rather than being a fixed positional bitmask Mmu
   // can compute on its own.
   [[nodiscard]] std::uint8_t readRegister(std::uint16_t address) const;
+
+  // Called by Mmu::writeByte() for every write to Wave RAM
+  // (0xFF30-0xFF3F, see regs::WAVE_RAM_START) - mirrors the byte into
+  // WaveChannel's own copy (see WaveChannel::Configuration::waveRam) for
+  // CH3 playback. Mmu keeps its own copy too, for CPU reads - Wave RAM
+  // isn't forwarded the other direction (Apu doesn't hold a Mmu&, see
+  // runNextTCycle()'s comment on divCounter for why), so each side's copy
+  // only ever reflects what's actually been written, never diverging.
+  void writeWaveRam(std::uint16_t address, std::uint8_t value);
 
 private:
   // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples
@@ -235,6 +244,10 @@ private:
       // Combined NR33 (low 8 bits) + NR34 (high 3 bits).
       std::uint16_t period{ 0 };
       bool isLengthEnabled{ false };
+      // 16 bytes (0xFF30-0xFF3F), mirrored here from Mmu on every write
+      // via Apu::writeWaveRam() - 32 4-bit samples, two per byte (high
+      // nibble played before low), read by runNextTCycle().
+      std::array<std::uint8_t, 16> waveRam{};
     } configuration;
 
     struct PlaybackState

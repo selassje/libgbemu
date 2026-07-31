@@ -312,6 +312,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           m_wave.playback.remainingLengthTicks = static_cast<std::uint16_t>(
             maxLengthTicks - m_wave.configuration.lengthTimer);
         }
+        // Real hardware restarts Wave RAM playback from its first sample
+        // on every trigger.
+        m_wave.playback.waveRamIndex = 0;
       }
       break;
     }
@@ -355,6 +358,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_noise.playback.volume = m_noise.configuration.envelope.initialVolume;
         m_noise.playback.envelopeTicksRemaining =
           m_noise.configuration.envelope.pace;
+        // All 15 bits set - real hardware's power-on/trigger LFSR state.
+        static constexpr std::uint16_t lfsrResetValue = 0x7FFF;
+        m_noise.playback.lfsr = lfsrResetValue;
       }
       break;
     }
@@ -376,10 +382,14 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       if (!m_powered) {
         // Mirrors Mmu's own NR10-NR51 byte-range clearing on power-off -
         // keep Apu's channel state and Mmu's raw register bytes consistent
-        // with each other.
+        // with each other. Wave RAM is deliberately preserved across this
+        // reset (real hardware doesn't clear it on power-off, only
+        // NR10-NR51 - see Mmu::writeByte()'s own NR52 handling).
+        const auto waveRam = m_wave.configuration.waveRam;
         m_pulse1 = PulseChannel1{};
         m_pulse2 = PulseChannel{};
         m_wave = WaveChannel{};
+        m_wave.configuration.waveRam = waveRam;
         m_noise = NoiseChannel{};
         m_leftVolume = 0;
         m_rightVolume = 0;
@@ -422,6 +432,12 @@ Apu::readRegister(std::uint16_t address) const
     return static_cast<std::uint8_t>(result);
   }
   return 0;
+}
+
+void
+Apu::writeWaveRam(std::uint16_t address, std::uint8_t value)
+{
+  m_wave.configuration.waveRam.at(address - regs::WAVE_RAM_START) = value;
 }
 
 void
@@ -523,7 +539,40 @@ Apu::PulseChannel1::calculateSweepFrequency()
 void
 Apu::WaveChannel::runNextTCycle()
 {
-  // TODO: not implemented yet.
+  if (!playback.enabled) {
+    playback.output = 0;
+    return;
+  }
+  if (playback.periodCounter == 0) {
+    static constexpr std::uint16_t periodBase = 2048;
+    static constexpr std::uint16_t periodMultiplier = 2;
+    playback.periodCounter = static_cast<std::uint16_t>(
+      periodMultiplier * (periodBase - configuration.period));
+
+    static constexpr std::uint8_t sampleCount = 32;
+    playback.waveRamIndex =
+      static_cast<std::uint8_t>((playback.waveRamIndex + 1) % sampleCount);
+
+    // Each byte holds two 4-bit samples - high nibble (even index) played
+    // before low nibble (odd index).
+    const std::uint8_t sampleByte =
+      configuration.waveRam.at(playback.waveRamIndex / 2);
+    static constexpr unsigned nibbleShift = 4U;
+    static constexpr unsigned nibbleMask = 0x0FU;
+    const unsigned nibble =
+      (playback.waveRamIndex % 2 == 0)
+        ? (static_cast<unsigned>(sampleByte) >> nibbleShift)
+        : (static_cast<unsigned>(sampleByte) & nibbleMask);
+
+    // configuration.outputLevel (0-3) indexes directly: 0 = mute (shifting
+    // a 4-bit nibble right by 4 always yields 0), 1 = 100%, 2 = 50%,
+    // 3 = 25%.
+    static constexpr std::array<unsigned, 4> outputShift = { 4, 0, 1, 2 };
+    playback.output = static_cast<std::uint8_t>(
+      nibble >> outputShift.at(configuration.outputLevel));
+  } else {
+    --playback.periodCounter;
+  }
 }
 
 void
@@ -541,7 +590,43 @@ Apu::WaveChannel::clockLength()
 void
 Apu::NoiseChannel::runNextTCycle()
 {
-  // TODO: not implemented yet.
+  if (!playback.enabled) {
+    playback.output = 0;
+    return;
+  }
+  if (playback.periodCounter == 0) {
+    // NR43 bits 2-0 look up a base divisor here (0 meaning 8, i.e. 0.5x
+    // the divisor-1 rate); bits 7-4 (clockShift) then left-shift that
+    // further - see the class comment on NR43's own frequency formula.
+    static constexpr std::array<std::uint16_t, 8> divisorTable = { 8,  16, 32,
+                                                                   48, 64, 80,
+                                                                   96, 112 };
+    playback.periodCounter = static_cast<std::uint16_t>(
+      divisorTable.at(configuration.clockDivider) << configuration.clockShift);
+
+    // LFSR shift: XOR the low two bits, shift everything right by one, and
+    // feed the XOR result into what's now the top (bit 14) of the 15-bit
+    // register - and also into bit 6 in narrow/7-bit mode, producing a
+    // much shorter, more tonal repeat cycle. Kept in an unsigned local
+    // throughout (rather than uint16_t's own bitwise ops, which promote to
+    // signed int) to avoid hicpp-signed-bitwise.
+    auto lfsrValue = static_cast<unsigned>(playback.lfsr);
+    const unsigned xorResult = (lfsrValue ^ (lfsrValue >> 1U)) & 0b1U;
+    lfsrValue >>= 1U;
+    static constexpr unsigned highBitShift = 14U;
+    lfsrValue |= xorResult << highBitShift;
+    if (configuration.narrowLfsr) {
+      static constexpr unsigned narrowBitShift = 6U;
+      static constexpr unsigned narrowBitMask = 1U << narrowBitShift;
+      lfsrValue = (lfsrValue & ~narrowBitMask) | (xorResult << narrowBitShift);
+    }
+    playback.lfsr = static_cast<std::uint16_t>(lfsrValue);
+    // Output is bit 0 of the LFSR, inverted.
+    playback.output = static_cast<std::uint8_t>(
+      (~lfsrValue & 0b1U) * static_cast<unsigned>(playback.volume));
+  } else {
+    --playback.periodCounter;
+  }
 }
 
 void

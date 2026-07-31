@@ -97,6 +97,8 @@ constexpr unsigned STAT_INTERRUPT_FLAG_BIT = 0b0000'0010U;
 
 constexpr std::uint16_t APU_REGISTERS_START = 0xFF10;
 
+constexpr std::uint16_t WAVE_RAM_SIZE = 16;
+
 }
 
 std::uint8_t
@@ -341,6 +343,14 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   // (panning) stays Mmu's own responsibility for now.
   if (address >= APU_REGISTERS_START && address < regs::NR51) {
     m_apu.get().writeRegister(address, value);
+  }
+
+  // Wave RAM mirrors into Apu on every write, unconditionally - unlike
+  // NR10-NR51 above it's never read-only regardless of APU power state
+  // (see the read-only guard above), so there's no gating to check first.
+  if (address >= regs::WAVE_RAM_START &&
+      address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
+    m_apu.get().writeWaveRam(address, value);
   }
 
   // Starts a new transfer, restarting any one already in progress - matches
