@@ -36,10 +36,11 @@ Apu::runNextTCycle(std::uint16_t divCounter)
   const bool currentFrameSequencerBit =
     (divCounter & FRAME_SEQUENCER_BIT_MASK) != 0;
   if (m_previousFrameSequencerBit && !currentFrameSequencerBit) {
-    static constexpr std::uint8_t frameSequencerStepCount = 8;
-    m_frameSequencerStep = static_cast<std::uint8_t>(
-      (m_frameSequencerStep + 1) % frameSequencerStepCount);
-
+    // Process the CURRENT step, then advance - not the other way around.
+    // m_frameSequencerStep starts at 0, and per the frame sequencer's own
+    // spec, step 0 is a length-clock step: incrementing before processing
+    // would make the very first edge process step 1 (a no-op) instead,
+    // permanently shifting every subsequent step by one edge.
     switch (m_frameSequencerStep) {
       // CH1 period sweep: steps 2/6 (128 Hz) - falls through to also clock
       // length, same as steps 0/4.
@@ -64,6 +65,9 @@ Apu::runNextTCycle(std::uint16_t divCounter)
       default:
         break;
     }
+    static constexpr std::uint8_t frameSequencerStepCount = 8;
+    m_frameSequencerStep = static_cast<std::uint8_t>(
+      (m_frameSequencerStep + 1) % frameSequencerStepCount);
   }
   m_previousFrameSequencerBit = currentFrameSequencerBit;
 
@@ -85,8 +89,13 @@ Apu::runNextTCycle(std::uint16_t divCounter)
   // mixed output stays inspectable on its own.
   const auto mixed = mix();
   const auto [left, right] = applyHpf(mixed);
-  m_buffer.at(m_sampleCount++) = left;
-  m_buffer.at(m_sampleCount++) = right;
+  // mix() itself is normalized to [-1, 1] (see its own comment), but
+  // applyHpf()'s capacitor filter can still transiently overshoot that
+  // range for a sample or two right after a sudden polarity flip (its
+  // capacitor hasn't caught up yet) - this clamp is the safety net for
+  // that, keeping buffer()'s own documented [-1, 1] contract true.
+  m_buffer.at(m_sampleCount++) = std::clamp(left, -1.0F, 1.0F);
+  m_buffer.at(m_sampleCount++) = std::clamp(right, -1.0F, 1.0F);
 }
 
 void
@@ -133,8 +142,10 @@ Apu::mix() const
                               : 0.0F;
 
   // NR51 bit N (channel N+1) selects whether that channel is routed to
-  // this side - summed, not averaged, matching real hardware (see the
-  // class comment on mix()'s wider-than-[-1,1] intermediate range).
+  // this side - real hardware sums rather than averages these (its analog
+  // mixer just saturates past [-1, 1]), but a digital float sample has no
+  // such natural ceiling, so this divides by channelCount below to keep
+  // buffer()'s own documented [-1, 1] contract true instead.
   static constexpr unsigned ch1Bit = 0b0001U;
   static constexpr unsigned ch2Bit = 0b0010U;
   static constexpr unsigned ch3Bit = 0b0100U;
@@ -167,6 +178,10 @@ Apu::mix() const
   if ((m_rightPanning & ch4Bit) != 0) {
     right += noiseOutput;
   }
+
+  static constexpr float channelCount = 4.0F;
+  left /= channelCount;
+  right /= channelCount;
 
   static constexpr float maxVolume = 8.0F;
   left *= static_cast<float>(m_leftVolume + 1) / maxVolume;
@@ -471,6 +486,15 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_rightVolume = 0;
         m_leftPanning = 0;
         m_rightPanning = 0;
+        // Real hardware resets the frame sequencer's step counter on
+        // power-off - runNextTCycle() itself isn't gated on m_powered (it
+        // keeps ticking length/envelope/sweep against the now-disabled
+        // channels above, all no-ops), so without this the step would
+        // otherwise just drift silently across power cycles.
+        // m_previousFrameSequencerBit is deliberately left alone: it
+        // tracks DIV's real bit state, which keeps changing regardless of
+        // APU power and shouldn't be reset independently of it.
+        m_frameSequencerStep = 0;
       }
       break;
     }
@@ -528,8 +552,12 @@ Apu::PulseChannel::runNextTCycle()
   if (playback.periodCounter == 0) {
     static constexpr std::uint16_t periodBase = 2048;
     static constexpr std::uint16_t periodMultiplier = 4;
+    // The -1 makes the full period exactly periodMultiplier*(periodBase-
+    // period) T-cycles: this branch itself (reload+advance) is the Nth
+    // tick, so counting down from N-1 here (not N) is what makes N total
+    // ticks elapse between one advance and the next.
     playback.periodCounter = static_cast<std::uint16_t>(
-      periodMultiplier * (periodBase - configuration.period));
+      (periodMultiplier * (periodBase - configuration.period)) - 1);
     static constexpr std::uint8_t dutyStepCount = 8;
     playback.dutyStep =
       static_cast<std::uint8_t>((playback.dutyStep + 1) % dutyStepCount);
@@ -624,8 +652,11 @@ Apu::WaveChannel::runNextTCycle()
   if (playback.periodCounter == 0) {
     static constexpr std::uint16_t periodBase = 2048;
     static constexpr std::uint16_t periodMultiplier = 2;
+    // See PulseChannel::runNextTCycle()'s comment on the -1: this branch
+    // is itself the Nth tick of the period, so reloading to N-1 (not N)
+    // is what makes exactly N ticks elapse per period.
     playback.periodCounter = static_cast<std::uint16_t>(
-      periodMultiplier * (periodBase - configuration.period));
+      (periodMultiplier * (periodBase - configuration.period)) - 1);
 
     static constexpr std::uint8_t sampleCount = 32;
     playback.waveRamIndex =
@@ -679,8 +710,13 @@ Apu::NoiseChannel::runNextTCycle()
     static constexpr std::array<std::uint16_t, 8> divisorTable = { 8,  16, 32,
                                                                    48, 64, 80,
                                                                    96, 112 };
-    playback.periodCounter = static_cast<std::uint16_t>(
-      divisorTable.at(configuration.clockDivider) << configuration.clockShift);
+    // See PulseChannel::runNextTCycle()'s comment on the -1: this branch
+    // is itself the Nth tick of the period, so reloading to N-1 (not N)
+    // is what makes exactly N ticks elapse per period.
+    playback.periodCounter =
+      static_cast<std::uint16_t>((divisorTable.at(configuration.clockDivider)
+                                  << configuration.clockShift) -
+                                 1);
 
     // LFSR shift: XOR the low two bits, shift everything right by one, and
     // feed the XOR result into what's now the top (bit 14) of the 15-bit

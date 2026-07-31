@@ -359,13 +359,15 @@ private:
   [[nodiscard]] static float toDacOutput(std::uint8_t amplitude);
 
   // Sums each channel's DAC output (see toDacOutput()) into (left, right)
-  // per NR51 panning (m_leftPanning/m_rightPanning), then scales by NR50
-  // master volume. A channel whose DAC is off contributes nothing at all
-  // (not even a silent 0 amplitude's DC bias) - real hardware disconnects
-  // it from the mixer entirely; one whose DAC is on but that's simply not
-  // currently playing (length-expired, untriggered, ...) still
-  // contributes toDacOutput(0)'s constant bias, which is exactly what
-  // applyHpf() exists to remove.
+  // per NR51 panning (m_leftPanning/m_rightPanning), divides by the
+  // channel count to stay within [-1, 1] (real hardware's analog mixer
+  // just saturates past that instead - a digital float sample has no such
+  // ceiling), then scales by NR50 master volume. A channel whose DAC is
+  // off contributes nothing at all (not even a silent 0 amplitude's DC
+  // bias) - real hardware disconnects it from the mixer entirely; one
+  // whose DAC is on but that's simply not currently playing
+  // (length-expired, untriggered, ...) still contributes toDacOutput(0)'s
+  // constant bias, which is exactly what applyHpf() exists to remove.
   [[nodiscard]] std::pair<float, float> mix() const;
 
   // Final stage before a sample is pushed to the buffer - removes the DC
