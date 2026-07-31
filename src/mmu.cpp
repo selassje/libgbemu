@@ -194,17 +194,10 @@ Mmu::readByte(std::uint16_t address) const
     return static_cast<std::uint8_t>(
       (static_cast<unsigned>(value) & outputLevelBits) | unusedBits);
   }
-  // Bit 7 is APU power (the only bit actually stored - see writeByte()).
-  // Bits 4-6 are unused (always 1). Bits 0-3 would report each channel's
-  // active status, but always read 0 for now since no channels are
-  // implemented yet - real hardware, and this once channels exist, drives
-  // them from actual channel state, not from what was last written (that's
-  // read-only, see the NR52 comment in writeByte()).
+  // NR52's CPU-visible value depends on live per-channel state (bits 0-3),
+  // not just a fixed positional bitmask - Apu computes the whole byte.
   if (address == regs::NR52) {
-    constexpr unsigned powerBit = 0b1000'0000U;
-    constexpr unsigned unusedBits = 0b0111'0000U;
-    return static_cast<std::uint8_t>((static_cast<unsigned>(value) & powerBit) |
-                                     unusedBits);
+    return m_apu.get().readRegister(address);
   }
   return value;
 }
@@ -295,12 +288,13 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
-  // NR52 bit 7 gates the APU's power. Only that bit is actually stored -
-  // bits 0-3 (channel status) are read-only and bits 4-6 are unused, so
-  // writes to them are silently discarded rather than stored, matching real
-  // hardware ("writing to those does not enable or disable the channels").
-  // Powering off clears NR10-NR51 (0xFF10-0xFF25) and makes them read-only
-  // until powered back on; Wave RAM and NR52 itself are unaffected.
+  // NR52 bit 7 gates the APU's power - bits 0-3 (channel status) and 4-6
+  // (unused) are read-only, so writes to them are silently discarded,
+  // matching real hardware ("writing to those does not enable or disable
+  // the channels"). Powering off clears NR10-NR51 (0xFF10-0xFF25) here and
+  // makes them read-only until powered back on; Wave RAM is unaffected.
+  // Apu tracks the power bit and its own channel state itself now (see
+  // readByte()), so NR52 no longer needs a raw byte stored in m_io.
   if (address == regs::NR52) {
     constexpr unsigned powerBit = 0b1000'0000U;
     const bool poweringOn = (static_cast<unsigned>(value) & powerBit) != 0;
@@ -310,9 +304,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
         getByteRef(reg) = 0;
       }
     }
-    auto& nr52 = getByteRef(regs::NR52);
-    nr52 = static_cast<std::uint8_t>((static_cast<unsigned>(nr52) & ~powerBit) |
-                                     (static_cast<unsigned>(value) & powerBit));
+    m_apu.get().writeRegister(address, value);
     return;
   }
 

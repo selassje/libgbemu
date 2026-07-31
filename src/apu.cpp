@@ -210,6 +210,53 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     }
     return;
   }
+
+  if (address == regs::NR52) {
+    constexpr unsigned powerBit = 0b1000'0000U;
+    m_powered = (static_cast<unsigned>(value) & powerBit) != 0;
+    if (!m_powered) {
+      // Mirrors Mmu's own NR10-NR51 byte-range clearing on power-off - keep
+      // Apu's channel state and Mmu's raw register bytes consistent with
+      // each other.
+      m_pulse1 = PulseChannel1{};
+      m_pulse2 = PulseChannel{};
+      m_wave = WaveChannel{};
+      m_noise = NoiseChannel{};
+    }
+    return;
+  }
+}
+
+std::uint8_t
+Apu::readRegister(std::uint16_t address) const
+{
+  if (address == regs::NR52) {
+    constexpr unsigned powerBit = 0b1000'0000U;
+    constexpr unsigned unusedBits = 0b0111'0000U;
+    constexpr unsigned ch1Bit = 0b0000'0001U;
+    constexpr unsigned ch2Bit = 0b0000'0010U;
+    constexpr unsigned ch3Bit = 0b0000'0100U;
+    constexpr unsigned ch4Bit = 0b0000'1000U;
+
+    unsigned result = unusedBits;
+    if (m_powered) {
+      result |= powerBit;
+    }
+    if (m_pulse1.enabled) {
+      result |= ch1Bit;
+    }
+    if (m_pulse2.enabled) {
+      result |= ch2Bit;
+    }
+    if (m_wave.enabled) {
+      result |= ch3Bit;
+    }
+    if (m_noise.enabled) {
+      result |= ch4Bit;
+    }
+    return static_cast<std::uint8_t>(result);
+  }
+  return 0;
 }
 
 }

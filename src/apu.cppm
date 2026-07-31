@@ -32,9 +32,15 @@ public:
   // Called by Mmu::writeByte() for every write to a channel register
   // (NR10-NR44) that actually took effect (i.e. not dropped by the
   // APU-powered-off read-only guard) - parses the byte into whichever
-  // channel struct's fields it belongs to. Global registers (NR50-NR52,
-  // Wave RAM) aren't included; Mmu still owns those directly.
+  // channel struct's fields it belongs to. Also handles NR52 (power) -
+  // Mmu still owns NR50/NR51 and Wave RAM directly.
   void writeRegister(std::uint16_t address, std::uint8_t value);
+
+  // Called by Mmu::readByte() for NR52 - the only register whose
+  // CPU-visible value genuinely depends on live Apu state (each channel's
+  // real active status) rather than being a fixed positional bitmask Mmu
+  // can compute on its own.
+  [[nodiscard]] std::uint8_t readRegister(std::uint16_t address) const;
 
 private:
   std::vector<std::int16_t> m_buffer;
@@ -44,6 +50,9 @@ private:
   // a sample whenever accumulated cycles cross the clock rate, carrying the
   // remainder forward.
   std::uint32_t m_sampleAccumulator{ 0 };
+  // NR52 bit 7. Named distinctly from the channels' own "enabled" (a
+  // channel being actively on) - this is the APU as a whole.
+  bool m_powered{ false };
 
   // NRx2's volume-envelope layout (initial volume/direction/pace) is
   // identical across CH1, CH2, and CH4 - CH3's wave channel has no
