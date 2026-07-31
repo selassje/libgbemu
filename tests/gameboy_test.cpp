@@ -490,4 +490,29 @@ TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
+TEST_CASE("dmg_sound 01-registers", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
+                      "rom_singles" / "01-registers.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(std::chrono::milliseconds(20000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+
+  // Reports via cartridge RAM (memoryOutput()), not the serial port - see
+  // Mmu.cppm's comment on memoryOutput() for why blargg's newer test
+  // shells use this channel instead of serial.
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
 }
