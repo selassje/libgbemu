@@ -29,6 +29,13 @@ public:
     return m_buffer;
   }
 
+  // Called by Mmu::writeByte() for every write to a channel register
+  // (NR10-NR44) that actually took effect (i.e. not dropped by the
+  // APU-powered-off read-only guard) - parses the byte into whichever
+  // channel struct's fields it belongs to. Global registers (NR50-NR52,
+  // Wave RAM) aren't included; Mmu still owns those directly.
+  void writeRegister(std::uint16_t address, std::uint8_t value);
+
 private:
   std::vector<std::int16_t> m_buffer;
   // Bresenham-style fractional accumulator driving sample timing - the
@@ -131,6 +138,16 @@ private:
     bool enabled{ false };
     bool isLengthEnabled{ false };
   };
+
+  // Shared by the 5 NR12/22/42 (envelope write) and NR14/24/44 (trigger)
+  // call sites in writeRegister() - "initial volume 0 + decreasing"
+  // (bits 3-7 all zero) is the DAC-off condition for any envelope-having
+  // channel.
+  [[nodiscard]] static bool isDacEnabled(const Envelope& envelope)
+  {
+    return envelope.initialVolume != 0 || envelope.increase;
+  }
+  static void writeEnvelope(Envelope& envelope, std::uint8_t value);
 
   PulseChannel1 m_pulse1;
   PulseChannel m_pulse2;

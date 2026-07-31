@@ -324,6 +324,14 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
+  // Forward channel-register writes (NR10-NR44) to Apu so it can update
+  // its own channel state - only reached once we know the write wasn't
+  // just dropped by the read-only guard above. NR50/NR51 (global, not
+  // per-channel) stay Mmu's own responsibility for now.
+  if (address >= APU_REGISTERS_START && address < regs::NR50) {
+    m_apu.get().writeRegister(address, value);
+  }
+
   // Starts a new transfer, restarting any one already in progress - matches
   // real hardware. The register itself still stores the written byte
   // normally (falls through to getByteRef below), so reading 0xFF46 back

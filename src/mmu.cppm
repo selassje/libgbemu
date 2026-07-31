@@ -1,6 +1,7 @@
 export module gbemu:mmu;
 
 import std;
+import :apu;
 
 namespace gbemu {
 
@@ -45,7 +46,12 @@ public:
   static constexpr std::size_t KB8 = 0x2000;
   static constexpr std::size_t KB4 = 0x1000;
 
-  Mmu() = default;
+  // Forwards channel-register writes (NR10-NR44) to apu - see
+  // writeByte(). apu must outlive this Mmu.
+  explicit Mmu(Apu& apu)
+    : m_apu(apu)
+  {
+  }
 
   [[nodiscard]] std::uint8_t readByte(std::uint16_t address) const;
   [[nodiscard]] std::uint16_t readWord(std::uint16_t address) const;
@@ -74,6 +80,8 @@ public:
   void runNextTCycle();
 
 private:
+  std::reference_wrapper<Apu> m_apu;
+
   // Real hardware copies 1 byte per 4 T-cycles (160 bytes -> 640 T-cycles
   // total), not all 160 at once - std::nullopt when no transfer is active.
   struct DmaState

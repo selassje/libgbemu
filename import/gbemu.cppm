@@ -36,7 +36,8 @@ class GameBoy
 {
 public:
   GameBoy()
-    : m_ppu(m_mmu)
+    : m_mmu(m_apu)
+    , m_ppu(m_mmu)
     , m_cpu(m_mmu, m_ppu)
   {
   }
@@ -61,12 +62,15 @@ private:
   // currently in m_romBytes.
   [[nodiscard]] std::expected<void, std::string> initializeFromRom();
 
+  // Declared before m_mmu so it's fully constructed before Mmu's
+  // constructor receives a reference to it (Mmu forwards channel-register
+  // writes to it - see Mmu::writeByte()).
+  Apu m_apu;
   Mmu m_mmu;
   // Declared before m_cpu so it's fully constructed before Cpu's
   // constructor receives a reference to it.
   Ppu m_ppu;
   Cpu m_cpu;
-  Apu m_apu;
   // Whether the cartridge itself declares CGB awareness (header byte
   // 0x0143, bit 7) - kept for gating actual CGB-exclusive hardware
   // features (VRAM banking, palette RAM, double speed, ...) once those
