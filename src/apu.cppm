@@ -88,11 +88,11 @@ private:
   // identical across CH1, CH2, and CH4 - CH3's wave channel has no
   // envelope at all, just a coarser output-level shift instead (see
   // WaveChannel).
-  struct Envelope
+  struct EnvelopeConfig
   {
     // Note: readable, but not updated by the envelope itself as it runs -
-    // that live/current volume isn't tracked here yet (see class-level
-    // comment on what's still missing).
+    // see PulseChannel::PlaybackState::volume/NoiseChannel::PlaybackState::
+    // volume for the live, currently-playing value.
     std::uint8_t initialVolume{ 0 };
     bool increase{ false };
     // Bits 2-0 - ticks at 64 Hz, volume changes every pace-many ticks; 0
@@ -110,7 +110,7 @@ private:
       std::uint8_t duty{ 0 };
       // Initial/loaded value - not the live countdown (see PlaybackState).
       std::uint8_t lengthTimer{ 0 };
-      Envelope envelope;
+      EnvelopeConfig envelope;
       // Combined NRx3 (low 8 bits) + NRx4 (high 3 bits) - the configured
       // setting, not the live period counter (see PlaybackState).
       std::uint16_t period{ 0 };
@@ -132,10 +132,15 @@ private:
       std::uint16_t periodCounter{ 0 };
       // 0-7, which entry of DUTY_CYCLES[configuration.duty] is playing.
       std::uint8_t dutyStep{ 0 };
+      // 0-15, the live, currently-playing volume - reset from
+      // configuration.envelope.initialVolume on trigger, then stepped
+      // up/down by the envelope while playing (not implemented yet).
+      // Distinct from initialVolume, which the envelope never modifies.
+      std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
-      // DUTY_CYCLES[configuration.duty][dutyStep] gates the current
-      // envelope volume on/off (the duty waveform is a 1-bit-per-step
-      // multiplier, not an amplitude of its own).
+      // DUTY_CYCLES[configuration.duty][dutyStep] gates volume on/off (the
+      // duty waveform is a 1-bit-per-step multiplier, not an amplitude of
+      // its own).
       std::uint8_t output{ 0 };
     } playback;
 
@@ -212,7 +217,7 @@ private:
     struct Configuration
     {
       std::uint8_t lengthTimer{ 0 };
-      Envelope envelope;
+      EnvelopeConfig envelope;
       // NR43 bits 7-4 - see the frequency formula in NR43's own docs.
       std::uint8_t clockShift{ 0 };
       // NR43 bit 3 - false = 15-bit LFSR, true = 7-bit (more
@@ -231,9 +236,14 @@ private:
       // Counts down to 0 per NR43's clock shift/divider formula, shifting
       // the LFSR by one bit each time it does.
       std::uint16_t periodCounter{ 0 };
+      // 0-15, the live, currently-playing volume - reset from
+      // configuration.envelope.initialVolume on trigger, then stepped
+      // up/down by the envelope while playing (not implemented yet).
+      // Distinct from initialVolume, which the envelope never modifies.
+      std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
-      // the current envelope volume gated by the LFSR's output bit (0 if
-      // the shifted-out bit is 0, the volume otherwise).
+      // volume gated by the LFSR's output bit (0 if the shifted-out bit is
+      // 0, volume otherwise).
       std::uint8_t output{ 0 };
     } playback;
 
@@ -244,11 +254,11 @@ private:
   // call sites in writeRegister() - "initial volume 0 + decreasing"
   // (bits 3-7 all zero) is the DAC-off condition for any envelope-having
   // channel.
-  [[nodiscard]] static bool isDacEnabled(const Envelope& envelope)
+  [[nodiscard]] static bool isDacEnabled(const EnvelopeConfig& envelope)
   {
     return envelope.initialVolume != 0 || envelope.increase;
   }
-  static void writeEnvelope(Envelope& envelope, std::uint8_t value);
+  static void writeEnvelope(EnvelopeConfig& envelope, std::uint8_t value);
 
   PulseChannel1 m_pulse1;
   PulseChannel m_pulse2;

@@ -48,15 +48,17 @@ Apu::runNextTCycle(std::uint16_t divCounter)
   }
   m_sampleAccumulator -= CLOCK_RATE_HZ;
 
-  // Placeholder silence - this only wires up the T-cycle-driven sample
-  // timing and per-frame buffer; actual channel synthesis/mixing isn't
-  // implemented yet.
+  m_pulse1.runNextTCycle();
+  m_pulse2.runNextTCycle();
+  m_wave.runNextTCycle();
+  m_noise.runNextTCycle();
+
   m_buffer.at(m_sampleCount++) = 0.0F;
   m_buffer.at(m_sampleCount++) = 0.0F;
 }
 
 void
-Apu::writeEnvelope(Envelope& envelope, std::uint8_t value)
+Apu::writeEnvelope(EnvelopeConfig& envelope, std::uint8_t value)
 {
   constexpr unsigned initialVolumeShift = 4U;
   constexpr unsigned initialVolumeMask = 0b1111U;
@@ -105,7 +107,7 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
   }
 
   if (address == regs::NR12 || address == regs::NR22 || address == regs::NR42) {
-    Envelope* envelope = nullptr;
+    EnvelopeConfig* envelope = nullptr;
     bool* enabled = nullptr;
     if (address == regs::NR12) {
       envelope = &m_pulse1.configuration.envelope;
@@ -293,6 +295,20 @@ Apu::readRegister(std::uint16_t address) const
 void
 Apu::PulseChannel::runNextTCycle()
 {
+  if (playback.periodCounter == 0) {
+    constexpr std::uint16_t periodBase = 2048;
+    constexpr std::uint16_t periodMultiplier = 4;
+    playback.periodCounter = static_cast<std::uint16_t>(
+      periodMultiplier * (periodBase - configuration.period));
+    constexpr std::uint8_t dutyStepCount = 8;
+    playback.dutyStep =
+      static_cast<std::uint8_t>((playback.dutyStep + 1) % dutyStepCount);
+    playback.output = static_cast<std::uint8_t>(
+      DUTY_CYCLES.at(configuration.duty).at(playback.dutyStep) *
+      playback.volume);
+  } else {
+    --playback.periodCounter;
+  }
 }
 
 void
