@@ -183,6 +183,17 @@ Mmu::readByte(std::uint16_t address) const
     constexpr std::uint8_t writeOnlyReadsAsAllOnes = 0xFF;
     return writeOnlyReadsAsAllOnes;
   }
+  // 0xFF15 ("NR20") and 0xFF1F ("NR40") aren't real registers at all - the
+  // gaps between NR14/NR21 and NR34/NR41 respectively. Unlike the
+  // write-only registers above (which DO store a real value, just don't
+  // expose it), real hardware has nothing wired up here, so these always
+  // read back $FF regardless of what's written.
+  constexpr std::uint16_t unusedNr20 = 0xFF15;
+  constexpr std::uint16_t unusedNr40 = 0xFF1F;
+  if (address == unusedNr20 || address == unusedNr40) {
+    constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+    return unwiredReadsAsAllOnes;
+  }
   // NR10: only sweep pace/direction/step (bits 6-0) are meaningful; bit 7
   // is unused.
   if (address == regs::NR10) {
@@ -208,6 +219,14 @@ Mmu::readByte(std::uint16_t address) const
   // not just a fixed positional bitmask - Apu computes the whole byte.
   if (address == regs::NR52) {
     return m_apu.get().readRegister(address);
+  }
+  // 0xFF27-0xFF2F: the unused gap between NR52 and Wave RAM - like
+  // 0xFF15/0xFF1F above, nothing real hardware wires up here, so it
+  // always reads back $FF regardless of what's written.
+  constexpr std::uint16_t unusedGapStart = 0xFF27;
+  if (address >= unusedGapStart && address < regs::WAVE_RAM_START) {
+    constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+    return unwiredReadsAsAllOnes;
   }
   return value;
 }
