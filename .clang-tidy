@@ -17,6 +17,7 @@ Checks: "*,
          -llvm-prefer-static-over-anonymous-namespace,
          -readability-redundant-declaration,
          -misc-include-cleaner,
+         -google-readability-todo,
          "
 CheckOptions:
   misc-non-private-member-variables-in-classes.IgnorePublicMemberVariables: true

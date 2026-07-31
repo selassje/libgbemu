@@ -24,9 +24,7 @@ public:
   // this same T-cycle - not read back via a stored Mmu& (that would make
   // Mmu and Apu circularly reference each other, since Mmu already holds
   // an Apu& for channel-register write forwarding); GameBoy::runNextFrame()
-  // just passes it through each cycle instead. Not used yet - wiring for
-  // the frame sequencer (length/envelope/sweep timing), which watches a
-  // specific bit of this counter for a falling edge, not implemented yet.
+  // just passes it through each cycle instead.
   void runNextTCycle(std::uint16_t divCounter);
 
   // Interleaved stereo samples (L, R, L, R, ...) accumulated so far this
@@ -75,13 +73,14 @@ private:
   // Frame sequencer (drives length counter/envelope/sweep timing at
   // 512 Hz) - clocked not by a fixed T-cycle divisor but by watching bit 4
   // of DIV (bit 12 of the full 16-bit counter Mmu passes into
-  // runNextTCycle()) for a 1->0 transition. CGB double speed mode watches
-  // bit 5 of DIV instead - not handled yet, since double speed mode itself
-  // isn't implemented anywhere in this codebase yet.
+  // runNextTCycle()) for a 1->0 transition.
+  // TODO: CGB double speed mode watches bit 5 of DIV instead - not handled,
+  // since double speed mode itself isn't implemented anywhere in this
+  // codebase yet.
   bool m_previousFrameSequencerBit{ false };
-  // Increments (wrapping 0-7) on each falling edge detected above - which
-  // of length/envelope/sweep actually gets clocked on a given step isn't
-  // wired up yet, this only tracks the step index itself.
+  // Increments (wrapping 0-7) on each falling edge detected above - see
+  // runNextTCycle() for which channel methods each step dispatches to
+  // (length: steps 0/2/4/6, CH1 sweep: 2/6, envelope: 7).
   std::uint8_t m_frameSequencerStep{ 0 };
 
   // NRx2's volume-envelope layout (initial volume/direction/pace) is
@@ -134,7 +133,7 @@ private:
       std::uint8_t dutyStep{ 0 };
       // 0-15, the live, currently-playing volume - reset from
       // configuration.envelope.initialVolume on trigger, then stepped
-      // up/down by the envelope while playing (not implemented yet).
+      // TODO: up/down by the envelope while playing - not implemented.
       // Distinct from initialVolume, which the envelope never modifies.
       std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
@@ -145,6 +144,12 @@ private:
     } playback;
 
     void runNextTCycle();
+
+    // Frame-sequencer-driven events (see Apu::runNextTCycle()) - steps 0/2/
+    // 4/6 (256 Hz) and 7 (64 Hz) respectively.
+    // TODO: not implemented yet.
+    void clockLength();
+    void clockEnvelope();
   };
 
   // CH1-only. Operates on PulseChannel1::period (inherited) directly -
@@ -167,6 +172,10 @@ private:
   struct PulseChannel1 : PulseChannel
   {
     PeriodSweep sweep;
+
+    // CH1-only frame-sequencer event - steps 2/6 (128 Hz).
+    // TODO: not implemented yet.
+    void clockSweep();
   };
 
   // CH3 - plays back Wave RAM (see regs::WAVE_RAM_START) instead of a
@@ -207,6 +216,11 @@ private:
     } playback;
 
     void runNextTCycle();
+
+    // Frame-sequencer event - steps 0/2/4/6 (256 Hz). No envelope on this
+    // channel (see the class comment above), so no clockEnvelope().
+    // TODO: not implemented yet.
+    void clockLength();
   };
 
   // CH4 - white noise via an LFSR instead of a duty cycle or wave table,
@@ -238,7 +252,7 @@ private:
       std::uint16_t periodCounter{ 0 };
       // 0-15, the live, currently-playing volume - reset from
       // configuration.envelope.initialVolume on trigger, then stepped
-      // up/down by the envelope while playing (not implemented yet).
+      // TODO: up/down by the envelope while playing - not implemented.
       // Distinct from initialVolume, which the envelope never modifies.
       std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
@@ -248,6 +262,12 @@ private:
     } playback;
 
     void runNextTCycle();
+
+    // Frame-sequencer-driven events (see Apu::runNextTCycle()) - steps 0/2/
+    // 4/6 (256 Hz) and 7 (64 Hz) respectively.
+    // TODO: not implemented yet.
+    void clockLength();
+    void clockEnvelope();
   };
 
   // Shared by the 5 NR12/22/42 (envelope write) and NR14/24/44 (trigger)
