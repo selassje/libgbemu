@@ -97,9 +97,10 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
     const auto unsignedValue = static_cast<unsigned>(value);
     PulseChannel& pulse = (address == regs::NR11) ? m_pulse1 : m_pulse2;
-    pulse.duty =
+    pulse.configuration.duty =
       static_cast<std::uint8_t>((unsignedValue >> dutyShift) & dutyMask);
-    pulse.lengthTimer = static_cast<std::uint8_t>(unsignedValue & lengthMask);
+    pulse.configuration.lengthTimer =
+      static_cast<std::uint8_t>(unsignedValue & lengthMask);
     return;
   }
 
@@ -107,14 +108,14 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     Envelope* envelope = nullptr;
     bool* enabled = nullptr;
     if (address == regs::NR12) {
-      envelope = &m_pulse1.envelope;
-      enabled = &m_pulse1.enabled;
+      envelope = &m_pulse1.configuration.envelope;
+      enabled = &m_pulse1.playback.enabled;
     } else if (address == regs::NR22) {
-      envelope = &m_pulse2.envelope;
-      enabled = &m_pulse2.enabled;
+      envelope = &m_pulse2.configuration.envelope;
+      enabled = &m_pulse2.playback.enabled;
     } else {
-      envelope = &m_noise.envelope;
-      enabled = &m_noise.enabled;
+      envelope = &m_noise.configuration.envelope;
+      enabled = &m_noise.playback.enabled;
     }
     writeEnvelope(*envelope, value);
     // "Setting bits 3-7 of this register all to 0 ... turns the DAC off
@@ -129,8 +130,8 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     constexpr unsigned periodHighBitsMask = 0b0000'0111'0000'0000U;
 
     PulseChannel& pulse = (address == regs::NR13) ? m_pulse1 : m_pulse2;
-    pulse.period = static_cast<std::uint16_t>(
-      (static_cast<unsigned>(pulse.period) & periodHighBitsMask) |
+    pulse.configuration.period = static_cast<std::uint16_t>(
+      (static_cast<unsigned>(pulse.configuration.period) & periodHighBitsMask) |
       static_cast<unsigned>(value));
     return;
   }
@@ -144,42 +145,45 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
     const auto unsignedValue = static_cast<unsigned>(value);
     PulseChannel& pulse = (address == regs::NR14) ? m_pulse1 : m_pulse2;
-    pulse.isLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
-    pulse.period = static_cast<std::uint16_t>(
-      (static_cast<unsigned>(pulse.period) & periodLowBitsMask) |
+    pulse.configuration.isLengthEnabled =
+      (unsignedValue & lengthEnableBit) != 0;
+    pulse.configuration.period = static_cast<std::uint16_t>(
+      (static_cast<unsigned>(pulse.configuration.period) & periodLowBitsMask) |
       ((unsignedValue & periodHighMask) << periodHighShift));
     if ((unsignedValue & triggerBit) != 0) {
-      pulse.enabled = isDacEnabled(pulse.envelope);
+      pulse.playback.enabled = isDacEnabled(pulse.configuration.envelope);
     }
     return;
   }
 
   if (address == regs::NR30) {
     constexpr unsigned dacEnabledBit = 0b1000'0000U;
-    m_wave.dacEnabled = (static_cast<unsigned>(value) & dacEnabledBit) != 0;
-    if (!m_wave.dacEnabled) {
-      m_wave.enabled = false;
+    m_wave.configuration.dacEnabled =
+      (static_cast<unsigned>(value) & dacEnabledBit) != 0;
+    if (!m_wave.configuration.dacEnabled) {
+      m_wave.playback.enabled = false;
     }
     return;
   }
 
   if (address == regs::NR31) {
-    m_wave.lengthTimer = value;
+    m_wave.configuration.lengthTimer = value;
     return;
   }
 
   if (address == regs::NR32) {
     constexpr unsigned outputLevelShift = 5U;
     constexpr unsigned outputLevelMask = 0b11U;
-    m_wave.outputLevel = static_cast<std::uint8_t>(
+    m_wave.configuration.outputLevel = static_cast<std::uint8_t>(
       (static_cast<unsigned>(value) >> outputLevelShift) & outputLevelMask);
     return;
   }
 
   if (address == regs::NR33) {
     constexpr unsigned periodHighBitsMask = 0b0000'0111'0000'0000U;
-    m_wave.period = static_cast<std::uint16_t>(
-      (static_cast<unsigned>(m_wave.period) & periodHighBitsMask) |
+    m_wave.configuration.period = static_cast<std::uint16_t>(
+      (static_cast<unsigned>(m_wave.configuration.period) &
+       periodHighBitsMask) |
       static_cast<unsigned>(value));
     return;
   }
@@ -192,19 +196,20 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     constexpr unsigned periodLowBitsMask = 0x00FFU;
 
     const auto unsignedValue = static_cast<unsigned>(value);
-    m_wave.isLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
-    m_wave.period = static_cast<std::uint16_t>(
-      (static_cast<unsigned>(m_wave.period) & periodLowBitsMask) |
+    m_wave.configuration.isLengthEnabled =
+      (unsignedValue & lengthEnableBit) != 0;
+    m_wave.configuration.period = static_cast<std::uint16_t>(
+      (static_cast<unsigned>(m_wave.configuration.period) & periodLowBitsMask) |
       ((unsignedValue & periodHighMask) << periodHighShift));
     if ((unsignedValue & triggerBit) != 0) {
-      m_wave.enabled = m_wave.dacEnabled;
+      m_wave.playback.enabled = m_wave.configuration.dacEnabled;
     }
     return;
   }
 
   if (address == regs::NR41) {
     constexpr unsigned lengthMask = 0b0011'1111U;
-    m_noise.lengthTimer =
+    m_noise.configuration.lengthTimer =
       static_cast<std::uint8_t>(static_cast<unsigned>(value) & lengthMask);
     return;
   }
@@ -216,10 +221,10 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     constexpr unsigned clockDividerMask = 0b111U;
 
     const auto unsignedValue = static_cast<unsigned>(value);
-    m_noise.clockShift = static_cast<std::uint8_t>(
+    m_noise.configuration.clockShift = static_cast<std::uint8_t>(
       (unsignedValue >> clockShiftShift) & clockShiftMask);
-    m_noise.narrowLfsr = (unsignedValue & narrowLfsrBit) != 0;
-    m_noise.clockDivider =
+    m_noise.configuration.narrowLfsr = (unsignedValue & narrowLfsrBit) != 0;
+    m_noise.configuration.clockDivider =
       static_cast<std::uint8_t>(unsignedValue & clockDividerMask);
     return;
   }
@@ -229,9 +234,10 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
     constexpr unsigned lengthEnableBit = 0b0100'0000U;
 
     const auto unsignedValue = static_cast<unsigned>(value);
-    m_noise.isLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
+    m_noise.configuration.isLengthEnabled =
+      (unsignedValue & lengthEnableBit) != 0;
     if ((unsignedValue & triggerBit) != 0) {
-      m_noise.enabled = isDacEnabled(m_noise.envelope);
+      m_noise.playback.enabled = isDacEnabled(m_noise.configuration.envelope);
     }
     return;
   }
@@ -267,21 +273,36 @@ Apu::readRegister(std::uint16_t address) const
     if (m_powered) {
       result |= powerBit;
     }
-    if (m_pulse1.enabled) {
+    if (m_pulse1.playback.enabled) {
       result |= ch1Bit;
     }
-    if (m_pulse2.enabled) {
+    if (m_pulse2.playback.enabled) {
       result |= ch2Bit;
     }
-    if (m_wave.enabled) {
+    if (m_wave.playback.enabled) {
       result |= ch3Bit;
     }
-    if (m_noise.enabled) {
+    if (m_noise.playback.enabled) {
       result |= ch4Bit;
     }
     return static_cast<std::uint8_t>(result);
   }
   return 0;
+}
+
+void
+Apu::PulseChannel::runNextTCycle()
+{
+}
+
+void
+Apu::WaveChannel::runNextTCycle()
+{
+}
+
+void
+Apu::NoiseChannel::runNextTCycle()
+{
 }
 
 }

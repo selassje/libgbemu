@@ -104,16 +104,42 @@ private:
   // of this, it isn't itself "a kind of" CH2.
   struct PulseChannel
   {
-    std::uint8_t duty{ 0 };
-    std::uint8_t lengthTimer{ 0 };
-    Envelope envelope;
-    // Combined NRx3 (low 8 bits) + NRx4 (high 3 bits).
-    std::uint16_t period{ 0 };
-    // Whether the channel is currently active - set by triggering
-    // (NRx4 bit 7, a one-shot write-only action, not stored as-is), cleared
-    // by length expiry, sweep overflow (CH1 only), or the DAC turning off.
-    bool enabled{ false };
-    bool isLengthEnabled{ false };
+    // What a register write directly set - never mutated by anything else.
+    struct Configuration
+    {
+      std::uint8_t duty{ 0 };
+      // Initial/loaded value - not the live countdown (see PlaybackState).
+      std::uint8_t lengthTimer{ 0 };
+      Envelope envelope;
+      // Combined NRx3 (low 8 bits) + NRx4 (high 3 bits) - the configured
+      // setting, not the live period counter (see PlaybackState).
+      std::uint16_t period{ 0 };
+      bool isLengthEnabled{ false };
+    } configuration;
+
+    // What's actually happening right now - mutated by runNextTCycle()/the
+    // frame sequencer, not directly by register writes.
+    struct PlaybackState
+    {
+      // Whether the channel is currently active - set by triggering
+      // (NRx4 bit 7, a one-shot write-only action, not stored as-is),
+      // cleared by length expiry, sweep overflow (CH1 only), or the DAC
+      // turning off.
+      bool enabled{ false };
+      // Counts down from 4*(2048-period) to 0 every T-cycle; hitting 0
+      // advances dutyStep and reloads from configuration.period's current
+      // value (which can change live via NR13/NR14 while playing).
+      std::uint16_t periodCounter{ 0 };
+      // 0-7, which entry of DUTY_CYCLES[configuration.duty] is playing.
+      std::uint8_t dutyStep{ 0 };
+      // 0-15, the channel's current digital amplitude before DAC/mixing:
+      // DUTY_CYCLES[configuration.duty][dutyStep] gates the current
+      // envelope volume on/off (the duty waveform is a 1-bit-per-step
+      // multiplier, not an amplitude of its own).
+      std::uint8_t output{ 0 };
+    } playback;
+
+    void runNextTCycle();
   };
 
   // CH1-only. Operates on PulseChannel1::period (inherited) directly -
@@ -147,17 +173,35 @@ private:
   // deliberately not modeled as a redundant stored bit here).
   struct WaveChannel
   {
-    bool dacEnabled{ false };
-    // NR31 - unlike the pulse/noise channels' 6-bit length timers, this is
-    // the full 8 bits (channel 3's length counter has a wider range).
-    std::uint8_t lengthTimer{ 0 };
-    // NR32 bits 6-5: 0 = mute, 1 = 100%, 2 = 50% (samples shifted right
-    // once), 3 = 25% (shifted right twice).
-    std::uint8_t outputLevel{ 0 };
-    // Combined NR33 (low 8 bits) + NR34 (high 3 bits).
-    std::uint16_t period{ 0 };
-    bool enabled{ false };
-    bool isLengthEnabled{ false };
+    struct Configuration
+    {
+      bool dacEnabled{ false };
+      // NR31 - unlike the pulse/noise channels' 6-bit length timers, this
+      // is the full 8 bits (channel 3's length counter has a wider range).
+      std::uint8_t lengthTimer{ 0 };
+      // NR32 bits 6-5: 0 = mute, 1 = 100%, 2 = 50% (samples shifted right
+      // once), 3 = 25% (shifted right twice).
+      std::uint8_t outputLevel{ 0 };
+      // Combined NR33 (low 8 bits) + NR34 (high 3 bits).
+      std::uint16_t period{ 0 };
+      bool isLengthEnabled{ false };
+    } configuration;
+
+    struct PlaybackState
+    {
+      bool enabled{ false };
+      // Counts down from 2*(2048-period) to 0 every T-cycle - twice the
+      // pulse channels' rate, per Wave RAM's own frequency formula.
+      std::uint16_t periodCounter{ 0 };
+      // 0-31, which Wave RAM sample is currently playing.
+      std::uint8_t waveRamIndex{ 0 };
+      // 0-15, the channel's current digital amplitude before DAC/mixing:
+      // the Wave RAM nibble at waveRamIndex, right-shifted per
+      // configuration.outputLevel (0/1/2 bits, or forced 0 if muted).
+      std::uint8_t output{ 0 };
+    } playback;
+
+    void runNextTCycle();
   };
 
   // CH4 - white noise via an LFSR instead of a duty cycle or wave table,
@@ -165,17 +209,35 @@ private:
   // of its own; NR43 drives its clocking instead.
   struct NoiseChannel
   {
-    std::uint8_t lengthTimer{ 0 };
-    Envelope envelope;
-    // NR43 bits 7-4 - see the frequency formula in NR43's own docs.
-    std::uint8_t clockShift{ 0 };
-    // NR43 bit 3 - false = 15-bit LFSR, true = 7-bit (more regular-sounding
-    // output).
-    bool narrowLfsr{ false };
-    // NR43 bits 2-0 - divider = 0 is treated as 0.5.
-    std::uint8_t clockDivider{ 0 };
-    bool enabled{ false };
-    bool isLengthEnabled{ false };
+    struct Configuration
+    {
+      std::uint8_t lengthTimer{ 0 };
+      Envelope envelope;
+      // NR43 bits 7-4 - see the frequency formula in NR43's own docs.
+      std::uint8_t clockShift{ 0 };
+      // NR43 bit 3 - false = 15-bit LFSR, true = 7-bit (more
+      // regular-sounding output).
+      bool narrowLfsr{ false };
+      // NR43 bits 2-0 - divider = 0 is treated as 0.5.
+      std::uint8_t clockDivider{ 0 };
+      bool isLengthEnabled{ false };
+    } configuration;
+
+    struct PlaybackState
+    {
+      bool enabled{ false };
+      // The actual running 15/7-bit linear feedback shift register.
+      std::uint16_t lfsr{ 0 };
+      // Counts down to 0 per NR43's clock shift/divider formula, shifting
+      // the LFSR by one bit each time it does.
+      std::uint16_t periodCounter{ 0 };
+      // 0-15, the channel's current digital amplitude before DAC/mixing:
+      // the current envelope volume gated by the LFSR's output bit (0 if
+      // the shifted-out bit is 0, the volume otherwise).
+      std::uint8_t output{ 0 };
+    } playback;
+
+    void runNextTCycle();
   };
 
   // Shared by the 5 NR12/22/42 (envelope write) and NR14/24/44 (trigger)
