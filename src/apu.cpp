@@ -35,7 +35,15 @@ Apu::runNextTCycle(std::uint16_t divCounter)
 {
   const bool currentFrameSequencerBit =
     (divCounter & FRAME_SEQUENCER_BIT_MASK) != 0;
-  if (m_previousFrameSequencerBit && !currentFrameSequencerBit) {
+  // The frame sequencer's step counter is frozen while the APU is
+  // powered off (real hardware quirk - see dmg_sound/07-len sweep period
+  // sync.gb's "Powering up APU MODs next frame time with 8192": the
+  // first post-power-on clock isn't a fixed 8192 T-cycles away, it's
+  // however long DIV's bit 12 - which keeps ticking regardless of APU
+  // power - takes to naturally transition next). m_previousFrameSequencerBit
+  // itself still updates unconditionally below, so that tracking stays
+  // accurate the instant power resumes.
+  if (m_powered && m_previousFrameSequencerBit && !currentFrameSequencerBit) {
     // Process the CURRENT step, then advance - not the other way around.
     // m_frameSequencerStep starts at 0, and per the frame sequencer's own
     // spec, step 0 is a length-clock step: incrementing before processing
@@ -534,7 +542,18 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
     case regs::NR52: {
       static constexpr unsigned powerBit = 0b1000'0000U;
+      const bool wasPowered = m_powered;
       m_powered = (static_cast<unsigned>(value) & powerBit) != 0;
+      if (!wasPowered && m_powered) {
+        // Real hardware resets the frame sequencer's step counter exactly
+        // at power-on (not power-off) - runNextTCycle() freezes step
+        // processing entirely while powered off (see its own comment), so
+        // this is the only reset needed; nothing can have drifted the
+        // step while off. m_previousFrameSequencerBit is deliberately
+        // left alone: it tracks DIV's real bit state, which keeps
+        // changing regardless of APU power.
+        m_frameSequencerStep = 0;
+      }
       if (!m_powered) {
         // Mirrors Mmu's own NR10-NR51 byte-range clearing on power-off -
         // keep Apu's channel state and Mmu's raw register bytes consistent
@@ -551,15 +570,6 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_rightVolume = 0;
         m_leftPanning = 0;
         m_rightPanning = 0;
-        // Real hardware resets the frame sequencer's step counter on
-        // power-off - runNextTCycle() itself isn't gated on m_powered (it
-        // keeps ticking length/envelope/sweep against the now-disabled
-        // channels above, all no-ops), so without this the step would
-        // otherwise just drift silently across power cycles.
-        // m_previousFrameSequencerBit is deliberately left alone: it
-        // tracks DIV's real bit state, which keeps changing regardless of
-        // APU power and shouldn't be reset independently of it.
-        m_frameSequencerStep = 0;
       }
       break;
     }
