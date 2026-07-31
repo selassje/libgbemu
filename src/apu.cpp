@@ -255,6 +255,13 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         static_cast<std::uint8_t>((unsignedValue >> dutyShift) & dutyMask);
       pulse.configuration.lengthTimer =
         static_cast<std::uint8_t>(unsignedValue & lengthMask);
+      // Real hardware reloads the live length counter immediately on any
+      // write to this register, not just at trigger - unlike the
+      // trigger-time reload (only when already expired), this always
+      // applies.
+      static constexpr std::uint16_t maxLengthTicks = 64;
+      pulse.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+        maxLengthTicks - pulse.configuration.lengthTimer);
       break;
     }
 
@@ -313,9 +320,12 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       if ((unsignedValue & triggerBit) != 0) {
         pulse.playback.enabled = isDacEnabled(pulse.configuration.envelope);
         if (pulse.playback.remainingLengthTicks == 0) {
+          // Jams to the hardcoded maximum, NOT recomputed from the
+          // length-timer register's current value - a real hardware
+          // quirk, confirmed by dmg_sound/02-len ctr.gb's "Trigger should
+          // treat 0 length as maximum" check.
           static constexpr std::uint16_t maxLengthTicks = 64;
-          pulse.playback.remainingLengthTicks = static_cast<std::uint16_t>(
-            maxLengthTicks - pulse.configuration.lengthTimer);
+          pulse.playback.remainingLengthTicks = maxLengthTicks;
         }
         pulse.playback.volume = pulse.configuration.envelope.initialVolume;
         pulse.playback.envelopeTicksRemaining =
@@ -349,6 +359,11 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
     case regs::NR31: {
       m_wave.configuration.lengthTimer = value;
+      // See NR11/NR21's comment: any write reloads the live counter
+      // immediately, not just an expired one at trigger.
+      static constexpr std::uint16_t maxLengthTicks = 256;
+      m_wave.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+        maxLengthTicks - m_wave.configuration.lengthTimer);
       break;
     }
 
@@ -386,9 +401,10 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       if ((unsignedValue & triggerBit) != 0) {
         m_wave.playback.enabled = m_wave.configuration.dacEnabled;
         if (m_wave.playback.remainingLengthTicks == 0) {
+          // See PulseChannel's NR14/NR24 comment: jams to the hardcoded
+          // maximum, not recomputed from the length-timer register.
           static constexpr std::uint16_t maxLengthTicks = 256;
-          m_wave.playback.remainingLengthTicks = static_cast<std::uint16_t>(
-            maxLengthTicks - m_wave.configuration.lengthTimer);
+          m_wave.playback.remainingLengthTicks = maxLengthTicks;
         }
         // Real hardware restarts Wave RAM playback from its first sample
         // on every trigger.
@@ -401,6 +417,11 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       static constexpr unsigned lengthMask = 0b0011'1111U;
       m_noise.configuration.lengthTimer =
         static_cast<std::uint8_t>(static_cast<unsigned>(value) & lengthMask);
+      // See NR11/NR21's comment: any write reloads the live counter
+      // immediately, not just an expired one at trigger.
+      static constexpr std::uint16_t maxLengthTicks = 64;
+      m_noise.playback.remainingLengthTicks = static_cast<std::uint16_t>(
+        maxLengthTicks - m_noise.configuration.lengthTimer);
       break;
     }
 
@@ -429,9 +450,10 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       if ((unsignedValue & triggerBit) != 0) {
         m_noise.playback.enabled = isDacEnabled(m_noise.configuration.envelope);
         if (m_noise.playback.remainingLengthTicks == 0) {
+          // See PulseChannel's NR14/NR24 comment: jams to the hardcoded
+          // maximum, not recomputed from the length-timer register.
           static constexpr std::uint16_t maxLengthTicks = 64;
-          m_noise.playback.remainingLengthTicks = static_cast<std::uint16_t>(
-            maxLengthTicks - m_noise.configuration.lengthTimer);
+          m_noise.playback.remainingLengthTicks = maxLengthTicks;
         }
         m_noise.playback.volume = m_noise.configuration.envelope.initialVolume;
         m_noise.playback.envelopeTicksRemaining =
