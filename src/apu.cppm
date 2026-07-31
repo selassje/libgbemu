@@ -28,7 +28,10 @@ public:
   // artificial extra quantization step between the HPF (a feedback filter,
   // and so precision-sensitive) and this buffer, and SDL3's SDL_AUDIO_F32
   // is just as native a stream format as S16.
-  [[nodiscard]] const std::vector<float>& buffer() const { return m_buffer; }
+  [[nodiscard]] std::span<const float> buffer() const
+  {
+    return { m_buffer.data(), m_sampleCount };
+  }
 
   // Called by Mmu::writeByte() for every write to a channel register
   // (NR10-NR44) that actually took effect (i.e. not dropped by the
@@ -44,7 +47,14 @@ public:
   [[nodiscard]] std::uint8_t readRegister(std::uint16_t address) const;
 
 private:
-  std::vector<float> m_buffer;
+  // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples
+  // is ~1476-1478 floats (see runNextTCycle()'s accumulator) - comfortable
+  // headroom over that without heap-allocating like a std::vector would.
+  static constexpr std::size_t BUFFER_CAPACITY = 2048;
+  std::array<float, BUFFER_CAPACITY> m_buffer{};
+  // How many of m_buffer's slots hold real samples so far this frame - see
+  // buffer() and startFrame().
+  std::size_t m_sampleCount{ 0 };
   // Bresenham-style fractional accumulator driving sample timing - the
   // Game Boy's clock doesn't divide evenly into any standard sample rate,
   // so a fixed T-cycles-per-sample divisor would drift; this instead emits

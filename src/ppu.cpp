@@ -493,8 +493,8 @@ Ppu::handlePixelTransfer()
   return m_pixelsRendered >= SCREEN_WIDTH;
 }
 
-Ppu::FrameBuffer&
-Ppu::frameBuffer()
+const Ppu::FrameBuffer&
+Ppu::frameBuffer() const
 {
   return m_frameBuffer;
 }

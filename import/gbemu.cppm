@@ -20,7 +20,7 @@ struct Rgb
 
 struct EmulationFrame
 {
-  std::mdspan<std::uint8_t,
+  std::mdspan<const std::uint8_t,
               std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
     pixels;
   // Interleaved stereo (L, R, L, R, ...), normalized to [-1, 1] - dynamic

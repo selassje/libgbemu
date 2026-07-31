@@ -79,9 +79,9 @@ gbemu::GameBoy::runNextFrame()
     }
     mCycles += cycles;
   }
-  const auto& audioBuffer = m_apu.buffer();
+  const auto audioBuffer = m_apu.buffer();
   const EmulationFrame frame = {
-    std::mdspan<std::uint8_t,
+    std::mdspan<const std::uint8_t,
                 std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>(
       m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH, 3),
     std::mdspan<const float, std::extents<std::size_t, std::dynamic_extent, 2>>(

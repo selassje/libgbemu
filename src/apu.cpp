@@ -22,7 +22,7 @@ namespace gbemu {
 void
 Apu::startFrame()
 {
-  m_buffer.clear();
+  m_sampleCount = 0;
 }
 
 void
@@ -37,8 +37,8 @@ Apu::runNextTCycle()
   // Placeholder silence - this only wires up the T-cycle-driven sample
   // timing and per-frame buffer; actual channel synthesis/mixing isn't
   // implemented yet.
-  m_buffer.push_back(0.0F);
-  m_buffer.push_back(0.0F);
+  m_buffer.at(m_sampleCount++) = 0.0F;
+  m_buffer.at(m_sampleCount++) = 0.0F;
 }
 
 void

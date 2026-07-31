@@ -19,7 +19,11 @@ public:
   using FrameBuffer =
     std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;
 
-  FrameBuffer& frameBuffer();
+  // Only ever read externally (GameBoy::runNextFrame() wraps it in a
+  // const-element mdspan) - Ppu's own rendering writes go straight to
+  // m_frameBuffer, bypassing this accessor entirely, so there's no
+  // legitimate need for a mutable view out of it.
+  [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
 private:
   enum class Mode : std::uint8_t
