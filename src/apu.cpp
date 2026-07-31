@@ -311,8 +311,16 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
       const auto unsignedValue = static_cast<unsigned>(value);
       PulseChannel& pulse = (address == regs::NR14) ? m_pulse1 : m_pulse2;
-      pulse.configuration.isLengthEnabled =
-        (unsignedValue & lengthEnableBit) != 0;
+      const bool wasLengthEnabled = pulse.configuration.isLengthEnabled;
+      const bool nowLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
+      pulse.configuration.isLengthEnabled = nowLengthEnabled;
+      // "Extra length clock" quirk: enabling length (0->1) when the next
+      // frame-sequencer edge wouldn't clock it anyway causes an immediate
+      // bonus clock - see frameSequencerWontClockLengthNext()'s comment.
+      if (!wasLengthEnabled && nowLengthEnabled &&
+          frameSequencerWontClockLengthNext()) {
+        pulse.clockLength();
+      }
       pulse.configuration.period = static_cast<std::uint16_t>(
         (static_cast<unsigned>(pulse.configuration.period) &
          periodLowBitsMask) |
@@ -326,6 +334,13 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           // treat 0 length as maximum" check.
           static constexpr std::uint16_t maxLengthTicks = 64;
           pulse.playback.remainingLengthTicks = maxLengthTicks;
+          // The same extra-clock quirk also applies to this fresh
+          // reload, when length is (now) enabled and the phase condition
+          // still holds - see dmg_sound/03-trigger.gb's "Triggering that
+          // clocks length of 1 should clock twice" check.
+          if (nowLengthEnabled && frameSequencerWontClockLengthNext()) {
+            pulse.clockLength();
+          }
         }
         pulse.playback.volume = pulse.configuration.envelope.initialVolume;
         pulse.playback.envelopeTicksRemaining =
@@ -392,8 +407,14 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       static constexpr unsigned periodLowBitsMask = 0x00FFU;
 
       const auto unsignedValue = static_cast<unsigned>(value);
-      m_wave.configuration.isLengthEnabled =
-        (unsignedValue & lengthEnableBit) != 0;
+      const bool wasLengthEnabled = m_wave.configuration.isLengthEnabled;
+      const bool nowLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
+      m_wave.configuration.isLengthEnabled = nowLengthEnabled;
+      // See PulseChannel's NR14/NR24 comment on the extra-clock quirk.
+      if (!wasLengthEnabled && nowLengthEnabled &&
+          frameSequencerWontClockLengthNext()) {
+        m_wave.clockLength();
+      }
       m_wave.configuration.period = static_cast<std::uint16_t>(
         (static_cast<unsigned>(m_wave.configuration.period) &
          periodLowBitsMask) |
@@ -405,6 +426,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           // maximum, not recomputed from the length-timer register.
           static constexpr std::uint16_t maxLengthTicks = 256;
           m_wave.playback.remainingLengthTicks = maxLengthTicks;
+          if (nowLengthEnabled && frameSequencerWontClockLengthNext()) {
+            m_wave.clockLength();
+          }
         }
         // Real hardware restarts Wave RAM playback from its first sample
         // on every trigger.
@@ -445,8 +469,14 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
       static constexpr unsigned lengthEnableBit = 0b0100'0000U;
 
       const auto unsignedValue = static_cast<unsigned>(value);
-      m_noise.configuration.isLengthEnabled =
-        (unsignedValue & lengthEnableBit) != 0;
+      const bool wasLengthEnabled = m_noise.configuration.isLengthEnabled;
+      const bool nowLengthEnabled = (unsignedValue & lengthEnableBit) != 0;
+      m_noise.configuration.isLengthEnabled = nowLengthEnabled;
+      // See PulseChannel's NR14/NR24 comment on the extra-clock quirk.
+      if (!wasLengthEnabled && nowLengthEnabled &&
+          frameSequencerWontClockLengthNext()) {
+        m_noise.clockLength();
+      }
       if ((unsignedValue & triggerBit) != 0) {
         m_noise.playback.enabled = isDacEnabled(m_noise.configuration.envelope);
         if (m_noise.playback.remainingLengthTicks == 0) {
@@ -454,6 +484,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           // maximum, not recomputed from the length-timer register.
           static constexpr std::uint16_t maxLengthTicks = 64;
           m_noise.playback.remainingLengthTicks = maxLengthTicks;
+          if (nowLengthEnabled && frameSequencerWontClockLengthNext()) {
+            m_noise.clockLength();
+          }
         }
         m_noise.playback.volume = m_noise.configuration.envelope.initialVolume;
         m_noise.playback.envelopeTicksRemaining =

@@ -353,6 +353,18 @@ private:
   }
   static void writeEnvelope(EnvelopeConfig& envelope, std::uint8_t value);
 
+  // True when the NEXT frame-sequencer edge will NOT clock length (odd
+  // steps 1/3/5/7) - used by the NR14/24/34/44 write handlers to detect
+  // the "extra length clock" quirk: enabling the length counter (a 0->1
+  // transition on isLengthEnabled) when it wouldn't otherwise be clocked
+  // again "soon" causes an immediate bonus clock, matching real
+  // hardware - see dmg_sound/03-trigger.gb.
+  [[nodiscard]] bool frameSequencerWontClockLengthNext() const
+  {
+    static constexpr std::uint8_t two = 2;
+    return (m_frameSequencerStep % two) != 0;
+  }
+
   // Converts a channel's raw 0-15 digital amplitude (any of the 4
   // channels' PlaybackState::output) to the DAC's normalized [-1, 1]
   // range.
