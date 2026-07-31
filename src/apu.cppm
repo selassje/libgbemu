@@ -23,11 +23,12 @@ public:
   void runNextTCycle();
 
   // Interleaved stereo samples (L, R, L, R, ...) accumulated so far this
-  // frame - size() / 2 sample-frames.
-  [[nodiscard]] const std::vector<std::int16_t>& buffer() const
-  {
-    return m_buffer;
-  }
+  // frame - size() / 2 sample-frames. Normalized float in [-1, 1] (the DAC's
+  // own natural output range) rather than a fixed-point type: avoids an
+  // artificial extra quantization step between the HPF (a feedback filter,
+  // and so precision-sensitive) and this buffer, and SDL3's SDL_AUDIO_F32
+  // is just as native a stream format as S16.
+  [[nodiscard]] const std::vector<float>& buffer() const { return m_buffer; }
 
   // Called by Mmu::writeByte() for every write to a channel register
   // (NR10-NR44) that actually took effect (i.e. not dropped by the
@@ -43,7 +44,7 @@ public:
   [[nodiscard]] std::uint8_t readRegister(std::uint16_t address) const;
 
 private:
-  std::vector<std::int16_t> m_buffer;
+  std::vector<float> m_buffer;
   // Bresenham-style fractional accumulator driving sample timing - the
   // Game Boy's clock doesn't divide evenly into any standard sample rate,
   // so a fixed T-cycles-per-sample divisor would drift; this instead emits

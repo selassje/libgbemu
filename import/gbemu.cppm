@@ -23,12 +23,11 @@ struct EmulationFrame
   std::mdspan<std::uint8_t,
               std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
     pixels;
-  // Interleaved stereo (L, R, L, R, ...) - dynamic in the sample-frame
-  // count (the Game Boy's clock doesn't divide evenly into any standard
-  // sample rate, so this varies by a sample or two frame to frame), fixed
-  // at 2 channels.
-  std::mdspan<const std::int16_t,
-              std::extents<std::size_t, std::dynamic_extent, 2>>
+  // Interleaved stereo (L, R, L, R, ...), normalized to [-1, 1] - dynamic
+  // in the sample-frame count (the Game Boy's clock doesn't divide evenly
+  // into any standard sample rate, so this varies by a sample or two frame
+  // to frame), fixed at 2 channels.
+  std::mdspan<const float, std::extents<std::size_t, std::dynamic_extent, 2>>
     audio;
 };
 

@@ -84,8 +84,7 @@ gbemu::GameBoy::runNextFrame()
     std::mdspan<std::uint8_t,
                 std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>(
       m_ppu.frameBuffer().data(), SCREEN_HEIGHT, SCREEN_WIDTH, 3),
-    std::mdspan<const std::int16_t,
-                std::extents<std::size_t, std::dynamic_extent, 2>>(
+    std::mdspan<const float, std::extents<std::size_t, std::dynamic_extent, 2>>(
       audioBuffer.data(), audioBuffer.size() / 2, 2)
   };
 

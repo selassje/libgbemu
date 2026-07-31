@@ -4,6 +4,17 @@ namespace {
 
 constexpr std::uint32_t CLOCK_RATE_HZ = 4194304;
 
+// NR11/NR21 bits 7-6 (duty) select one of these 4 waveforms - each row is
+// one full 8-step cycle read left to right, 1 = high, 0 = low. Duty 3 is
+// the exact element-wise complement of duty 1 (25% and 75% are
+// complementary duty cycles), a useful sanity check on these values.
+constexpr std::array<std::array<std::uint8_t, 8>, 4> DUTY_CYCLES = { {
+  { 0, 0, 0, 0, 0, 0, 0, 1 }, // 12.5%
+  { 1, 0, 0, 0, 0, 0, 0, 1 }, // 25%
+  { 1, 0, 0, 0, 0, 1, 1, 1 }, // 50%
+  { 0, 1, 1, 1, 1, 1, 1, 0 }, // 75%
+} };
+
 }
 
 namespace gbemu {
@@ -26,8 +37,8 @@ Apu::runNextTCycle()
   // Placeholder silence - this only wires up the T-cycle-driven sample
   // timing and per-frame buffer; actual channel synthesis/mixing isn't
   // implemented yet.
-  m_buffer.push_back(0);
-  m_buffer.push_back(0);
+  m_buffer.push_back(0.0F);
+  m_buffer.push_back(0.0F);
 }
 
 void
