@@ -136,6 +136,11 @@ private:
       // (if expired) from 64 - configuration.lengthTimer, decremented by
       // clockLength(); hitting 0 disables the channel.
       std::uint16_t remainingLengthTicks{ 0 };
+      // Live envelope timer, in 64 Hz ticks - reloaded unconditionally on
+      // trigger and again whenever it reaches 0, from
+      // configuration.envelope.pace; clockEnvelope() steps volume by +/-1
+      // each time it fires. pace == 0 disables the envelope entirely.
+      std::uint8_t envelopeTicksRemaining{ 0 };
       // Counts down from 4*(2048-period) to 0 every T-cycle; hitting 0
       // advances dutyStep and reloads from configuration.period's current
       // value (which can change live via NR13/NR14 while playing).
@@ -144,8 +149,8 @@ private:
       std::uint8_t dutyStep{ 0 };
       // 0-15, the live, currently-playing volume - reset from
       // configuration.envelope.initialVolume on trigger, then stepped
-      // TODO: up/down by the envelope while playing - not implemented.
-      // Distinct from initialVolume, which the envelope never modifies.
+      // up/down by clockEnvelope() while playing. Distinct from
+      // initialVolume, which the envelope never modifies.
       std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
       // DUTY_CYCLES[configuration.duty][dutyStep] gates volume on/off (the
@@ -158,7 +163,6 @@ private:
 
     // Frame-sequencer-driven events (see Apu::runNextTCycle()) - steps 0/2/
     // 4/6 (256 Hz) and 7 (64 Hz) respectively.
-    // TODO: not implemented yet.
     void clockLength();
     void clockEnvelope();
   };
@@ -235,7 +239,6 @@ private:
 
     // Frame-sequencer event - steps 0/2/4/6 (256 Hz). No envelope on this
     // channel (see the class comment above), so no clockEnvelope().
-    // TODO: not implemented yet.
     void clockLength();
   };
 
@@ -265,6 +268,11 @@ private:
       // (if expired) from 64 - configuration.lengthTimer, decremented by
       // clockLength(); hitting 0 disables the channel.
       std::uint16_t remainingLengthTicks{ 0 };
+      // Live envelope timer, in 64 Hz ticks - reloaded unconditionally on
+      // trigger and again whenever it reaches 0, from
+      // configuration.envelope.pace; clockEnvelope() steps volume by +/-1
+      // each time it fires. pace == 0 disables the envelope entirely.
+      std::uint8_t envelopeTicksRemaining{ 0 };
       // The actual running 15/7-bit linear feedback shift register.
       std::uint16_t lfsr{ 0 };
       // Counts down to 0 per NR43's clock shift/divider formula, shifting
@@ -272,8 +280,8 @@ private:
       std::uint16_t periodCounter{ 0 };
       // 0-15, the live, currently-playing volume - reset from
       // configuration.envelope.initialVolume on trigger, then stepped
-      // TODO: up/down by the envelope while playing - not implemented.
-      // Distinct from initialVolume, which the envelope never modifies.
+      // up/down by clockEnvelope() while playing. Distinct from
+      // initialVolume, which the envelope never modifies.
       std::uint8_t volume{ 0 };
       // 0-15, the channel's current digital amplitude before DAC/mixing:
       // volume gated by the LFSR's output bit (0 if the shifted-out bit is
@@ -285,7 +293,6 @@ private:
 
     // Frame-sequencer-driven events (see Apu::runNextTCycle()) - steps 0/2/
     // 4/6 (256 Hz) and 7 (64 Hz) respectively.
-    // TODO: not implemented yet.
     void clockLength();
     void clockEnvelope();
   };

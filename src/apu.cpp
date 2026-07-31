@@ -239,6 +239,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           pulse.playback.remainingLengthTicks = static_cast<std::uint16_t>(
             maxLengthTicks - pulse.configuration.lengthTimer);
         }
+        pulse.playback.volume = pulse.configuration.envelope.initialVolume;
+        pulse.playback.envelopeTicksRemaining =
+          pulse.configuration.envelope.pace;
       }
       break;
     }
@@ -336,6 +339,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
           m_noise.playback.remainingLengthTicks = static_cast<std::uint16_t>(
             maxLengthTicks - m_noise.configuration.lengthTimer);
         }
+        m_noise.playback.volume = m_noise.configuration.envelope.initialVolume;
+        m_noise.playback.envelopeTicksRemaining =
+          m_noise.configuration.envelope.pace;
       }
       break;
     }
@@ -443,7 +449,23 @@ Apu::PulseChannel::clockLength()
 void
 Apu::PulseChannel::clockEnvelope()
 {
-  // TODO: not implemented yet.
+  if (configuration.envelope.pace == 0) {
+    return;
+  }
+  if (playback.envelopeTicksRemaining > 0) {
+    --playback.envelopeTicksRemaining;
+  }
+  if (playback.envelopeTicksRemaining == 0) {
+    playback.envelopeTicksRemaining = configuration.envelope.pace;
+    static constexpr std::uint8_t maxVolume = 15;
+    if (configuration.envelope.increase) {
+      if (playback.volume < maxVolume) {
+        ++playback.volume;
+      }
+    } else if (playback.volume > 0) {
+      --playback.volume;
+    }
+  }
 }
 
 void
@@ -491,7 +513,23 @@ Apu::NoiseChannel::clockLength()
 void
 Apu::NoiseChannel::clockEnvelope()
 {
-  // TODO: not implemented yet.
+  if (configuration.envelope.pace == 0) {
+    return;
+  }
+  if (playback.envelopeTicksRemaining > 0) {
+    --playback.envelopeTicksRemaining;
+  }
+  if (playback.envelopeTicksRemaining == 0) {
+    playback.envelopeTicksRemaining = configuration.envelope.pace;
+    static constexpr std::uint8_t maxVolume = 15;
+    if (configuration.envelope.increase) {
+      if (playback.volume < maxVolume) {
+        ++playback.volume;
+      }
+    } else if (playback.volume > 0) {
+      --playback.volume;
+    }
+  }
 }
 
 }
