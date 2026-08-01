@@ -323,6 +323,17 @@ Mmu::objPaletteColor(std::uint8_t palette, std::uint8_t colorIndex) const
   return paletteColor(m_objPaletteRam, palette, colorIndex);
 }
 
+std::uint8_t
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+Mmu::readVram(std::uint8_t bank, std::uint16_t address) const
+{
+  constexpr unsigned bankMask = 0b1U;
+  const auto bankIndex =
+    static_cast<std::size_t>(static_cast<unsigned>(bank) & bankMask);
+  constexpr std::uint16_t vramStart = 2 * KB16;
+  return m_vram.at((address - vramStart) + (bankIndex * KB8));
+}
+
 std::uint16_t
 Mmu::readWord(std::uint16_t address) const
 {

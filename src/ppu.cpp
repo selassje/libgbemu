@@ -199,7 +199,11 @@ Ppu::Fetcher::runNextTCycle()
 
         const auto tileMapAddress = static_cast<std::uint16_t>(
           tileMapBaseAddress + ((tileY / 8) * 32) + tileX);
-        m_mTileIndex = m_mmu.get().readByte(tileMapAddress);
+        // Bank 0 explicitly, not readByte() - see Mmu::readVram()'s
+        // comment: the PPU's own tile-map fetch must not follow whatever
+        // the CPU currently has VBK pointed at.
+        constexpr std::uint8_t vramBank0 = 0;
+        m_mTileIndex = m_mmu.get().readVram(vramBank0, tileMapAddress);
         m_mState = State::ReadTileDataLow;
       }
       break;
@@ -239,24 +243,30 @@ Ppu::Fetcher::runNextTCycle()
             (rowWithinTile * 2) + (isHighByte ? 1 : 0));
           const auto tileOffset =
             static_cast<std::uint16_t>((tileIndex * 16) + rowOffset);
-          tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+          constexpr std::uint8_t vramBank0 = 0;
+          tileByte =
+            m_mmu.get().readVram(vramBank0, tileDataBlock0 + tileOffset);
         } else {
           const auto scy =
             m_mode == Mode::Window ? 0 : m_mmu.get().readByte(regs::SCY);
           const auto rowOffset = static_cast<std::uint16_t>(
             (((m_Y + scy) % 8) * 2) + (isHighByte ? 1 : 0));
+          constexpr std::uint8_t vramBank0 = 0;
           if (m_mTileIndex >= 128) {
             const auto tileOffset = static_cast<std::uint16_t>(
               ((m_mTileIndex - 128) * 16) + rowOffset);
-            tileByte = m_mmu.get().readByte(tileDataBlock1 + tileOffset);
+            tileByte =
+              m_mmu.get().readVram(vramBank0, tileDataBlock1 + tileOffset);
           } else {
             const auto tileOffset =
               static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
             const auto lcdc = m_mmu.get().readByte(regs::LCDC);
             if ((lcdc & 0x10U) != 0) {
-              tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+              tileByte =
+                m_mmu.get().readVram(vramBank0, tileDataBlock0 + tileOffset);
             } else {
-              tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
+              tileByte =
+                m_mmu.get().readVram(vramBank0, tileDataBlock2 + tileOffset);
             }
           }
         }
@@ -493,11 +503,11 @@ Ppu::handlePixelTransfer()
   // A DMG-only cartridge running in CGB compatibility mode still computes
   // its shade index exactly as above, but looks it up in CGB background
   // palette 0 instead of the fixed DMG grayscale table - see
-  // setCgbMode()'s comment.
+  // setCgbCompatibilityMode()'s comment.
   constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
-  auto rgb = m_isCgbHardware ? cgbColorToRgb(m_mmu.get().bgPaletteColor(
-                                 cgbCompatibilityBgPalette, shade))
-                             : DMG_PALETTE.at(shade);
+  auto rgb = m_cgbCompatibilityMode ? cgbColorToRgb(m_mmu.get().bgPaletteColor(
+                                        cgbCompatibilityBgPalette, shade))
+                                    : DMG_PALETTE.at(shade);
 
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
@@ -516,8 +526,9 @@ Ppu::handlePixelTransfer()
         shadeMask);
       // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
       // that selects OBP0/OBP1 above) doubles as the CGB object palette
-      // index in compatibility mode - see setCgbMode()'s comment.
-      const auto objRgb = m_isCgbHardware
+      // index in compatibility mode - see setCgbCompatibilityMode()'s
+      // comment.
+      const auto objRgb = m_cgbCompatibilityMode
                             ? cgbColorToRgb(m_mmu.get().objPaletteColor(
                                 objPixel.palette, objShade))
                             : DMG_PALETTE.at(objShade);

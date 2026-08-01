@@ -49,7 +49,12 @@ GameBoy::initializeFromRom()
   m_mmu.enableBootRom(bootAsCgb ? cgbBootRom() : dmgBootRom());
   m_apu.setCgbMode(bootAsCgb);
   m_mmu.setCgbMode(bootAsCgb);
-  m_ppu.setCgbMode(bootAsCgb);
+  // Narrower than bootAsCgb: true only for a DMG-only cartridge running
+  // on CGB hardware, not for a genuinely CGB-aware one running in its own
+  // native mode - see Ppu::setCgbCompatibilityMode()'s comment on why
+  // that distinction matters for rendering specifically (unlike
+  // Apu/Mmu's CGB-hardware quirks, which apply either way).
+  m_ppu.setCgbCompatibilityMode(bootAsCgb && !m_isCgb);
   m_cpu.reset();
 
   return result;

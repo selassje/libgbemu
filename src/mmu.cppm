@@ -110,6 +110,23 @@ public:
   [[nodiscard]] std::uint16_t objPaletteColor(std::uint8_t palette,
                                               std::uint8_t colorIndex) const;
 
+  // Reads VRAM (0x8000-0x9FFF) from an explicitly-chosen bank, ignoring
+  // whatever the CPU currently has VBK pointed at - Ppu's own tile
+  // map/tile-data fetches must use this, not readByte(): VBK selects
+  // which bank *CPU* accesses land on, but the PPU's fetch logic needs a
+  // specific bank per purpose (bank 0 for tile map indices/pixel data;
+  // bank 1 only for the CGB tile-attribute byte at the same tile-map
+  // address, or for pixel data when that attribute's bank bit says so -
+  // not yet read by anything, see Ppu::setCgbMode()'s comment on native
+  // mode). Using readByte() here would make the PPU's fetches silently
+  // follow whatever the CPU last left VBK as, corrupting tile data for
+  // any CGB game that leaves VBK=1 selected after setting up attributes.
+  // bank is masked to 0-1 (VRAM only ever has 2 banks) - out-of-range
+  // input can't reach here since it's only ever a literal 0 or a value
+  // masked from an attribute byte's own single bank bit.
+  [[nodiscard]] std::uint8_t readVram(std::uint8_t bank,
+                                      std::uint16_t address) const;
+
 private:
   std::reference_wrapper<Apu> m_apu;
   // Defaults to false (DMG) purely so a default-constructed Mmu has a

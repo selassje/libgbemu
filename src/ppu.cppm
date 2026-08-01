@@ -26,23 +26,32 @@ public:
   [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
   // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see Mode) - mirrors
-  // Apu::setCgbMode()/Mmu::setCgbMode(). Only affects the final
-  // shade-to-RGB lookup in handlePixelTransfer(): a DMG-only cartridge
-  // running in CGB compatibility mode still computes its BG/object shade
-  // index exactly as on real DMG hardware (via BGP/OBP0/OBP1), but looks
-  // that shade up in CGB background palette 0 / object palette
-  // objPixel.palette (via Mmu::bgPaletteColor()/objPaletteColor()) instead
-  // of the fixed DMG_PALETTE grayscale table - real hardware's own
-  // DMG-compatibility colorization scheme, not an emulator invention.
-  void setCgbMode(bool isCgb) { m_isCgbHardware = isCgb; }
+  // physical console this session actually boots as (see Mode) -
+  // deliberately narrower than Apu::setCgbMode()/Mmu::setCgbMode()'s "is
+  // this CGB hardware at all": isCompatibilityMode should be true only
+  // for a DMG-only cartridge running on CGB hardware, false both for
+  // real DMG and for a genuinely CGB-aware cartridge running in its own
+  // native mode - passing plain "is CGB hardware" here would wrongly
+  // route native-mode cartridges through DMG-compatibility rendering
+  // rules too (single background palette 0, object palette via the DMG
+  // OBP0/OBP1-select OAM bit), which only matches what real hardware
+  // actually does for a DMG-only cartridge. Native mode (VRAM-bank-1 tile
+  // attributes, palettes 0-7, CGB priority rules) isn't implemented yet -
+  // until it is, a native-mode cartridge falls back to the same
+  // DMG_PALETTE grayscale table plain DMG rendering uses, which is
+  // honestly incomplete rather than confidently wrong.
+  void setCgbCompatibilityMode(bool isCompatibilityMode)
+  {
+    m_cgbCompatibilityMode = isCompatibilityMode;
+  }
 
 private:
-  // Defaults to false (DMG) purely so a default-constructed Ppu has a
-  // well-defined value before GameBoy calls setCgbMode() - always set
-  // explicitly in practice, same reasoning as Apu/Mmu's own
-  // m_isCgbHardware.
-  bool m_isCgbHardware{ false };
+  // Defaults to false (DMG, or CGB native mode until that's implemented)
+  // purely so a default-constructed Ppu has a well-defined value before
+  // GameBoy calls setCgbCompatibilityMode() - always set explicitly in
+  // practice, same reasoning as Apu/Mmu's own
+  // m_cgbCompatibilityMode.
+  bool m_cgbCompatibilityMode{ false };
   enum class Mode : std::uint8_t
   {
     HBlank = 0,
