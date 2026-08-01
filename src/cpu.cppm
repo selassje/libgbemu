@@ -3,15 +3,17 @@ export module gbemu:cpu;
 import std;
 import :mmu;
 import :ppu;
+import :apu;
 
 namespace gbemu {
 
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
-  Cpu(Mmu& mmu, Ppu& ppu)
+  Cpu(Mmu& mmu, Ppu& ppu, Apu& apu)
     : m_mmu(mmu)
     , m_ppu(ppu)
+    , m_apu(apu)
   {
   }
 
@@ -46,9 +48,15 @@ private:
 
   std::size_t m_mcycles{ 0 };
   std::size_t m_lastTimerMCycles{ 0 };
+  // How many Ppu/Mmu/Apu T-cycles have already been run, in the same
+  // absolute-T-cycle numbering advanceHardware() is called with (4x
+  // m_mcycles' numbering) - see advanceHardware()'s comment for why this
+  // needs T-cycle, not M-cycle, granularity.
+  std::size_t m_syncedTCycles{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
   std::reference_wrapper<Ppu> m_ppu;
+  std::reference_wrapper<Apu> m_apu;
 
   using InstructionFun = std::size_t (Cpu::*)();
 
@@ -62,7 +70,21 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   void handleInterrupts();
-  void handleTimer(std::size_t currentMCycles);
+  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time (so a
+  // memory access made partway through an instruction sees hardware state
+  // as of its own T-cycle, not just whatever was left over from the
+  // *previous* instruction), then runs the timer's own DIV/TIMA catch-up
+  // math. Called at every point in an instruction handler that performs a
+  // memory access with currentTCycles = (m_mcycles + <M-cycles into this
+  // instruction that access happens at>) * 4 - the same checkpoints this
+  // used to only serve for the timer, at M-cycle granularity - plus once
+  // more at the end of runNextInstruction() with the instruction's final
+  // T-cycle total, to flush any of its own trailing cycles a
+  // mid-instruction checkpoint didn't already cover. Takes a T-cycle (not
+  // M-cycle) count specifically so a future caller *could* target a
+  // sub-M-cycle offset if a quirk ever needs it - every current call site
+  // still targets an exact M-cycle boundary.
+  void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;
 
   std::size_t nop();

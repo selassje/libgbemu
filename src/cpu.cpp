@@ -376,7 +376,7 @@ Cpu::ldRR()
 
   std::uint8_t value = 0;
   if (src == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     value = m_mmu.get().readByte(m_HL);
     cycles = 2;
   } else {
@@ -384,7 +384,7 @@ Cpu::ldRR()
   }
 
   if (dst == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     m_mmu.get().writeByte(m_HL, value);
     cycles = 2;
   } else {
@@ -405,7 +405,7 @@ Cpu::ldRd8()
 
   std::size_t cycles = 2;
   if (dst == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
     m_mmu.get().writeByte(m_HL, value);
     cycles = 3;
   } else {
@@ -424,10 +424,10 @@ Cpu::ldhlia()
   const bool decrement = (static_cast<unsigned>(opcode) & 0x10U) != 0;
 
   if (load) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(m_HL));
   } else {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     m_mmu.get().writeByte(m_HL, getR8(REG_A));
   }
 
@@ -446,10 +446,10 @@ Cpu::ldbcdea()
   const auto address = useDE ? m_DE : m_BC;
 
   if (load) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -467,7 +467,7 @@ Cpu::incr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     oldValue = m_mmu.get().readByte(m_HL);
     cycles = 3;
   } else {
@@ -477,7 +477,7 @@ Cpu::incr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue + 1);
 
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -507,7 +507,7 @@ Cpu::decr8()
   std::uint8_t oldValue = 0;
   std::size_t cycles = 1;
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     oldValue = m_mmu.get().readByte(m_HL);
     cycles = 3;
   } else {
@@ -517,7 +517,7 @@ Cpu::decr8()
   const auto newValue = static_cast<std::uint8_t>(oldValue - 1);
 
   if (reg == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
     m_mmu.get().writeByte(m_HL, newValue);
   } else {
     setR8(reg, newValue);
@@ -639,10 +639,10 @@ Cpu::ldaa16()
   const auto address = m_mmu.get().readWord(m_PC + 1);
 
   if (load) {
-    handleTimer(m_mcycles + 4);
+    advanceHardware((m_mcycles + 4) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 4);
+    advanceHardware((m_mcycles + 4) * 4);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -659,10 +659,10 @@ Cpu::ldha8()
   const auto address = static_cast<std::uint16_t>(IO_REGISTERS_BASE + offset);
 
   if (load) {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -679,10 +679,10 @@ Cpu::ldhca()
     static_cast<std::uint16_t>(IO_REGISTERS_BASE + getR8(REG_C));
 
   if (load) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -928,7 +928,7 @@ Cpu::aluR8()
   std::size_t cycles = 1;
   std::uint8_t operand = 0;
   if (srcCode == REG_HL_INDIRECT) {
-    handleTimer(m_mcycles + 2);
+    advanceHardware((m_mcycles + 2) * 4);
     operand = m_mmu.get().readByte(m_HL);
     cycles = 2;
   } else {
@@ -984,7 +984,7 @@ Cpu::cbPrefixed()
 
   const bool isMemory = (regCode == REG_HL_INDIRECT);
   if (isMemory) {
-    handleTimer(m_mcycles + 3);
+    advanceHardware((m_mcycles + 3) * 4);
   }
   auto value = isMemory ? m_mmu.get().readByte(m_HL) : getR8(regCode);
 
@@ -1070,7 +1070,7 @@ Cpu::cbPrefixed()
   }
 
   if (isMemory) {
-    handleTimer(m_mcycles + 4);
+    advanceHardware((m_mcycles + 4) * 4);
     m_mmu.get().writeByte(m_HL, value);
   } else {
     setR8(regCode, value);
@@ -1360,8 +1360,34 @@ Cpu::handleInterrupts()
 }
 
 void
-Cpu::handleTimer(std::size_t currentMCycles)
+Cpu::advanceHardware(std::size_t currentTCycles)
 {
+  // One T-cycle at a time, in the same Ppu/Mmu/Apu order runNextFrame()
+  // used to tick them in wholesale after each instruction - preserved
+  // exactly so moving this earlier/more granular doesn't change the total
+  // ticks or their relative order, only *when within an instruction* a
+  // mid-instruction memory access observes them. T-cycle (not M-cycle)
+  // granularity specifically matters for Apu::readWaveRam() - CH3's own
+  // wave-fetch period can be as short as 4 T-cycles (a single M-cycle), so
+  // a memory access needs to be placeable at a specific T-cycle *within*
+  // an M-cycle, not just at M-cycle boundaries, to land in or out of that
+  // narrow window the same way real hardware's bus timing does.
+  while (m_syncedTCycles < currentTCycles) {
+    m_ppu.get().runNextTCycle();
+    m_mmu.get().runNextTCycle();
+    m_apu.get().runNextTCycle(m_mmu.get().divCounter());
+    ++m_syncedTCycles;
+  }
+
+  // The timer's own DIV/TIMA catch-up math is inherently M-cycle grained
+  // (that's the real hardware's own granularity for it) - truncating here
+  // is fine even when currentTCycles lands mid-M-cycle (as it now can, see
+  // above): any tick this misses because it's not yet a whole M-cycle gets
+  // picked up by the next call once currentTCycles/tCyclesPerMCycle
+  // advances past it, same as the timer already tolerated no-op calls at
+  // an M-cycle it had already caught up to.
+  constexpr unsigned tCyclesPerMCycle = 4;
+  const auto currentMCycles = currentTCycles / tCyclesPerMCycle;
   const auto tac = m_mmu.get().readByte(regs::TAC);
   const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
   const auto timerFrequencyBits =
@@ -1404,18 +1430,20 @@ Cpu::reset()
   m_imeEnableDelay = 0;
   m_mcycles = 0;
   m_lastTimerMCycles = 0;
+  m_syncedTCycles = 0;
 }
 
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
-  handleTimer(m_mcycles);
+  advanceHardware(m_mcycles * 4);
   const auto lastMCycles = m_mcycles;
 
   if (m_halted) {
     if (!interruptRequestPending()) {
       constexpr std::size_t haltIdleCycles = 1;
       m_mcycles += haltIdleCycles;
+      advanceHardware(m_mcycles * 4);
       return haltIdleCycles;
     }
     m_halted = false;
@@ -1476,6 +1504,12 @@ Cpu::runNextInstruction()
     }
   }
   m_mcycles += cycles;
+  // Flushes whatever T-cycles this instruction's own body didn't already
+  // cover via a mid-instruction advanceHardware() checkpoint (e.g. an
+  // instruction with no memory access at all) - mirrors what
+  // runNextFrame()'s old post-instruction tick loop used to guarantee
+  // unconditionally for every instruction.
+  advanceHardware(m_mcycles * 4);
   return m_mcycles - lastMCycles;
 }
 

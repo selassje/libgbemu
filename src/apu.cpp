@@ -457,6 +457,17 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         // Real hardware restarts Wave RAM playback from its first sample
         // on every trigger.
         m_wave.playback.waveRamIndex = 0;
+        // Trigger also reloads the frequency timer from the (just-updated)
+        // period - same formula as WaveChannel::runNextTCycle()'s own
+        // reload. Without this, periodCounter would carry over unchanged
+        // from however the channel was counting down before this trigger,
+        // which is wrong: dmg_sound/09-wave read while on.gb specifically
+        // depends on each iteration's freshly-triggered period determining
+        // when the channel's first post-trigger Wave RAM fetch happens.
+        static constexpr std::uint16_t periodBase = 2048;
+        static constexpr std::uint16_t periodMultiplier = 2;
+        m_wave.playback.periodCounter = static_cast<std::uint16_t>(
+          (periodMultiplier * (periodBase - m_wave.configuration.period)) - 1);
       }
       break;
     }
@@ -638,6 +649,23 @@ Apu::writeWaveRam(std::uint16_t address, std::uint8_t value)
   m_wave.configuration.waveRam.at(address - regs::WAVE_RAM_START) = value;
 }
 
+std::uint8_t
+Apu::readWaveRam(std::uint16_t address) const
+{
+  if (!m_wave.playback.enabled) {
+    return m_wave.configuration.waveRam.at(address - regs::WAVE_RAM_START);
+  }
+  // While enabled, the requested address is ignored - both DMG and CGB
+  // return whatever byte CH3 is currently playing. DMG additionally only
+  // allows this during the narrow T-cycle window the channel itself
+  // fetches that byte (see waveRamAccessWindow); CGB has no such
+  // restriction and returns the current byte unconditionally.
+  if (!m_isCgbHardware && !m_wave.playback.waveRamAccessWindow) {
+    return 0xFF;
+  }
+  return m_wave.configuration.waveRam.at(m_wave.playback.waveRamIndex / 2);
+}
+
 void
 Apu::PulseChannel::runNextTCycle()
 {
@@ -778,7 +806,9 @@ Apu::WaveChannel::runNextTCycle()
     static constexpr std::array<unsigned, 4> outputShift = { 4, 0, 1, 2 };
     playback.output = static_cast<std::uint8_t>(
       nibble >> outputShift.at(configuration.outputLevel));
+    playback.waveRamAccessWindow = true;
   } else {
+    playback.waveRamAccessWindow = false;
     --playback.periodCounter;
   }
 }

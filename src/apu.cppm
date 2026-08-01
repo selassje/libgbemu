@@ -61,6 +61,18 @@ public:
   // only ever reflects what's actually been written, never diverging.
   void writeWaveRam(std::uint16_t address, std::uint8_t value);
 
+  // Called by Mmu::readByte() for every read of Wave RAM
+  // (0xFF30-0xFF3F). While CH3 is enabled, the requested address is
+  // ignored on both DMG and CGB - the byte the channel is currently
+  // playing is returned instead. DMG additionally only allows this during
+  // the same T-cycle the channel itself fetches that sample, reading back
+  // 0xFF on any other T-cycle; CGB has no such restriction and returns the
+  // current byte unconditionally. See
+  // WaveChannel::PlaybackState::waveRamAccessWindow, set by
+  // WaveChannel::runNextTCycle() on the one T-cycle this is true (DMG
+  // only - irrelevant to CGB's unconditional access).
+  [[nodiscard]] std::uint8_t readWaveRam(std::uint16_t address) const;
+
   // Called once by GameBoy::initializeFromRom() after resolving which
   // physical console this session actually boots as (see Mode).
   // Some APU power-on behavior genuinely differs between DMG and CGB
@@ -299,6 +311,10 @@ private:
       // the Wave RAM nibble at waveRamIndex, right-shifted per
       // configuration.outputLevel (0/1/2 bits, or forced 0 if muted).
       std::uint8_t output{ 0 };
+      // True for exactly the one T-cycle each period that runNextTCycle()
+      // fetches a new sample byte - see Apu::readWaveRam(). Cleared again
+      // on every other T-cycle, including the very next one.
+      bool waveRamAccessWindow{ false };
     } playback;
 
     void runNextTCycle();

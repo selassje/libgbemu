@@ -71,7 +71,7 @@ public:
     : m_model(model)
     , m_mmu(m_apu)
     , m_ppu(m_mmu)
-    , m_cpu(m_mmu, m_ppu)
+    , m_cpu(m_mmu, m_ppu, m_apu)
   {
   }
 

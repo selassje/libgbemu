@@ -79,7 +79,7 @@ GameBoy::reset()
   // m_ppu.
   m_ppu.~Ppu();
   new (&m_ppu) Ppu(m_mmu);
-  m_cpu = Cpu(m_mmu, m_ppu);
+  m_cpu = Cpu(m_mmu, m_ppu, m_apu);
   return initializeFromRom();
 }
 
@@ -90,17 +90,21 @@ gbemu::GameBoy::runNextFrame()
   m_apu.startFrame();
   std::size_t mCycles = 0;
   while (mCycles < mCyclesPerFrame) {
+    // Cpu::runNextInstruction() ticks Ppu/Mmu/Apu itself now (see
+    // Cpu::advanceHardware()), at the specific memory-access points within
+    // an instruction that already called it for timer-accuracy reasons,
+    // rather than this loop catching everything up in one batch afterward
+    // - needed so a mid-instruction Wave RAM read (see
+    // Apu::readWaveRam()) observes the channel's state as of its own
+    // T-cycle, not whatever was left over from the previous instruction.
+    // Not every memory access gets this treatment (e.g. opcode/operand
+    // fetches don't), only the ones advanceHardware() was already being
+    // called around.
     const auto result = m_cpu.runNextInstruction();
     if (!result) {
       return std::unexpected(result.error());
     }
-    const auto cycles = result.value();
-    for (std::size_t i = 0; i < cycles * 4; ++i) {
-      m_ppu.runNextTCycle();
-      m_mmu.runNextTCycle();
-      m_apu.runNextTCycle(m_mmu.divCounter());
-    }
-    mCycles += cycles;
+    mCycles += result.value();
   }
   const auto audioBuffer = m_apu.buffer();
   const EmulationFrame frame = {
