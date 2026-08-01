@@ -1,6 +1,7 @@
 export module gbemu:apu;
 
 import std;
+import :hardware_mode;
 
 namespace gbemu {
 
@@ -74,11 +75,16 @@ public:
   [[nodiscard]] std::uint8_t readWaveRam(std::uint16_t address) const;
 
   // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see Mode).
+  // physical console this session actually boots as (see HardwareMode).
   // Some APU power-on behavior genuinely differs between DMG and CGB
   // hardware even in CGB compatibility mode - see the NR52 write
-  // handler's use of this for the length-counter-on-power-on quirk.
-  void setCgbMode(bool isCgb) { m_isCgbHardware = isCgb; }
+  // handler's use of this for the length-counter-on-power-on quirk. Both
+  // CGB variants count as CGB hardware here (unlike Ppu's rendering path,
+  // this quirk doesn't distinguish compatibility from native mode).
+  void setHardwareMode(HardwareMode mode)
+  {
+    m_isCgbHardware = mode != HardwareMode::Dmg;
+  }
 
 private:
   // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples

@@ -2,6 +2,7 @@ export module gbemu:mmu;
 
 import std;
 import :apu;
+import :hardware_mode;
 
 namespace gbemu {
 
@@ -88,13 +89,19 @@ public:
   [[nodiscard]] std::uint16_t divCounter() const { return m_divCounter; }
 
   // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see Mode) - mirrors
-  // Apu::setCgbMode(). Gates VBK/SVBK (VRAM/WRAM bank select) and
-  // BCPS/BCPD/OCPS/OCPD (palette RAM): real DMG hardware doesn't have any
-  // of these registers at all (reads $FF, writes are no-ops), so
-  // writeByte()/readByte() only let them actually take effect when this
-  // is true.
-  void setCgbMode(bool isCgb) { m_isCgbHardware = isCgb; }
+  // physical console this session actually boots as (see HardwareMode) -
+  // mirrors Apu::setHardwareMode(). Gates VBK/SVBK (VRAM/WRAM bank
+  // select) and BCPS/BCPD/OCPS/OCPD (palette RAM): real DMG hardware
+  // doesn't have any of these registers at all (reads $FF, writes are
+  // no-ops), so writeByte()/readByte() only let them actually take
+  // effect when this isn't Dmg. Both CGB variants count as CGB hardware
+  // here - these registers exist regardless of whether the cartridge
+  // itself is compatibility- or native-mode, see HardwareMode's own
+  // comment.
+  void setHardwareMode(HardwareMode mode)
+  {
+    m_isCgbHardware = mode != HardwareMode::Dmg;
+  }
 
   // The CGB color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR in the low 15
   // bits) BCPS/BCPD (background) or OCPS/OCPD (object) have stored for the

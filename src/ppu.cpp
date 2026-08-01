@@ -503,11 +503,12 @@ Ppu::handlePixelTransfer()
   // A DMG-only cartridge running in CGB compatibility mode still computes
   // its shade index exactly as above, but looks it up in CGB background
   // palette 0 instead of the fixed DMG grayscale table - see
-  // setCgbCompatibilityMode()'s comment.
+  // setHardwareMode()'s comment.
   constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
-  auto rgb = m_cgbCompatibilityMode ? cgbColorToRgb(m_mmu.get().bgPaletteColor(
-                                        cgbCompatibilityBgPalette, shade))
-                                    : DMG_PALETTE.at(shade);
+  auto rgb = m_hardwareMode == HardwareMode::CgbCompatibility
+               ? cgbColorToRgb(
+                   m_mmu.get().bgPaletteColor(cgbCompatibilityBgPalette, shade))
+               : DMG_PALETTE.at(shade);
 
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
@@ -526,9 +527,8 @@ Ppu::handlePixelTransfer()
         shadeMask);
       // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
       // that selects OBP0/OBP1 above) doubles as the CGB object palette
-      // index in compatibility mode - see setCgbCompatibilityMode()'s
-      // comment.
-      const auto objRgb = m_cgbCompatibilityMode
+      // index in compatibility mode - see setHardwareMode()'s comment.
+      const auto objRgb = m_hardwareMode == HardwareMode::CgbCompatibility
                             ? cgbColorToRgb(m_mmu.get().objPaletteColor(
                                 objPixel.palette, objShade))
                             : DMG_PALETTE.at(objShade);

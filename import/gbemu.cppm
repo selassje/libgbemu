@@ -8,6 +8,11 @@ export import :mmu;
 export import :ppu;
 export import :boot_rom;
 export import :regs;
+// Structurally required (an interface partition must be reachable from
+// the primary module interface), but the HardwareMode enum it declares
+// isn't itself marked `export` - see its own comment for why that keeps
+// it out of this module's public API despite this line.
+export import :hardware_mode;
 
 export namespace gbemu {
 
@@ -109,14 +114,12 @@ private:
   // constructor receives a reference to it.
   Ppu m_ppu;
   Cpu m_cpu;
-  // Whether the cartridge itself declares CGB awareness (header byte
-  // 0x0143, bit 7) - combined with m_model in initializeFromRom() to
-  // decide which boot ROM actually runs (Auto: per-cartridge; Dmg/Cgb:
-  // always the forced choice) and to tell Apu which power-on hardware
-  // quirks apply (see Apu::setCgbMode()). Also kept for gating other
-  // CGB-exclusive hardware features (VRAM banking, palette RAM, double
-  // speed, ...) once those exist.
-  bool m_isCgb{ false };
+  // The actual, resolved hardware behavior this session boots as -
+  // computed once in initializeFromRom() by combining m_model with the
+  // cartridge's own header CGB flag, and handed to Apu/Mmu/Ppu via their
+  // own setHardwareMode(). See HardwareMode's own comment for why this is
+  // a distinct concept from m_model.
+  HardwareMode m_hardwareMode{ HardwareMode::Dmg };
   // Kept so reset() can re-run initializeFromRom() without the caller
   // needing to re-supply the same ROM bytes.
   std::vector<std::uint8_t> m_romBytes;
