@@ -48,6 +48,8 @@ GameBoy::initializeFromRom()
     m_model == Mode::Cgb || (m_model == Mode::Auto && m_isCgb);
   m_mmu.enableBootRom(bootAsCgb ? cgbBootRom() : dmgBootRom());
   m_apu.setCgbMode(bootAsCgb);
+  m_mmu.setCgbMode(bootAsCgb);
+  m_ppu.setCgbMode(bootAsCgb);
   m_cpu.reset();
 
   return result;

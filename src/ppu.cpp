@@ -22,6 +22,33 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
   { 0x00, 0x00, 0x00 },
 } };
 
+// Expands a CGB palette color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR -
+// see Mmu::bgPaletteColor()/objPaletteColor()) to 8-bit RGB. Bit-replicates
+// the top 3 bits into the low 3 (rather than a plain x8 shift) so a
+// component's full 5-bit range 0-31 maps onto the full 8-bit range
+// 0-255 (0->0, 31->255) instead of leaving it capped at 248 - the
+// standard, widely-used N-bit-to-8-bit expansion, not a
+// hardware-accurate color-correction curve (real CGB hardware's LCD has
+// its own non-linear response that this doesn't attempt to model).
+std::array<std::uint8_t, 3>
+cgbColorToRgb(std::uint16_t color)
+{
+  constexpr unsigned componentMask = 0x1FU;
+  constexpr unsigned redShift = 0U;
+  constexpr unsigned greenShift = 5U;
+  constexpr unsigned blueShift = 10U;
+  constexpr unsigned expandLowShift = 3U;
+  constexpr unsigned expandHighShift = 2U;
+  const auto expand = [](unsigned component5) -> std::uint8_t {
+    return static_cast<std::uint8_t>((component5 << expandLowShift) |
+                                     (component5 >> expandHighShift));
+  };
+  const auto unsignedColor = static_cast<unsigned>(color);
+  return { expand((unsignedColor >> redShift) & componentMask),
+           expand((unsignedColor >> greenShift) & componentMask),
+           expand((unsignedColor >> blueShift) & componentMask) };
+}
+
 }
 
 namespace gbemu {
@@ -463,7 +490,14 @@ Ppu::handlePixelTransfer()
   const auto shade = static_cast<std::uint8_t>(
     (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
     shadeMask);
-  auto rgb = DMG_PALETTE.at(shade);
+  // A DMG-only cartridge running in CGB compatibility mode still computes
+  // its shade index exactly as above, but looks it up in CGB background
+  // palette 0 instead of the fixed DMG grayscale table - see
+  // setCgbMode()'s comment.
+  constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
+  auto rgb = m_isCgbHardware ? cgbColorToRgb(m_mmu.get().bgPaletteColor(
+                                 cgbCompatibilityBgPalette, shade))
+                             : DMG_PALETTE.at(shade);
 
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
@@ -480,7 +514,13 @@ Ppu::handlePixelTransfer()
         (static_cast<unsigned>(obp) >>
          (static_cast<unsigned>(objPixel.colorIndex) * 2U)) &
         shadeMask);
-      const auto objRgb = DMG_PALETTE.at(objShade);
+      // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
+      // that selects OBP0/OBP1 above) doubles as the CGB object palette
+      // index in compatibility mode - see setCgbMode()'s comment.
+      const auto objRgb = m_isCgbHardware
+                            ? cgbColorToRgb(m_mmu.get().objPaletteColor(
+                                objPixel.palette, objShade))
+                            : DMG_PALETTE.at(objShade);
 
       rgb = objRgb;
     }

@@ -220,6 +220,59 @@ Mmu::readByte(std::uint16_t address) const
   if (address == regs::NR52) {
     return m_apu.get().readRegister(address);
   }
+  // CGB-only: bit 0 selects the VRAM bank, bits 1-7 always read back as 1.
+  // Real DMG hardware doesn't have this register at all, always reading
+  // $FF regardless of what's written - see setCgbMode().
+  if (address == regs::VBK) {
+    if (!m_isCgbHardware) {
+      constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+      return unwiredReadsAsAllOnes;
+    }
+    constexpr unsigned vramBankBit = 0b0000'0001U;
+    constexpr unsigned unusedBits = 0b1111'1110U;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & vramBankBit) | unusedBits);
+  }
+  // CGB-only: bits 0-2 select the WRAM bank, bits 3-7 always read back as
+  // 1. Real DMG hardware doesn't have this register at all - see
+  // setCgbMode().
+  if (address == regs::SVBK) {
+    if (!m_isCgbHardware) {
+      constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+      return unwiredReadsAsAllOnes;
+    }
+    constexpr unsigned wramBankBits = 0b0000'0111U;
+    constexpr unsigned unusedBits = 0b1111'1000U;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & wramBankBits) | unusedBits);
+  }
+  // CGB-only: bits 0-5 are the palette RAM index, bit 6 always reads back
+  // as 1, bit 7 is the auto-increment flag. Real DMG hardware doesn't have
+  // BCPS/OCPS at all - see setCgbMode().
+  if (address == regs::BCPS || address == regs::OCPS) {
+    if (!m_isCgbHardware) {
+      constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+      return unwiredReadsAsAllOnes;
+    }
+    constexpr unsigned unusedBit = 0b0100'0000U;
+    return static_cast<std::uint8_t>(static_cast<unsigned>(value) | unusedBit);
+  }
+  // CGB-only: reads back the byte of BG/object palette RAM BCPS/OCPS
+  // currently indexes - see bgPaletteColor()/objPaletteColor(). Real DMG
+  // hardware doesn't have BCPD/OCPD at all.
+  if (address == regs::BCPD || address == regs::OCPD) {
+    if (!m_isCgbHardware) {
+      constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
+      return unwiredReadsAsAllOnes;
+    }
+    constexpr unsigned indexMask = 0b0011'1111U;
+    const auto controlAddress = address == regs::BCPD ? regs::BCPS : regs::OCPS;
+    const auto index =
+      static_cast<unsigned>(self.getByteRef(controlAddress)) & indexMask;
+    const auto& paletteRam =
+      address == regs::BCPD ? m_bgPaletteRam : m_objPaletteRam;
+    return paletteRam.at(index);
+  }
   // 0xFF27-0xFF2F: the unused gap between NR52 and Wave RAM - like
   // 0xFF15/0xFF1F above, nothing real hardware wires up here, so it
   // always reads back $FF regardless of what's written.
@@ -236,6 +289,38 @@ Mmu::readByte(std::uint16_t address) const
     return m_apu.get().readWaveRam(address);
   }
   return value;
+}
+
+namespace {
+
+std::uint16_t
+paletteColor(const std::array<std::uint8_t, 64>& paletteRam,
+             std::uint8_t palette,
+             std::uint8_t colorIndex)
+{
+  constexpr std::size_t colorsPerPalette = 4;
+  constexpr std::size_t bytesPerColor = 2;
+  const auto offset =
+    ((static_cast<std::size_t>(palette) * colorsPerPalette) + colorIndex) *
+    bytesPerColor;
+  const auto lowByte = paletteRam.at(offset);
+  const auto highByte = paletteRam.at(offset + 1);
+  return static_cast<std::uint16_t>((static_cast<unsigned>(highByte) << 8U) |
+                                    static_cast<unsigned>(lowByte));
+}
+
+}
+
+std::uint16_t
+Mmu::bgPaletteColor(std::uint8_t palette, std::uint8_t colorIndex) const
+{
+  return paletteColor(m_bgPaletteRam, palette, colorIndex);
+}
+
+std::uint16_t
+Mmu::objPaletteColor(std::uint8_t palette, std::uint8_t colorIndex) const
+{
+  return paletteColor(m_objPaletteRam, palette, colorIndex);
 }
 
 std::uint16_t
@@ -408,6 +493,65 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   if (address == regs::OAM_DMA) {
     m_dmaState = DmaState{ .sourceBase = static_cast<std::uint16_t>(
                              static_cast<unsigned>(value) << 8U) };
+  }
+
+  // CGB-only: selects which VRAM bank 0x8000-0x9FFF maps to - see
+  // setCgbMode() and getByteRef(). Ignored on DMG (no such bank to
+  // select); the register itself still stores the written byte either way
+  // (falls through to getByteRef below), it just never affects addressing
+  // or reads back as anything but $FF there.
+  if (address == regs::VBK && m_isCgbHardware) {
+    constexpr unsigned vramBankBit = 0b0000'0001U;
+    m_switchableVRamBank = static_cast<unsigned>(value) & vramBankBit;
+  }
+
+  // CGB-only: selects which WRAM bank 0xD000-0xDFFF maps to - bank 0
+  // behaves as bank 1 (there's no way to map WRAM bank 0 into the
+  // switchable window, only the fixed 0xC000-0xCFFF one). Ignored on DMG,
+  // same reasoning as VBK above.
+  if (address == regs::SVBK && m_isCgbHardware) {
+    constexpr unsigned wramBankBits = 0b0000'0111U;
+    auto bank = static_cast<unsigned>(value) & wramBankBits;
+    if (bank == 0) {
+      bank = 1;
+    }
+    m_switchableWRamBank = bank;
+  }
+
+  // CGB-only: writes the byte of BG palette RAM BCPS currently indexes,
+  // then auto-increments that index (wrapping) if BCPS bit 7 is set - see
+  // bgPaletteColor(). No backing byte for BCPD itself (like NR52, its
+  // whole CPU-visible behavior is this side effect), so this returns
+  // early rather than falling through to the generic getByteRef() store
+  // below. On DMG, falls through and is simply not readable back as
+  // anything but $FF (see readByte()) - the register doesn't exist there.
+  if (address == regs::BCPD && m_isCgbHardware) {
+    constexpr unsigned indexMask = 0b0011'1111U;
+    constexpr unsigned autoIncBit = 0b1000'0000U;
+    const auto bcps = static_cast<unsigned>(getByteRef(regs::BCPS));
+    const auto index = bcps & indexMask;
+    m_bgPaletteRam.at(index) = value;
+    if ((bcps & autoIncBit) != 0) {
+      const auto nextIndex = (index + 1) % m_bgPaletteRam.size();
+      getByteRef(regs::BCPS) =
+        static_cast<std::uint8_t>((bcps & ~indexMask) | nextIndex);
+    }
+    return;
+  }
+
+  // CGB-only: same as BCPD above, but for object palette RAM via OCPS.
+  if (address == regs::OCPD && m_isCgbHardware) {
+    constexpr unsigned indexMask = 0b0011'1111U;
+    constexpr unsigned autoIncBit = 0b1000'0000U;
+    const auto ocps = static_cast<unsigned>(getByteRef(regs::OCPS));
+    const auto index = ocps & indexMask;
+    m_objPaletteRam.at(index) = value;
+    if ((ocps & autoIncBit) != 0) {
+      const auto nextIndex = (index + 1) % m_objPaletteRam.size();
+      getByteRef(regs::OCPS) =
+        static_cast<std::uint8_t>((ocps & ~indexMask) | nextIndex);
+    }
+    return;
   }
 
   // Only an internally-clocked transfer (bit 0 set) has a local timer to

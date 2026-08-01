@@ -25,7 +25,24 @@ public:
   // legitimate need for a mutable view out of it.
   [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
+  // Called once by GameBoy::initializeFromRom() after resolving which
+  // physical console this session actually boots as (see Mode) - mirrors
+  // Apu::setCgbMode()/Mmu::setCgbMode(). Only affects the final
+  // shade-to-RGB lookup in handlePixelTransfer(): a DMG-only cartridge
+  // running in CGB compatibility mode still computes its BG/object shade
+  // index exactly as on real DMG hardware (via BGP/OBP0/OBP1), but looks
+  // that shade up in CGB background palette 0 / object palette
+  // objPixel.palette (via Mmu::bgPaletteColor()/objPaletteColor()) instead
+  // of the fixed DMG_PALETTE grayscale table - real hardware's own
+  // DMG-compatibility colorization scheme, not an emulator invention.
+  void setCgbMode(bool isCgb) { m_isCgbHardware = isCgb; }
+
 private:
+  // Defaults to false (DMG) purely so a default-constructed Ppu has a
+  // well-defined value before GameBoy calls setCgbMode() - always set
+  // explicitly in practice, same reasoning as Apu/Mmu's own
+  // m_isCgbHardware.
+  bool m_isCgbHardware{ false };
   enum class Mode : std::uint8_t
   {
     HBlank = 0,
