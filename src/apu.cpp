@@ -268,6 +268,12 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
       const auto unsignedValue = static_cast<unsigned>(value);
       PulseChannel& pulse = (address == regs::NR11) ? m_pulse1 : m_pulse2;
+      // While the APU is powered off, Mmu::writeByte() already merges
+      // this write's length bits into the EXISTING stored duty bits
+      // before forwarding here (only the length-timer load circuit
+      // bypasses the power gate on real hardware, not the duty bits
+      // sharing this register) - so parsing duty out of value normally
+      // is always correct, powered or not.
       pulse.configuration.duty =
         static_cast<std::uint8_t>((unsignedValue >> dutyShift) & dutyMask);
       pulse.configuration.lengthTimer =
@@ -561,11 +567,26 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         // reset (real hardware doesn't clear it on power-off, only
         // NR10-NR51 - see Mmu::writeByte()'s own NR52 handling).
         const auto waveRam = m_wave.configuration.waveRam;
+        // Each channel's length counter is preserved through a power
+        // cycle on DMG, but reset on CGB (real hardware difference, even
+        // in CGB compatibility mode - see dmg_sound/08-len ctr during
+        // power.gb's own comment). Either way it stops being clocked
+        // while off, via runNextTCycle()'s own power-freeze.
+        const auto pulse1LengthTicks = m_pulse1.playback.remainingLengthTicks;
+        const auto pulse2LengthTicks = m_pulse2.playback.remainingLengthTicks;
+        const auto waveLengthTicks = m_wave.playback.remainingLengthTicks;
+        const auto noiseLengthTicks = m_noise.playback.remainingLengthTicks;
         m_pulse1 = PulseChannel1{};
         m_pulse2 = PulseChannel{};
         m_wave = WaveChannel{};
         m_wave.configuration.waveRam = waveRam;
         m_noise = NoiseChannel{};
+        if (!m_isCgbHardware) {
+          m_pulse1.playback.remainingLengthTicks = pulse1LengthTicks;
+          m_pulse2.playback.remainingLengthTicks = pulse2LengthTicks;
+          m_wave.playback.remainingLengthTicks = waveLengthTicks;
+          m_noise.playback.remainingLengthTicks = noiseLengthTicks;
+        }
         m_leftVolume = 0;
         m_rightVolume = 0;
         m_leftPanning = 0;

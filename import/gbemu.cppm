@@ -31,11 +31,45 @@ struct EmulationFrame
     audio;
 };
 
+// Which physical console this GameBoy instance emulates - a property of
+// the console itself, not of whatever cartridge happens to be inserted.
+enum class Mode : std::uint8_t
+{
+  // Boots as DMG for a cartridge that doesn't declare CGB support/
+  // requirement (header byte 0x0143), or as CGB for one that does -
+  // matches inserting a cartridge into whichever real hardware it was
+  // actually designed for. This is a policy for resolving *this*
+  // emulator's boot choice, not a real hardware mode in its own right.
+  Auto,
+  // Always boots as DMG, regardless of what the cartridge declares -
+  // matches inserting a cartridge into a real DMG console. Rejected with
+  // an error (see initializeFromRom()) for a cartridge whose header
+  // declares CGB as *required* (0x0143 bits 7+6 both set, i.e. 0xC0-0xFF)
+  // rather than merely supported, since no real DMG console could run
+  // that cartridge correctly either.
+  Dmg,
+  // Always boots as CGB hardware, regardless of what the cartridge
+  // declares - matches inserting any cartridge into a real CGB console,
+  // which runs its own one fixed boot ROM either way. Lands in CGB
+  // compatibility mode for a DMG-only cartridge, or native CGB mode for
+  // a cartridge that itself declares CGB support.
+  Cgb,
+};
+
 class GameBoy
 {
 public:
+  // Delegates to the explicit-model constructor below instead of giving
+  // it a default argument (disallowed by this project's .clang-tidy -
+  // fuchsia-default-arguments-declarations).
   GameBoy()
-    : m_mmu(m_apu)
+    : GameBoy(Mode::Auto)
+  {
+  }
+
+  explicit GameBoy(Mode model)
+    : m_model(model)
+    , m_mmu(m_apu)
     , m_ppu(m_mmu)
     , m_cpu(m_mmu, m_ppu)
   {
@@ -61,6 +95,11 @@ private:
   // currently in m_romBytes.
   [[nodiscard]] std::expected<void, std::string> initializeFromRom();
 
+  // Caller-requested console model - see Mode's own comment.
+  // Declared first since the constructor's init list initializes it
+  // first (it doesn't depend on, or get depended on by, anything else
+  // constructed below).
+  Mode m_model;
   // Declared before m_mmu so it's fully constructed before Mmu's
   // constructor receives a reference to it (Mmu forwards channel-register
   // writes to it - see Mmu::writeByte()).
@@ -71,12 +110,12 @@ private:
   Ppu m_ppu;
   Cpu m_cpu;
   // Whether the cartridge itself declares CGB awareness (header byte
-  // 0x0143, bit 7) - kept for gating actual CGB-exclusive hardware
-  // features (VRAM banking, palette RAM, double speed, ...) once those
-  // exist. Deliberately not used to decide which boot ROM runs: real
-  // hardware always boots as whichever console it physically is, and lets
-  // the boot ROM itself branch on this same flag to decide compatibility
-  // vs. native mode - see GameBoy::initializeFromRom().
+  // 0x0143, bit 7) - combined with m_model in initializeFromRom() to
+  // decide which boot ROM actually runs (Auto: per-cartridge; Dmg/Cgb:
+  // always the forced choice) and to tell Apu which power-on hardware
+  // quirks apply (see Apu::setCgbMode()). Also kept for gating other
+  // CGB-exclusive hardware features (VRAM banking, palette RAM, double
+  // speed, ...) once those exist.
   bool m_isCgb{ false };
   // Kept so reset() can re-run initializeFromRom() without the caller
   // needing to re-supply the same ROM bytes.

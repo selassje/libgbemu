@@ -3,7 +3,12 @@ module gbemu;
 namespace {
 
 constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
-constexpr std::uint8_t CGB_FLAG_MASK = 0x80;
+// Bit 7 alone ($80) means "supports CGB, but still runs on DMG"; bits 7+6
+// together ($C0) mean "CGB required" - real hardware's own boot ROM checks
+// these same two bits the same way, it's not an emulator-invented
+// distinction.
+constexpr std::uint8_t CGB_SUPPORTED_MASK = 0x80;
+constexpr std::uint8_t CGB_REQUIRED_MASK = 0xC0;
 
 }
 
@@ -18,13 +23,31 @@ GameBoy::initializeFromRom()
   }
 
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
-  m_isCgb = (cgbFlag & CGB_FLAG_MASK) != 0;
-  // Always boot as CGB hardware, matching how a real CGB console always
-  // runs its one fixed boot ROM regardless of what's inserted - the boot
-  // ROM itself reads this same header flag to decide whether to enter
-  // DMG-compatibility mode or native CGB mode for this cartridge, not
-  // something selected from outside by which binary we choose to run.
-  m_mmu.enableBootRom(cgbBootRom());
+  m_isCgb = (cgbFlag & CGB_SUPPORTED_MASK) != 0;
+  const bool cgbRequired = (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK;
+
+  if (m_model == Mode::Dmg && cgbRequired) {
+    result = std::unexpected(
+      "cartridge requires CGB hardware (header byte 0x0143), cannot force "
+      "Mode::Dmg for it");
+    return result;
+  }
+
+  // Mode::Auto gives each cartridge the physical console it
+  // actually targets (DMG-only carts boot as DMG, CGB-aware/required
+  // carts boot as CGB); Mode::Dmg/Cgb force a specific physical
+  // console regardless of what the cartridge declares, for deliberately
+  // running a cartridge - even a DMG-only one on Cgb, or a CGB-aware one
+  // on Dmg - on hardware other than what it targets, matching a real
+  // console's own fixed boot ROM (a real DMG or CGB console runs the same
+  // boot ROM no matter what's inserted). Some hardware quirks genuinely
+  // differ between the two physical consoles even in compatibility mode
+  // (e.g. APU behavior on power-on - see Apu::setCgbMode()), so this is a
+  // real behavioral choice, not just which boot animation plays.
+  const bool bootAsCgb =
+    m_model == Mode::Cgb || (m_model == Mode::Auto && m_isCgb);
+  m_mmu.enableBootRom(bootAsCgb ? cgbBootRom() : dmgBootRom());
+  m_apu.setCgbMode(bootAsCgb);
   m_cpu.reset();
 
   return result;
