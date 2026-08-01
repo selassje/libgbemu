@@ -22,6 +22,33 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
   { 0x00, 0x00, 0x00 },
 } };
 
+// Expands a CGB palette color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR -
+// see Mmu::bgPaletteColor()/objPaletteColor()) to 8-bit RGB. Bit-replicates
+// the top 3 bits into the low 3 (rather than a plain x8 shift) so a
+// component's full 5-bit range 0-31 maps onto the full 8-bit range
+// 0-255 (0->0, 31->255) instead of leaving it capped at 248 - the
+// standard, widely-used N-bit-to-8-bit expansion, not a
+// hardware-accurate color-correction curve (real CGB hardware's LCD has
+// its own non-linear response that this doesn't attempt to model).
+std::array<std::uint8_t, 3>
+cgbColorToRgb(std::uint16_t color)
+{
+  constexpr unsigned componentMask = 0x1FU;
+  constexpr unsigned redShift = 0U;
+  constexpr unsigned greenShift = 5U;
+  constexpr unsigned blueShift = 10U;
+  constexpr unsigned expandLowShift = 3U;
+  constexpr unsigned expandHighShift = 2U;
+  const auto expand = [](unsigned component5) -> std::uint8_t {
+    return static_cast<std::uint8_t>((component5 << expandLowShift) |
+                                     (component5 >> expandHighShift));
+  };
+  const auto unsignedColor = static_cast<unsigned>(color);
+  return { expand((unsignedColor >> redShift) & componentMask),
+           expand((unsignedColor >> greenShift) & componentMask),
+           expand((unsignedColor >> blueShift) & componentMask) };
+}
+
 }
 
 namespace gbemu {
@@ -87,11 +114,22 @@ Ppu::Fetcher::runNextTCycle()
     if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >= 8) {
       return false;
     }
-    for (unsigned bit = 8; bit-- > 0;) {
+    const bool native = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative;
+    constexpr unsigned paletteMask = 0x07U;
+    constexpr unsigned xFlipBit = 0x20U;
+    constexpr unsigned priorityBit = 0x80U;
+    const bool xFlip =
+      native && (static_cast<unsigned>(m_tileAttributes) & xFlipBit) != 0;
+    const auto palette = static_cast<std::uint8_t>(
+      native ? static_cast<unsigned>(m_tileAttributes) & paletteMask : 0);
+    const bool priority =
+      native && (static_cast<unsigned>(m_tileAttributes) & priorityBit) != 0;
+    for (unsigned i = 0; i < 8; ++i) {
+      const unsigned bit = xFlip ? i : (7 - i);
       const auto colorIndex = static_cast<std::uint8_t>(
         (((static_cast<unsigned>(m_tileDataHigh) >> bit) & 1U) << 1U) |
         ((static_cast<unsigned>(m_tileDataLow) >> bit) & 1U));
-      m_ppu.get().m_bgWndFifo.push(colorIndex);
+      m_ppu.get().m_bgWndFifo.push({ colorIndex, palette, priority });
     }
     m_rowPushed = true;
     return true;
@@ -104,12 +142,19 @@ Ppu::Fetcher::runNextTCycle()
   // objectX wins, tied objectX broken by smaller oamIndex) decides.
   const auto mergeObjectRowIntoFifo = [this]() {
     constexpr std::uint8_t xFlipMask = 0x20;
-    constexpr std::uint8_t paletteMask = 0x10;
+    constexpr std::uint8_t dmgPaletteMask = 0x10;
+    constexpr std::uint8_t cgbPaletteMask = 0x07;
     constexpr std::uint8_t priorityMask = 0x80;
 
     const bool xFlip = (m_currentObject.attributes & xFlipMask) != 0;
-    const auto palette = static_cast<std::uint8_t>(
-      (m_currentObject.attributes & paletteMask) != 0 ? 1 : 0);
+    const bool native = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative;
+    std::uint8_t palette = 0;
+    if (native) {
+      palette =
+        static_cast<std::uint8_t>(m_currentObject.attributes & cgbPaletteMask);
+    } else if ((m_currentObject.attributes & dmgPaletteMask) != 0) {
+      palette = 1;
+    }
     const bool behindBackground =
       (m_currentObject.attributes & priorityMask) != 0;
 
@@ -130,16 +175,22 @@ Ppu::Fetcher::runNextTCycle()
     while (objFifo.size() < 8) {
       objFifo.push({});
     }
-    objFifo.merge(0, pixels, [](const auto& incoming, const auto& existing) {
-      if (incoming.colorIndex == 0) {
-        return false;
-      }
-      if (existing.colorIndex == 0) {
-        return true;
-      }
-      return std::tie(incoming.objectX, incoming.oamIndex) <
-             std::tie(existing.objectX, existing.oamIndex);
-    });
+    const bool cgbOamPriority =
+      native && (m_mmu.get().readByte(regs::OPRI) & 0x01U) == 0;
+    objFifo.merge(
+      0, pixels, [cgbOamPriority](const auto& incoming, const auto& existing) {
+        if (incoming.colorIndex == 0) {
+          return false;
+        }
+        if (existing.colorIndex == 0) {
+          return true;
+        }
+        if (cgbOamPriority) {
+          return incoming.oamIndex < existing.oamIndex;
+        }
+        return std::tie(incoming.objectX, incoming.oamIndex) <
+               std::tie(existing.objectX, existing.oamIndex);
+      });
   };
 
   switch (m_mState) {
@@ -172,7 +223,15 @@ Ppu::Fetcher::runNextTCycle()
 
         const auto tileMapAddress = static_cast<std::uint16_t>(
           tileMapBaseAddress + ((tileY / 8) * 32) + tileX);
-        m_mTileIndex = m_mmu.get().readByte(tileMapAddress);
+        // Bank 0 explicitly, not readByte() - see Mmu::readVram()'s
+        // comment: the PPU's own tile-map fetch must not follow whatever
+        // the CPU currently has VBK pointed at.
+        constexpr std::uint8_t vramBank0 = 0;
+        m_mTileIndex = m_mmu.get().readVram(vramBank0, tileMapAddress);
+        constexpr std::uint8_t vramBank1 = 1;
+        m_tileAttributes = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative
+                             ? m_mmu.get().readVram(vramBank1, tileMapAddress)
+                             : 0;
         m_mState = State::ReadTileDataLow;
       }
       break;
@@ -212,24 +271,49 @@ Ppu::Fetcher::runNextTCycle()
             (rowWithinTile * 2) + (isHighByte ? 1 : 0));
           const auto tileOffset =
             static_cast<std::uint16_t>((tileIndex * 16) + rowOffset);
-          tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+          constexpr unsigned vramBankBit = 0x08U;
+          const auto vramBank = static_cast<std::uint8_t>(
+            m_ppu.get().m_hardwareMode == HardwareMode::CgbNative &&
+                (static_cast<unsigned>(m_currentObject.attributes) &
+                 vramBankBit) != 0
+              ? 1
+              : 0);
+          tileByte =
+            m_mmu.get().readVram(vramBank, tileDataBlock0 + tileOffset);
         } else {
           const auto scy =
             m_mode == Mode::Window ? 0 : m_mmu.get().readByte(regs::SCY);
-          const auto rowOffset = static_cast<std::uint16_t>(
-            (((m_Y + scy) % 8) * 2) + (isHighByte ? 1 : 0));
+          auto row = static_cast<unsigned>((m_Y + scy) % 8);
+          const bool native =
+            m_ppu.get().m_hardwareMode == HardwareMode::CgbNative;
+          constexpr unsigned yFlipBit = 0x40U;
+          constexpr unsigned vramBankBit = 0x08U;
+          if (native &&
+              (static_cast<unsigned>(m_tileAttributes) & yFlipBit) != 0) {
+            row = 7 - row;
+          }
+          const auto rowOffset =
+            static_cast<std::uint16_t>((row * 2) + (isHighByte ? 1 : 0));
+          const auto vramBank = static_cast<std::uint8_t>(
+            native &&
+                (static_cast<unsigned>(m_tileAttributes) & vramBankBit) != 0
+              ? 1
+              : 0);
           if (m_mTileIndex >= 128) {
             const auto tileOffset = static_cast<std::uint16_t>(
               ((m_mTileIndex - 128) * 16) + rowOffset);
-            tileByte = m_mmu.get().readByte(tileDataBlock1 + tileOffset);
+            tileByte =
+              m_mmu.get().readVram(vramBank, tileDataBlock1 + tileOffset);
           } else {
             const auto tileOffset =
               static_cast<std::uint16_t>((m_mTileIndex * 16) + rowOffset);
             const auto lcdc = m_mmu.get().readByte(regs::LCDC);
             if ((lcdc & 0x10U) != 0) {
-              tileByte = m_mmu.get().readByte(tileDataBlock0 + tileOffset);
+              tileByte =
+                m_mmu.get().readVram(vramBank, tileDataBlock0 + tileOffset);
             } else {
-              tileByte = m_mmu.get().readByte(tileDataBlock2 + tileOffset);
+              tileByte =
+                m_mmu.get().readVram(vramBank, tileDataBlock2 + tileOffset);
             }
           }
         }
@@ -452,9 +536,12 @@ Ppu::handlePixelTransfer()
     ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) + m_pixelsRendered) *
     3;
 
-  auto bgColorIndex = m_bgWndFifo.pop();
+  const auto bgPixel = m_bgWndFifo.pop();
+  auto bgColorIndex = bgPixel.colorIndex;
   constexpr std::uint8_t bgWindowEnableMask = 0x01;
-  if ((m_mmu.get().readByte(regs::LCDC) & bgWindowEnableMask) == 0) {
+  const auto lcdc = m_mmu.get().readByte(regs::LCDC);
+  const bool native = m_hardwareMode == HardwareMode::CgbNative;
+  if (!native && (lcdc & bgWindowEnableMask) == 0) {
     bgColorIndex = 0;
   }
 
@@ -463,7 +550,19 @@ Ppu::handlePixelTransfer()
   const auto shade = static_cast<std::uint8_t>(
     (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
     shadeMask);
-  auto rgb = DMG_PALETTE.at(shade);
+  // A DMG-only cartridge running in CGB compatibility mode still computes
+  // its shade index exactly as above, but looks it up in CGB background
+  // palette 0 instead of the fixed DMG grayscale table - see
+  // setHardwareMode()'s comment.
+  constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
+  std::array<std::uint8_t, 3> rgb = DMG_PALETTE.at(shade);
+  if (native) {
+    rgb =
+      cgbColorToRgb(m_mmu.get().bgPaletteColor(bgPixel.palette, bgColorIndex));
+  } else if (m_hardwareMode == HardwareMode::CgbCompatibility) {
+    rgb = cgbColorToRgb(
+      m_mmu.get().bgPaletteColor(cgbCompatibilityBgPalette, shade));
+  }
 
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
@@ -471,8 +570,12 @@ Ppu::handlePixelTransfer()
     constexpr std::uint8_t objEnableMask = 0x02;
     const bool objEnabled =
       (m_mmu.get().readByte(regs::LCDC) & objEnableMask) != 0;
-    if (objPixel.colorIndex != 0 && objEnabled &&
-        (bgColorIndex == 0 || !objectBehindBackground)) {
+    const bool masterPriority = (lcdc & bgWindowEnableMask) != 0;
+    const bool objectAboveBackground =
+      native ? (!masterPriority || bgColorIndex == 0 ||
+                (!bgPixel.priority && !objectBehindBackground))
+             : (bgColorIndex == 0 || !objectBehindBackground);
+    if (objPixel.colorIndex != 0 && objEnabled && objectAboveBackground) {
       const auto objPaletteAddress = static_cast<std::uint16_t>(
         objPixel.palette == 0 ? regs::OBP0 : regs::OBP1);
       const auto obp = m_mmu.get().readByte(objPaletteAddress);
@@ -480,7 +583,17 @@ Ppu::handlePixelTransfer()
         (static_cast<unsigned>(obp) >>
          (static_cast<unsigned>(objPixel.colorIndex) * 2U)) &
         shadeMask);
-      const auto objRgb = DMG_PALETTE.at(objShade);
+      // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
+      // that selects OBP0/OBP1 above) doubles as the CGB object palette
+      // index in compatibility mode - see setHardwareMode()'s comment.
+      std::array<std::uint8_t, 3> objRgb = DMG_PALETTE.at(objShade);
+      if (native) {
+        objRgb = cgbColorToRgb(
+          m_mmu.get().objPaletteColor(objPixel.palette, objPixel.colorIndex));
+      } else if (m_hardwareMode == HardwareMode::CgbCompatibility) {
+        objRgb = cgbColorToRgb(
+          m_mmu.get().objPaletteColor(objPixel.palette, objShade));
+      }
 
       rgb = objRgb;
     }

@@ -18,6 +18,22 @@ export constexpr std::uint16_t OBP0 = 0xFF48;
 export constexpr std::uint16_t OBP1 = 0xFF49;
 export constexpr std::uint16_t LY = 0xFF44;
 export constexpr std::uint16_t BOOT_ROM_DISABLE = 0xFF50;
+// CGB-only: VRAM bank select (bit 0) - real DMG hardware doesn't have this
+// register at all. See Mmu::setCgbMode().
+export constexpr std::uint16_t VBK = 0xFF4F;
+// CGB-only: WRAM bank select (bits 0-2, bank 0 reads back/behaves as bank
+// 1) - real DMG hardware doesn't have this register at all. See
+// Mmu::setCgbMode().
+export constexpr std::uint16_t SVBK = 0xFF70;
+// CGB-only: background/object palette RAM index+auto-increment (BCPS/OCPS)
+// and data (BCPD/OCPD) - see Mmu::setCgbMode() and Mmu::bgPaletteColor()/
+// objPaletteColor(). Real DMG hardware doesn't have these registers at
+// all.
+export constexpr std::uint16_t BCPS = 0xFF68;
+export constexpr std::uint16_t BCPD = 0xFF69;
+export constexpr std::uint16_t OCPS = 0xFF6A;
+export constexpr std::uint16_t OCPD = 0xFF6B;
+export constexpr std::uint16_t OPRI = 0xFF6C;
 export constexpr std::uint16_t IE = 0xFFFF;
 export constexpr std::uint16_t SCX = 0xFF43;
 export constexpr std::uint16_t SCY = 0xFF42;

@@ -2,6 +2,7 @@ export module gbemu:mmu;
 
 import std;
 import :apu;
+import :hardware_mode;
 
 namespace gbemu {
 
@@ -87,8 +88,57 @@ public:
   // view - those subsystems tap bits below DIV's own visible range.
   [[nodiscard]] std::uint16_t divCounter() const { return m_divCounter; }
 
+  // Called once by GameBoy::initializeFromRom() after resolving which
+  // physical console this session actually boots as (see HardwareMode) -
+  // mirrors Apu::setHardwareMode(). Gates VBK/SVBK (VRAM/WRAM bank
+  // select) and BCPS/BCPD/OCPS/OCPD (palette RAM): real DMG hardware
+  // doesn't have any of these registers at all (reads $FF, writes are
+  // no-ops), so writeByte()/readByte() only let them actually take
+  // effect when this isn't Dmg. Both CGB variants count as CGB hardware
+  // here - these registers exist regardless of whether the cartridge
+  // itself is compatibility- or native-mode, see HardwareMode's own
+  // comment.
+  void setHardwareMode(HardwareMode mode)
+  {
+    m_isCgbHardware = mode != HardwareMode::Dmg;
+  }
+
+  // The CGB color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR in the low 15
+  // bits) BCPS/BCPD (background) or OCPS/OCPD (object) have stored for the
+  // given palette (0-7) and color-within-palette (0-3) - Ppu converts this
+  // to 8-bit RGB while rendering in CGB mode; DMG-mode rendering never
+  // calls these, using its own fixed grayscale table instead. palette RAM
+  // itself lives here (not Ppu) so Ppu doesn't need a second, circular
+  // reference back to Mmu on top of the one it already holds - same
+  // reasoning as BGP/OBP0/OBP1 already being plain Mmu-owned bytes Ppu
+  // just reads through readByte().
+  [[nodiscard]] std::uint16_t bgPaletteColor(std::uint8_t palette,
+                                             std::uint8_t colorIndex) const;
+  [[nodiscard]] std::uint16_t objPaletteColor(std::uint8_t palette,
+                                              std::uint8_t colorIndex) const;
+
+  // Reads VRAM (0x8000-0x9FFF) from an explicitly-chosen bank, ignoring
+  // whatever the CPU currently has VBK pointed at - Ppu's own tile
+  // map/tile-data fetches must use this, not readByte(): VBK selects
+  // which bank *CPU* accesses land on, but the PPU's fetch logic needs a
+  // specific bank per purpose (bank 0 for tile map indices/pixel data;
+  // bank 1 only for the CGB tile-attribute byte at the same tile-map
+  // address, or for pixel data when that attribute's bank bit says so).
+  // Using readByte() here would make the PPU's fetches silently
+  // follow whatever the CPU last left VBK as, corrupting tile data for
+  // any CGB game that leaves VBK=1 selected after setting up attributes.
+  // bank is masked to 0-1 (VRAM only ever has 2 banks) - out-of-range
+  // input can't reach here since it's only ever a literal 0 or a value
+  // masked from an attribute byte's own single bank bit.
+  [[nodiscard]] std::uint8_t readVram(std::uint8_t bank,
+                                      std::uint16_t address) const;
+
 private:
   std::reference_wrapper<Apu> m_apu;
+  // Defaults to false (DMG) purely so a default-constructed Mmu has a
+  // well-defined value before GameBoy calls setCgbMode() - always set
+  // explicitly in practice, same reasoning as Apu::m_isCgbHardware.
+  bool m_isCgbHardware{ false };
 
   // Real hardware copies 1 byte per 4 T-cycles (160 bytes -> 640 T-cycles
   // total), not all 160 at once - std::nullopt when no transfer is active.
@@ -129,6 +179,12 @@ private:
   bool m_usesMbc1{ false };
   std::size_t m_switchableVRamBank{ 0 };
   std::size_t m_switchableWRamBank{ 1 };
+  // 8 palettes x 4 colors x 2 bytes/color (15-bit RGB555, little-endian) -
+  // see bgPaletteColor()/objPaletteColor(). Indexed via BCPS/OCPS's low 6
+  // bits (see writeByte()), themselves stored as plain bytes in m_io like
+  // any other simple register - no separate index field needed here.
+  std::array<std::uint8_t, 64> m_bgPaletteRam{};
+  std::array<std::uint8_t, 64> m_objPaletteRam{};
   std::uint8_t m_interruptEnableRegister{ 0 };
   std::uint8_t m_unusable{ 0 };
   // 1 = pressed, one bit per Button - directional keys in bits 0-3, button

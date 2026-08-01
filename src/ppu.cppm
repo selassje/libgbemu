@@ -1,6 +1,7 @@
 export module gbemu:ppu;
 
 import :mmu;
+import :hardware_mode;
 
 namespace gbemu {
 
@@ -25,7 +26,26 @@ public:
   // legitimate need for a mutable view out of it.
   [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
+  // Called once by GameBoy::initializeFromRom() after resolving which
+  // physical console this session actually boots as (see HardwareMode) -
+  // unlike Apu::setHardwareMode()/Mmu::setHardwareMode(), Ppu keeps the
+  // full three-way distinction (not just "is this CGB hardware at all"):
+  // rendering rules genuinely differ between CgbCompatibility and
+  // CgbNative, not just between Dmg and CGB. CgbCompatibility means a
+  // DMG-only cartridge running on CGB hardware - real hardware's own
+  // DMG-compatibility scheme applies (background/object shade computed
+  // exactly as on real DMG hardware via BGP/OBP0/OBP1, then looked up in
+  // CGB background palette 0 / object palette 0-1 instead of the fixed
+  // grayscale table). CgbNative (a genuinely CGB-aware cartridge) needs
+  // VRAM-bank-1 tile attributes, palettes 0-7, and CGB priority rules
+  // instead; Fetcher and handlePixelTransfer() implement those rules.
+  void setHardwareMode(HardwareMode mode) { m_hardwareMode = mode; }
+
 private:
+  // Defaults to Dmg purely so a default-constructed Ppu has a well-defined
+  // value before GameBoy calls setHardwareMode(); it is set explicitly in
+  // practice, same reasoning as Apu/Mmu's own m_isCgbHardware.
+  HardwareMode m_hardwareMode{ HardwareMode::Dmg };
   enum class Mode : std::uint8_t
   {
     HBlank = 0,
@@ -159,10 +179,18 @@ private:
     std::uint8_t m_tileX{ 0 };
     std::uint8_t m_Y{ 0 };
     std::uint8_t m_mTileIndex{ 0 };
+    std::uint8_t m_tileAttributes{ 0 };
     std::uint16_t m_lastDotStateChange{ 0 };
     std::uint8_t m_tileDataLow{};
     std::uint8_t m_tileDataHigh{};
     Object m_currentObject{};
+  };
+
+  struct BackgroundPixel
+  {
+    std::uint8_t colorIndex{};
+    std::uint8_t palette{};
+    bool priority{};
   };
 
   // A decoded object-FIFO pixel. objectX and oamIndex exist purely for
@@ -200,7 +228,7 @@ private:
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
   bool m_YCondition{ false };
-  Fifo<std::uint8_t> m_bgWndFifo{};
+  Fifo<BackgroundPixel> m_bgWndFifo{};
   Fifo<ObjectPixel> m_objFifo{};
   FrameBuffer m_frameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };

@@ -18,7 +18,8 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/regs.cppm)
+         ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm)
 
 if(MSVC)
   # MSBuild's real build infers /interface per module-interface file from
@@ -34,6 +35,7 @@ if(MSVC)
     ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
     ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
     ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm
     PROPERTIES COMPILE_OPTIONS /interface)
 endif()
 
