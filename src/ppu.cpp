@@ -148,9 +148,13 @@ Ppu::Fetcher::runNextTCycle()
 
     const bool xFlip = (m_currentObject.attributes & xFlipMask) != 0;
     const bool native = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative;
-    const auto palette = static_cast<std::uint8_t>(
-      native ? (m_currentObject.attributes & cgbPaletteMask)
-             : ((m_currentObject.attributes & dmgPaletteMask) != 0 ? 1 : 0));
+    std::uint8_t palette = 0;
+    if (native) {
+      palette =
+        static_cast<std::uint8_t>(m_currentObject.attributes & cgbPaletteMask);
+    } else if ((m_currentObject.attributes & dmgPaletteMask) != 0) {
+      palette = 1;
+    }
     const bool behindBackground =
       (m_currentObject.attributes & priorityMask) != 0;
 
@@ -551,13 +555,14 @@ Ppu::handlePixelTransfer()
   // palette 0 instead of the fixed DMG grayscale table - see
   // setHardwareMode()'s comment.
   constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
-  auto rgb =
-    native
-      ? cgbColorToRgb(m_mmu.get().bgPaletteColor(bgPixel.palette, bgColorIndex))
-    : m_hardwareMode == HardwareMode::CgbCompatibility
-      ? cgbColorToRgb(
-          m_mmu.get().bgPaletteColor(cgbCompatibilityBgPalette, shade))
-      : DMG_PALETTE.at(shade);
+  std::array<std::uint8_t, 3> rgb = DMG_PALETTE.at(shade);
+  if (native) {
+    rgb =
+      cgbColorToRgb(m_mmu.get().bgPaletteColor(bgPixel.palette, bgColorIndex));
+  } else if (m_hardwareMode == HardwareMode::CgbCompatibility) {
+    rgb = cgbColorToRgb(
+      m_mmu.get().bgPaletteColor(cgbCompatibilityBgPalette, shade));
+  }
 
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
@@ -581,13 +586,14 @@ Ppu::handlePixelTransfer()
       // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
       // that selects OBP0/OBP1 above) doubles as the CGB object palette
       // index in compatibility mode - see setHardwareMode()'s comment.
-      const auto objRgb =
-        native ? cgbColorToRgb(m_mmu.get().objPaletteColor(objPixel.palette,
-                                                           objPixel.colorIndex))
-        : m_hardwareMode == HardwareMode::CgbCompatibility
-          ? cgbColorToRgb(
-              m_mmu.get().objPaletteColor(objPixel.palette, objShade))
-          : DMG_PALETTE.at(objShade);
+      std::array<std::uint8_t, 3> objRgb = DMG_PALETTE.at(objShade);
+      if (native) {
+        objRgb = cgbColorToRgb(
+          m_mmu.get().objPaletteColor(objPixel.palette, objPixel.colorIndex));
+      } else if (m_hardwareMode == HardwareMode::CgbCompatibility) {
+        objRgb = cgbColorToRgb(
+          m_mmu.get().objPaletteColor(objPixel.palette, objShade));
+      }
 
       rgb = objRgb;
     }
