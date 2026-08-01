@@ -760,4 +760,53 @@ TEST_CASE("dmg_sound 12-wave write while on", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
+TEST_CASE("scratch: cgb-acid2", "[.diag]")
+{
+  auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
+  auto reference =
+    readFile(std::filesystem::path(CGB_ACID2_DIR) / "reference.rgb");
+  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
+
+  auto result = gb.loadRom(rom);
+  REQUIRE(result.has_value());
+
+  // Not yet passing: this exercises CGB *native* mode rendering (per-tile
+  // VRAM-bank-1 attributes, 8 BG/8 OBJ palettes, CGB priority rules),
+  // which isn't implemented yet - see Ppu::setHardwareMode()'s comment.
+  // framesToStabilize is copied from dmg-acid2's own empirically-found
+  // value as a starting point, not independently verified against this
+  // ROM's own animation - revisit once native-mode rendering exists.
+  constexpr int framesToStabilize = 120;
+  for (int i = 0; i < framesToStabilize - 1; ++i) {
+    const auto frameResult = gb.runNextFrame();
+    if (!frameResult) {
+      FAIL("Error : " + frameResult.error());
+    }
+  }
+  const auto frame = gb.runNextFrame();
+  if (!frame) {
+    FAIL("Error : " + frame.error());
+  }
+  REQUIRE(frame.has_value());
+
+  REQUIRE(reference.size() == frame->pixels.size());
+  REQUIRE(std::equal(
+    reference.begin(), reference.end(), frame->pixels.data_handle()));
+}
+
+TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",
+          "[GameBoy]")
+{
+  // cgb-acid2.gbc's header declares itself CGB-required (0x0143 = 0xC0),
+  // not just CGB-aware - a real cartridge exercising the same rejection
+  // GameBoy::initializeFromRom() already has a dedicated error message
+  // for, rather than a synthetic ROM built just to set that byte.
+  auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
+  gbemu::GameBoy gb{ gbemu::Mode::Dmg };
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE_FALSE(result.has_value());
+}
+
 }
