@@ -62,7 +62,7 @@ public:
   void writeWaveRam(std::uint16_t address, std::uint8_t value);
 
   // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see ConsoleModel).
+  // physical console this session actually boots as (see Mode).
   // Some APU power-on behavior genuinely differs between DMG and CGB
   // hardware even in CGB compatibility mode - see the NR52 write
   // handler's use of this for the length-counter-on-power-on quirk.
