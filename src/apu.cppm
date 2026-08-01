@@ -61,6 +61,13 @@ public:
   // only ever reflects what's actually been written, never diverging.
   void writeWaveRam(std::uint16_t address, std::uint8_t value);
 
+  // Called once by GameBoy::initializeFromRom() after resolving which
+  // physical console this session actually boots as (see ConsoleModel).
+  // Some APU power-on behavior genuinely differs between DMG and CGB
+  // hardware even in CGB compatibility mode - see the NR52 write
+  // handler's use of this for the length-counter-on-power-on quirk.
+  void setCgbMode(bool isCgb) { m_isCgbHardware = isCgb; }
+
 private:
   // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples
   // is ~1476-1478 floats (see runNextTCycle()'s accumulator) - comfortable
@@ -79,6 +86,11 @@ private:
   // NR52 bit 7. Named distinctly from the channels' own "enabled" (a
   // channel being actively on) - this is the APU as a whole.
   bool m_powered{ false };
+  // Set once via setCgbMode() - which physical console's power-on APU
+  // quirks apply (see the NR52 write handler). Defaults to false (DMG)
+  // purely so a default-constructed Apu has a well-defined value before
+  // GameBoy calls setCgbMode(); it's always set explicitly in practice.
+  bool m_isCgbHardware{ false };
 
   // NR50 bits 6-4/2-0 - raw 0-7 register values; effective volume is
   // value+1 (1-8), applied in mix(). VIN (bits 7/3, external cartridge

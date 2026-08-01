@@ -647,4 +647,48 @@ TEST_CASE("dmg_sound 07-len sweep period sync", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
+TEST_CASE("dmg_sound 08-len ctr during power", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
+                      "rom_singles" / "08-len ctr during power.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(std::chrono::milliseconds(20000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
+TEST_CASE("dmg_sound 11-regs after power", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
+                      "rom_singles" / "11-regs after power.gb");
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE(result.has_value());
+
+  result = runFor(std::chrono::milliseconds(20000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
 }

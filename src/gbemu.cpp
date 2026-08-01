@@ -19,12 +19,18 @@ GameBoy::initializeFromRom()
 
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
   m_isCgb = (cgbFlag & CGB_FLAG_MASK) != 0;
-  // Always boot as CGB hardware, matching how a real CGB console always
-  // runs its one fixed boot ROM regardless of what's inserted - the boot
-  // ROM itself reads this same header flag to decide whether to enter
-  // DMG-compatibility mode or native CGB mode for this cartridge, not
-  // something selected from outside by which binary we choose to run.
-  m_mmu.enableBootRom(cgbBootRom());
+  // ConsoleModel::Native gives each cartridge the physical console it
+  // actually targets (DMG-only carts boot as DMG, CGB-aware/required
+  // carts boot as CGB); ConsoleModel::Cgb always boots as CGB regardless,
+  // for deliberately running any cartridge - even a DMG-only one - in
+  // CGB compatibility mode, matching a real CGB console's one fixed boot
+  // ROM. Some hardware quirks genuinely differ between the two physical
+  // consoles even in compatibility mode (e.g. APU behavior on power-on -
+  // see Apu::setCgbMode()), so this is a real behavioral choice, not
+  // just which boot animation plays.
+  const bool bootAsCgb = m_isCgb || m_model == ConsoleModel::Cgb;
+  m_mmu.enableBootRom(bootAsCgb ? cgbBootRom() : dmgBootRom());
+  m_apu.setCgbMode(bootAsCgb);
   m_cpu.reset();
 
   return result;

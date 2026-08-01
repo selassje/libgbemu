@@ -350,10 +350,32 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 
   // While the APU is powered off, NR10-NR51 are read-only (see the NR52
   // handling above) - Wave RAM (0xFF30-0xFF3F) is deliberately excluded,
-  // it's always writable regardless of APU power state.
+  // it's always writable regardless of APU power state. The four length-
+  // timer registers (NR11/NR21/NR31/NR41) are a second, narrower
+  // exception: real hardware's length-counter load circuit bypasses the
+  // power gate entirely - see dmg_sound/11-regs after power.gb's own
+  // "While powered off, writes to NR41 are NOT ignored" comment. But for
+  // NR11/NR21 specifically, only their length bits (0-5) bypass it; the
+  // duty bits (6-7) sharing that same register are ordinary NR10-NR51
+  // bits, still read-only while off (confirmed by
+  // dmg_sound/01-registers.gb's own "when off, should ignore writes to
+  // registers" check) - so merge the new length bits into the existing
+  // stored duty bits rather than letting the whole byte through.
+  const bool isLengthTimerRegister =
+    address == regs::NR11 || address == regs::NR21 || address == regs::NR31 ||
+    address == regs::NR41;
   if (address >= APU_REGISTERS_START && address < regs::NR52 &&
       m_apuRegistersReadOnly) {
-    return;
+    if (!isLengthTimerRegister) {
+      return;
+    }
+    if (address == regs::NR11 || address == regs::NR21) {
+      static constexpr unsigned lengthBitsMask = 0b0011'1111U;
+      static constexpr unsigned dutyBitsMask = 0b1100'0000U;
+      value = static_cast<std::uint8_t>(
+        (static_cast<unsigned>(getByteRef(address)) & dutyBitsMask) |
+        (static_cast<unsigned>(value) & lengthBitsMask));
+    }
   }
 
   // Forward channel-register writes (NR10-NR44), NR50 (master volume) and
