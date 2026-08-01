@@ -669,7 +669,9 @@ Cpu::ldha8()
     advanceHardware(((m_mcycles + 3) * 4) - 2, m_mcycles + 3);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    advanceHardware((m_mcycles + 3) * 4);
+    // Writes become visible on the final T-cycle of the last machine cycle,
+    // before that T-cycle's hardware tick has completed.
+    advanceHardware(((m_mcycles + 3) * 4) - 1, m_mcycles + 3);
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
