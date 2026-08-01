@@ -458,16 +458,23 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         // on every trigger.
         m_wave.playback.waveRamIndex = 0;
         // Trigger also reloads the frequency timer from the (just-updated)
-        // period - same formula as WaveChannel::runNextTCycle()'s own
+        // period - same base formula as WaveChannel::runNextTCycle()'s own
         // reload. Without this, periodCounter would carry over unchanged
         // from however the channel was counting down before this trigger,
         // which is wrong: dmg_sound/09-wave read while on.gb specifically
         // depends on each iteration's freshly-triggered period determining
         // when the channel's first post-trigger Wave RAM fetch happens.
+        // triggerStartupDelay is a real DMG quirk on top of that reload:
+        // the channel's first post-trigger fetch happens 4 T-cycles later
+        // than the reload formula alone would predict - confirmed
+        // empirically against dmg_sound/09-wave read while on.gb's exact
+        // expected byte sequence (its own checksum, not just pass/fail).
         static constexpr std::uint16_t periodBase = 2048;
         static constexpr std::uint16_t periodMultiplier = 2;
+        static constexpr std::uint16_t triggerStartupDelay = 4;
         m_wave.playback.periodCounter = static_cast<std::uint16_t>(
-          (periodMultiplier * (periodBase - m_wave.configuration.period)) - 1);
+          (periodMultiplier * (periodBase - m_wave.configuration.period)) - 1 +
+          triggerStartupDelay);
       }
       break;
     }

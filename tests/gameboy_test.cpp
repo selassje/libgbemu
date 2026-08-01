@@ -691,7 +691,7 @@ TEST_CASE("dmg_sound 11-regs after power", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
-TEST_CASE("scratch: dmg_sound 09-wave read while on", "[.diag]")
+TEST_CASE("dmg_sound 09-wave read while on", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
                       "rom_singles" / "09-wave read while on.gb");
@@ -707,7 +707,8 @@ TEST_CASE("scratch: dmg_sound 09-wave read while on", "[.diag]")
   }
   REQUIRE(result.has_value());
 
-  std::cerr << "memoryOutput: " << gbemu::memoryOutput() << "\n";
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
 
   gbemu::memoryOutput().clear();
   gbemu::serialOutput().clear();

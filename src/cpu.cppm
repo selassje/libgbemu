@@ -74,16 +74,22 @@ private:
   // memory access made partway through an instruction sees hardware state
   // as of its own T-cycle, not just whatever was left over from the
   // *previous* instruction), then runs the timer's own DIV/TIMA catch-up
-  // math. Called at every point in an instruction handler that performs a
-  // memory access with currentTCycles = (m_mcycles + <M-cycles into this
-  // instruction that access happens at>) * 4 - the same checkpoints this
-  // used to only serve for the timer, at M-cycle granularity - plus once
-  // more at the end of runNextInstruction() with the instruction's final
-  // T-cycle total, to flush any of its own trailing cycles a
-  // mid-instruction checkpoint didn't already cover. Takes a T-cycle (not
-  // M-cycle) count specifically so a future caller *could* target a
-  // sub-M-cycle offset if a quirk ever needs it - every current call site
-  // still targets an exact M-cycle boundary.
+  // math up to timerMCycles - a separate parameter (not just
+  // currentTCycles/4) specifically so a caller needing sub-M-cycle
+  // precision for the *peripheral* observation point (see ldha8(), the
+  // only current user) doesn't also drag the timer's own, genuinely
+  // M-cycle-granular catch-up point backward with it. Called at every
+  // point in an instruction handler that performs a memory access - the
+  // same checkpoints this used to only serve for the timer, before it
+  // needed T-cycle precision - plus once more at the end of
+  // runNextInstruction() with the instruction's final cycle totals, to
+  // flush any of its own trailing cycles a mid-instruction checkpoint
+  // didn't already cover.
+  void advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles);
+  // Convenience overload for every call site *except* ldha8()'s Wave RAM
+  // read: currentTCycles is always an exact M-cycle multiple for these, so
+  // currentTCycles/4 is genuinely the same M-cycle the timer should catch
+  // up to.
   void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;
 

@@ -659,7 +659,14 @@ Cpu::ldha8()
   const auto address = static_cast<std::uint16_t>(IO_REGISTERS_BASE + offset);
 
   if (load) {
-    advanceHardware((m_mcycles + 3) * 4);
+    // The CPU samples the bus on T2 of the final machine cycle, not after
+    // the whole M-cycle completes - two T-cycles matters for timing-
+    // sensitive I/O reads (notably DMG CH3's narrow Wave RAM access
+    // window, see Apu::readWaveRam()). The timer's own M-cycle-granular
+    // catch-up point is unaffected (see advanceHardware()'s two-argument
+    // overload) - only Ppu/Mmu/Apu observe this instruction's read two
+    // T-cycles early.
+    advanceHardware(((m_mcycles + 3) * 4) - 2, m_mcycles + 3);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
     advanceHardware((m_mcycles + 3) * 4);
@@ -1362,6 +1369,18 @@ Cpu::handleInterrupts()
 void
 Cpu::advanceHardware(std::size_t currentTCycles)
 {
+  // Every other call site wants the timer caught up to exactly the same
+  // M-cycle its T-cycle target lands on (they're always exact multiples of
+  // 4) - only the two-argument overload's callers (see its own comment)
+  // need those to differ.
+  constexpr unsigned tCyclesPerMCycle = 4;
+  advanceHardware(currentTCycles, currentTCycles / tCyclesPerMCycle);
+}
+
+void
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
+{
   // One T-cycle at a time, in the same Ppu/Mmu/Apu order runNextFrame()
   // used to tick them in wholesale after each instruction - preserved
   // exactly so moving this earlier/more granular doesn't change the total
@@ -1379,15 +1398,16 @@ Cpu::advanceHardware(std::size_t currentTCycles)
     ++m_syncedTCycles;
   }
 
-  // The timer's own DIV/TIMA catch-up math is inherently M-cycle grained
-  // (that's the real hardware's own granularity for it) - truncating here
-  // is fine even when currentTCycles lands mid-M-cycle (as it now can, see
-  // above): any tick this misses because it's not yet a whole M-cycle gets
-  // picked up by the next call once currentTCycles/tCyclesPerMCycle
-  // advances past it, same as the timer already tolerated no-op calls at
-  // an M-cycle it had already caught up to.
-  constexpr unsigned tCyclesPerMCycle = 4;
-  const auto currentMCycles = currentTCycles / tCyclesPerMCycle;
+  // timerMCycles is deliberately a separate parameter from currentTCycles,
+  // not just currentTCycles/4: the timer's own DIV/TIMA catch-up is
+  // M-cycle grained on real hardware and genuinely doesn't move just
+  // because a specific instruction's *peripheral* observation point (see
+  // above) needs sub-M-cycle precision - ldha8()'s Wave RAM read
+  // deliberately ticks Ppu/Mmu/Apu a couple of T-cycles early without
+  // fooling the timer into catching up a whole M-cycle early too (integer
+  // division would otherwise round currentTCycles/4 down to the *previous*
+  // M-cycle, not just a few T-cycles short of the current one).
+  const auto currentMCycles = timerMCycles;
   const auto tac = m_mmu.get().readByte(regs::TAC);
   const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
   const auto timerFrequencyBits =
