@@ -760,7 +760,7 @@ TEST_CASE("dmg_sound 12-wave write while on", "[GameBoy]")
   gbemu::serialOutput().clear();
 }
 
-TEST_CASE("scratch: cgb-acid2", "[.diag]")
+TEST_CASE("cgb-acid2", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
   auto reference =
