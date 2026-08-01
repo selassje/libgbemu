@@ -3,15 +3,17 @@ export module gbemu:cpu;
 import std;
 import :mmu;
 import :ppu;
+import :apu;
 
 namespace gbemu {
 
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
-  Cpu(Mmu& mmu, Ppu& ppu)
+  Cpu(Mmu& mmu, Ppu& ppu, Apu& apu)
     : m_mmu(mmu)
     , m_ppu(ppu)
+    , m_apu(apu)
   {
   }
 
@@ -46,9 +48,15 @@ private:
 
   std::size_t m_mcycles{ 0 };
   std::size_t m_lastTimerMCycles{ 0 };
+  // How many Ppu/Mmu/Apu T-cycles have already been run, in the same
+  // absolute-T-cycle numbering advanceHardware() is called with (4x
+  // m_mcycles' numbering) - see advanceHardware()'s comment for why this
+  // needs T-cycle, not M-cycle, granularity.
+  std::size_t m_syncedTCycles{ 0 };
 
   std::reference_wrapper<Mmu> m_mmu;
   std::reference_wrapper<Ppu> m_ppu;
+  std::reference_wrapper<Apu> m_apu;
 
   using InstructionFun = std::size_t (Cpu::*)();
 
@@ -62,7 +70,27 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   void handleInterrupts();
-  void handleTimer(std::size_t currentMCycles);
+  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time (so a
+  // memory access made partway through an instruction sees hardware state
+  // as of its own T-cycle, not just whatever was left over from the
+  // *previous* instruction), then runs the timer's own DIV/TIMA catch-up
+  // math up to timerMCycles - a separate parameter (not just
+  // currentTCycles/4) specifically so a caller needing sub-M-cycle
+  // precision for the *peripheral* observation point (see ldha8(), the
+  // only current user) doesn't also drag the timer's own, genuinely
+  // M-cycle-granular catch-up point backward with it. Called at every
+  // point in an instruction handler that performs a memory access - the
+  // same checkpoints this used to only serve for the timer, before it
+  // needed T-cycle precision - plus once more at the end of
+  // runNextInstruction() with the instruction's final cycle totals, to
+  // flush any of its own trailing cycles a mid-instruction checkpoint
+  // didn't already cover.
+  void advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles);
+  // Convenience overload for every call site *except* ldha8()'s Wave RAM
+  // read: currentTCycles is always an exact M-cycle multiple for these, so
+  // currentTCycles/4 is genuinely the same M-cycle the timer should catch
+  // up to.
+  void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;
 
   std::size_t nop();

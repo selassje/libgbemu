@@ -228,6 +228,13 @@ Mmu::readByte(std::uint16_t address) const
     constexpr std::uint8_t unwiredReadsAsAllOnes = 0xFF;
     return unwiredReadsAsAllOnes;
   }
+  // Wave RAM's CPU-visible value depends on live CH3 playback state (see
+  // Apu::readWaveRam()) while the channel is enabled on DMG, not just the
+  // stored byte.
+  if (address >= regs::WAVE_RAM_START &&
+      address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
+    return m_apu.get().readWaveRam(address);
+  }
   return value;
 }
 
