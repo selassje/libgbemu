@@ -481,6 +481,7 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         // Real hardware restarts Wave RAM playback from its first sample
         // on every trigger.
         m_wave.playback.waveRamIndex = 0;
+        m_wave.playback.hasFetchedWaveRam = false;
         // Trigger also reloads the frequency timer from the (just-updated)
         // period - same base formula as WaveChannel::runNextTCycle()'s own
         // reload. Without this, periodCounter would carry over unchanged
@@ -681,16 +682,19 @@ Apu::writeWaveRam(std::uint16_t address, std::uint8_t value)
     m_wave.configuration.waveRam.at(address - regs::WAVE_RAM_START) = value;
     return;
   }
-  // Mirrors readWaveRam()'s gating: while enabled, the requested address
-  // is ignored - the write lands on whatever byte CH3 is currently
-  // playing instead, and only takes effect at all on DMG during the
-  // narrow T-cycle window the channel itself fetches that byte (dropped
-  // entirely on any other T-cycle). CGB has no such restriction. See
+  // While enabled, the requested address is ignored and the write uses
+  // CH3's current Wave RAM byte. On DMG the CPU's write strobe is accepted
+  // in the post-fetch phase represented by periodCounter == 2 in this
+  // countdown convention. CGB has no such restriction. See
   // dmg_sound/12-wave write while on.gb.
-  if (!m_isCgbHardware && !m_wave.playback.waveRamAccessWindow) {
+  static constexpr std::uint16_t dmgWriteAccessCounter = 2;
+  if (!m_isCgbHardware &&
+      (m_wave.playback.periodCounter != dmgWriteAccessCounter ||
+       !m_wave.playback.hasFetchedWaveRam)) {
     return;
   }
-  m_wave.configuration.waveRam.at(m_wave.playback.waveRamIndex / 2) = value;
+  const std::size_t byteIndex = m_wave.playback.waveRamIndex / 2;
+  m_wave.configuration.waveRam.at(byteIndex) = value;
 }
 
 std::uint8_t
@@ -851,6 +855,7 @@ Apu::WaveChannel::runNextTCycle()
     playback.output = static_cast<std::uint8_t>(
       nibble >> outputShift.at(configuration.outputLevel));
     playback.waveRamAccessWindow = true;
+    playback.hasFetchedWaveRam = true;
   } else {
     playback.waveRamAccessWindow = false;
     --playback.periodCounter;

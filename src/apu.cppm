@@ -315,6 +315,10 @@ private:
       // fetches a new sample byte - see Apu::readWaveRam(). Cleared again
       // on every other T-cycle, including the very next one.
       bool waveRamAccessWindow{ false };
+      // Distinguishes trigger startup from the same counter phase during
+      // steady playback. CPU Wave RAM writes remain blocked until CH3's
+      // first post-trigger fetch.
+      bool hasFetchedWaveRam{ false };
     } playback;
 
     void runNextTCycle();
