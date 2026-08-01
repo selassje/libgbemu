@@ -770,12 +770,6 @@ TEST_CASE("cgb-acid2", "[GameBoy]")
   auto result = gb.loadRom(rom);
   REQUIRE(result.has_value());
 
-  // Not yet passing: this exercises CGB *native* mode rendering (per-tile
-  // VRAM-bank-1 attributes, 8 BG/8 OBJ palettes, CGB priority rules),
-  // which isn't implemented yet - see Ppu::setHardwareMode()'s comment.
-  // framesToStabilize is copied from dmg-acid2's own empirically-found
-  // value as a starting point, not independently verified against this
-  // ROM's own animation - revisit once native-mode rendering exists.
   constexpr int framesToStabilize = 120;
   for (int i = 0; i < framesToStabilize - 1; ++i) {
     const auto frameResult = gb.runNextFrame();

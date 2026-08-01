@@ -30,8 +30,7 @@ enum class HardwareMode : std::uint8_t // NOLINT(misc-use-internal-linkage)
   CgbCompatibility,
   // CGB hardware running a cartridge that does declare CGB support -
   // native CGB rendering features (VRAM bank 1 tile attributes, 8 BG/8
-  // OBJ palettes, CGB priority rules, ...) apply. Not fully implemented
-  // yet - see Ppu::setHardwareMode()'s comment.
+  // OBJ palettes, CGB priority rules, ...) apply.
   CgbNative,
 };
 

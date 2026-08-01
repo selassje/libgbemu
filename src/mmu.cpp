@@ -257,6 +257,15 @@ Mmu::readByte(std::uint16_t address) const
     constexpr unsigned unusedBit = 0b0100'0000U;
     return static_cast<std::uint8_t>(static_cast<unsigned>(value) | unusedBit);
   }
+  if (address == regs::OPRI) {
+    if (!m_isCgbHardware) {
+      return 0xFF;
+    }
+    constexpr unsigned priorityModeBit = 0x01U;
+    constexpr unsigned unusedBits = 0xFEU;
+    return static_cast<std::uint8_t>(
+      (static_cast<unsigned>(value) & priorityModeBit) | unusedBits);
+  }
   // CGB-only: reads back the byte of BG/object palette RAM BCPS/OCPS
   // currently indexes - see bgPaletteColor()/objPaletteColor(). Real DMG
   // hardware doesn't have BCPD/OCPD at all.

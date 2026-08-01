@@ -123,9 +123,8 @@ public:
   // which bank *CPU* accesses land on, but the PPU's fetch logic needs a
   // specific bank per purpose (bank 0 for tile map indices/pixel data;
   // bank 1 only for the CGB tile-attribute byte at the same tile-map
-  // address, or for pixel data when that attribute's bank bit says so -
-  // not yet read by anything, see Ppu::setCgbMode()'s comment on native
-  // mode). Using readByte() here would make the PPU's fetches silently
+  // address, or for pixel data when that attribute's bank bit says so).
+  // Using readByte() here would make the PPU's fetches silently
   // follow whatever the CPU last left VBK as, corrupting tile data for
   // any CGB game that leaves VBK=1 selected after setting up attributes.
   // bank is masked to 0-1 (VRAM only ever has 2 banks) - out-of-range

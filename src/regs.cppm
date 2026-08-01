@@ -33,6 +33,7 @@ export constexpr std::uint16_t BCPS = 0xFF68;
 export constexpr std::uint16_t BCPD = 0xFF69;
 export constexpr std::uint16_t OCPS = 0xFF6A;
 export constexpr std::uint16_t OCPD = 0xFF6B;
+export constexpr std::uint16_t OPRI = 0xFF6C;
 export constexpr std::uint16_t IE = 0xFFFF;
 export constexpr std::uint16_t SCX = 0xFF43;
 export constexpr std::uint16_t SCY = 0xFF42;
