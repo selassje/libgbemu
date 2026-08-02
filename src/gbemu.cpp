@@ -10,6 +10,20 @@ constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
 constexpr std::uint8_t CGB_SUPPORTED_MASK = 0x80;
 constexpr std::uint8_t CGB_REQUIRED_MASK = 0xC0;
 
+// Written first, unconditionally, by every saveState() call - lets
+// loadState() reject a file that isn't a gbemu save state at all (wrong
+// ROM's save, a corrupted download, an unrelated file) with a clear error
+// right away, rather than either misreading it as valid or failing with a
+// confusing error from deep inside some component's own deserialize().
+constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
+// Bumped whenever the save-state layout changes (a component gains/loses/
+// reorders a serialized field) - loadState() requires an exact match, no
+// migration or partial-load attempt for an older/newer version. See
+// serialization.cppm's own comment on C++26 reflection eventually
+// replacing the hand-maintained per-field serialize()/deserialize() calls
+// this version number protects against silently misreading.
+constexpr std::uint32_t SAVE_STATE_VERSION = 1;
+
 }
 
 namespace gbemu {
@@ -131,6 +145,63 @@ void
 GameBoy::setButtonState(Button button, bool pressed)
 {
   m_mmu.setButtonState(button, pressed);
+}
+
+std::vector<std::uint8_t>
+GameBoy::saveState() const
+{
+  SaveStateWriter writer;
+  writer.writeBytes(SAVE_STATE_MAGIC);
+  writer.writeU32(SAVE_STATE_VERSION);
+  m_cpu.serialize(writer);
+  m_mmu.serialize(writer);
+  m_ppu.serialize(writer);
+  m_apu.serialize(writer);
+  return writer.bytes();
+}
+
+std::expected<void, std::string>
+GameBoy::loadState(std::span<const std::uint8_t> data)
+{
+  SaveStateReader reader{ data };
+  std::array<std::uint8_t, SAVE_STATE_MAGIC.size()> magic{};
+  try {
+    reader.readBytes(magic);
+  } catch (const std::out_of_range&) {
+    return std::unexpected("not a gbemu save state (too short)");
+  }
+  if (magic != SAVE_STATE_MAGIC) {
+    return std::unexpected("not a gbemu save state (bad magic)");
+  }
+
+  std::uint32_t version{};
+  try {
+    version = reader.readU32();
+  } catch (const std::out_of_range&) {
+    return std::unexpected("not a gbemu save state (truncated header)");
+  }
+  if (version != SAVE_STATE_VERSION) {
+    return std::unexpected(
+      "save state version mismatch (this build supports version " +
+      std::to_string(SAVE_STATE_VERSION) + ", file is version " +
+      std::to_string(version) + ")");
+  }
+
+  // Magic and version are already verified above, so only a truncated or
+  // otherwise corrupt body can throw here - by this point some component's
+  // deserialize() may already have mutated its own state before the
+  // exception (unlike the magic/version check above, which never touches
+  // any component), so a save file that fails here shouldn't be trusted to
+  // resume correctly even after this returns an error.
+  try {
+    m_cpu.deserialize(reader);
+    m_mmu.deserialize(reader);
+    m_ppu.deserialize(reader);
+    m_apu.deserialize(reader);
+  } catch (const std::out_of_range&) {
+    return std::unexpected("corrupt or truncated save state");
+  }
+  return {};
 }
 
 };

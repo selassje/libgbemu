@@ -2,6 +2,7 @@ export module gbemu:ppu;
 
 import :mmu;
 import :hardware_mode;
+import :serialization;
 
 namespace gbemu {
 
@@ -40,6 +41,11 @@ public:
   // VRAM-bank-1 tile attributes, palettes 0-7, and CGB priority rules
   // instead; Fetcher and handlePixelTransfer() implement those rules.
   void setHardwareMode(HardwareMode mode) { m_hardwareMode = mode; }
+
+  // Save-state support (see GameBoy::saveState()/loadState()) - every data
+  // member below except m_mmu (owned separately).
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
 
 private:
   // Defaults to Dmg purely so a default-constructed Ppu has a well-defined
@@ -117,6 +123,30 @@ private:
     [[nodiscard]] bool empty() const { return m_size == 0; }
     [[nodiscard]] std::size_t size() const { return m_size; }
 
+    // All 16 buffer slots are written/read unconditionally, in fixed
+    // slot order, regardless of how many (m_size) are currently logical -
+    // simpler than only covering the logical range, and just as exact:
+    // m_head/m_size (written first) are what define which slots are
+    // logically live again on the read side, so slots outside that range
+    // round-trip as inert bytes either way.
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeSize(m_head);
+      writer.writeSize(m_size);
+      for (const auto& pixel : m_buffer) {
+        pixel.serialize(writer);
+      }
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      m_head = reader.readSize();
+      m_size = reader.readSize();
+      for (auto& pixel : m_buffer) {
+        pixel.deserialize(reader);
+      }
+    }
+
   private:
     [[nodiscard]] T& at(std::size_t index)
     {
@@ -140,6 +170,26 @@ private:
     std::uint8_t tileIndex{};
     std::uint8_t attributes{};
     bool isFetched{ false };
+
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeU8(oamIndex);
+      writer.writeU8(yPos);
+      writer.writeU8(xPos);
+      writer.writeU8(tileIndex);
+      writer.writeU8(attributes);
+      writer.writeBool(isFetched);
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      oamIndex = reader.readU8();
+      yPos = reader.readU8();
+      xPos = reader.readU8();
+      tileIndex = reader.readU8();
+      attributes = reader.readU8();
+      isFetched = reader.readBool();
+    }
   };
   class Fetcher
   {
@@ -161,6 +211,9 @@ private:
     {
       return m_mode == Mode::Object;
     }
+
+    void serialize(SaveStateWriter& writer) const;
+    void deserialize(SaveStateReader& reader);
 
   private:
     enum class State : std::uint8_t
@@ -195,6 +248,20 @@ private:
     std::uint8_t colorIndex{};
     std::uint8_t palette{};
     bool priority{};
+
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeU8(colorIndex);
+      writer.writeU8(palette);
+      writer.writeBool(priority);
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      colorIndex = reader.readU8();
+      palette = reader.readU8();
+      priority = reader.readBool();
+    }
   };
 
   // A decoded object-FIFO pixel. objectX and oamIndex exist purely for
@@ -212,6 +279,24 @@ private:
     std::uint8_t objectX{};
     std::uint8_t oamIndex{};
     bool behindBackground{};
+
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeU8(colorIndex);
+      writer.writeU8(palette);
+      writer.writeU8(objectX);
+      writer.writeU8(oamIndex);
+      writer.writeBool(behindBackground);
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      colorIndex = reader.readU8();
+      palette = reader.readU8();
+      objectX = reader.readU8();
+      oamIndex = reader.readU8();
+      behindBackground = reader.readBool();
+    }
   };
 
   std::array<Object, 10> m_objects{};

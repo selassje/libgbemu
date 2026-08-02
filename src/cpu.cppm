@@ -4,6 +4,7 @@ import std;
 import :mmu;
 import :ppu;
 import :apu;
+import :serialization;
 
 namespace gbemu {
 
@@ -25,6 +26,13 @@ public:
 
   std::expected<std::size_t, std::string> runNextInstruction();
   [[nodiscard]] std::size_t baseTCycles() const { return m_baseTCycles; }
+
+  // Save-state support (see GameBoy::saveState()/loadState()) - every data
+  // member below except the Mmu/Ppu/Apu references (owned/reloaded
+  // separately) and the static instruction table (fixed, not runtime
+  // state).
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
 
 private:
   enum class Flag : std::uint8_t

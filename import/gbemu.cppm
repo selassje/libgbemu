@@ -8,6 +8,7 @@ export import :mmu;
 export import :ppu;
 export import :boot_rom;
 export import :regs;
+export import :serialization;
 // Structurally required (an interface partition must be reachable from
 // the primary module interface), but the HardwareMode enum it declares
 // isn't itself marked `export` - see its own comment for why that keeps
@@ -91,6 +92,25 @@ public:
 
   std::expected<EmulationFrame, std::string> runNextFrame();
   void setButtonState(Button button, bool pressed);
+
+  // Captures Cpu/Mmu/Ppu/Apu state (everything except the cartridge ROM
+  // and boot ROM data - see Mmu::serialize()'s own comment) into a
+  // self-contained buffer a frontend can write to disk/localStorage as-is
+  // and hand back to loadState() later, on either this build or another
+  // (native <-> Emscripten/wasm) - see SaveStateWriter/SaveStateReader's
+  // own comments on why the encoding is portable across both.
+  [[nodiscard]] std::vector<std::uint8_t> saveState() const;
+
+  // Restores state written by saveState() - callers are expected to have
+  // already loadRom()'d the same cartridge this save was made against
+  // (see Mmu::serialize()'s comment on why the ROM itself isn't part of
+  // the save file). Rejects (without touching any component's own state)
+  // a buffer that doesn't start with the expected magic tag or whose
+  // format version doesn't exactly match SAVE_STATE_VERSION - no
+  // partial-load or cross-version migration attempt, the same
+  // fail-closed approach loadRom() takes for its own untrusted input.
+  [[nodiscard]] std::expected<void, std::string> loadState(
+    std::span<const std::uint8_t> data);
 
 private:
   // Reconstructs Mmu/Ppu/Cpu from scratch (guaranteeing every field
