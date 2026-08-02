@@ -33,6 +33,96 @@ runFor(std::chrono::duration<std::size_t, std::milli> duration,
   return {};
 }
 
+// Shared by every blargg-style ROM test below: load it, run it for the given
+// duration, then check whichever output channel that ROM's shell reports
+// through (see Mmu.cppm's comment on memoryOutput() for why some use that
+// instead of the serial port).
+void
+loadAndRun(gbemu::GameBoy& gb,
+           const std::filesystem::path& romPath,
+           std::chrono::milliseconds duration)
+{
+  auto rom = readFile(romPath);
+  auto result = gb.loadRom(rom);
+  REQUIRE(result.has_value());
+
+  result = runFor(duration, gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+  REQUIRE(result.has_value());
+}
+
+void
+expectSerialPass(gbemu::GameBoy& gb,
+                 const std::filesystem::path& romPath,
+                 std::chrono::milliseconds duration)
+{
+  loadAndRun(gb, romPath, duration);
+  REQUIRE_THAT(gbemu::serialOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::serialOutput().clear();
+}
+
+void
+expectMemoryPass(gbemu::GameBoy& gb,
+                 const std::filesystem::path& romPath,
+                 std::chrono::milliseconds duration)
+{
+  loadAndRun(gb, romPath, duration);
+  REQUIRE_THAT(gbemu::memoryOutput(),
+               Catch::Matchers::ContainsSubstring("Passed"));
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
+}
+
+// Runs framesToStabilize frames, failing loudly (via FAIL(), same as every
+// other test here) on any frame error, and returns the last one for the
+// caller to compare against a reference image.
+gbemu::EmulationFrame
+stabilizeAndGetFrame(gbemu::GameBoy& gb, int framesToStabilize)
+{
+  for (int i = 0; i < framesToStabilize - 1; ++i) {
+    const auto frameResult = gb.runNextFrame();
+    if (!frameResult) {
+      FAIL("Error : " + frameResult.error());
+    }
+  }
+  const auto frame = gb.runNextFrame();
+  if (!frame) {
+    FAIL("Error : " + frame.error());
+  }
+  REQUIRE(frame.has_value());
+  return *frame;
+}
+
+}
+
+// Expands to a full TEST_CASE - one line per ROM instead of the ~15-line
+// load/run/assert boilerplate repeated for each one. relPath is joined onto
+// GB_TEST_ROMS_DIR, same as every one of these tests already did by hand.
+// NOLINTBEGIN(cppcoreguidelines-macro-usage) - a constexpr function can't
+// generate a named TEST_CASE; Catch2's own registration mechanism is a
+// macro, so there's no non-macro way to do this.
+#define GB_SERIAL_ROM_TEST(name, relPath, ms)                                  \
+  TEST_CASE(name, "[GameBoy]")                                                 \
+  {                                                                            \
+    gbemu::GameBoy gb{};                                                       \
+    expectSerialPass(gb,                                                       \
+                     std::filesystem::path(GB_TEST_ROMS_DIR) / (relPath),      \
+                     std::chrono::milliseconds(ms));                           \
+  }
+
+#define GB_MEMORY_ROM_TEST(name, relPath, ms)                                  \
+  TEST_CASE(name, "[GameBoy]")                                                 \
+  {                                                                            \
+    gbemu::GameBoy gb{};                                                       \
+    expectMemoryPass(gb,                                                       \
+                     std::filesystem::path(GB_TEST_ROMS_DIR) / (relPath),      \
+                     std::chrono::milliseconds(ms));                           \
+  }
+// NOLINTEND(cppcoreguidelines-macro-usage)
+
 TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
 {
   std::vector<std::uint8_t> rom(gbemu::MIN_ROM_SIZE - 1, 0);
@@ -53,265 +143,22 @@ TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
   REQUIRE(result.has_value());
 }
 
-TEST_CASE("06-ld r,r", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "06-ld r,r.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(1000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("04-op r,imm", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "04-op r,imm.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("03-op sp,hl", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "03-op sp,hl.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("01-special", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "01-special.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("05-op rp", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "05-op rp.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("07-jr,jp,call,ret,rst", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "07-jr,jp,call,ret,rst.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("08-misc instrs", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "08-misc instrs.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("09-op r,r", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "09-op r,r.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("10-bit ops", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "10-bit ops.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("11-op a,(hl)", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "11-op a,(hl).gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("02-interrupts", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "individual" / "02-interrupts.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("instr_timing", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "instr_timing" /
-                      "instr_timing.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("mem_timing", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "mem_timing" /
-                      "mem_timing.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
+// clang-format off
+GB_SERIAL_ROM_TEST("06-ld r,r", "cpu_instrs/individual/06-ld r,r.gb", 1000)
+GB_SERIAL_ROM_TEST("04-op r,imm", "cpu_instrs/individual/04-op r,imm.gb", 20000)
+GB_SERIAL_ROM_TEST("03-op sp,hl", "cpu_instrs/individual/03-op sp,hl.gb", 20000)
+GB_SERIAL_ROM_TEST("01-special", "cpu_instrs/individual/01-special.gb", 20000)
+GB_SERIAL_ROM_TEST("05-op rp", "cpu_instrs/individual/05-op rp.gb", 20000)
+GB_SERIAL_ROM_TEST("07-jr,jp,call,ret,rst", "cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", 20000)
+GB_SERIAL_ROM_TEST("08-misc instrs", "cpu_instrs/individual/08-misc instrs.gb", 20000)
+GB_SERIAL_ROM_TEST("09-op r,r", "cpu_instrs/individual/09-op r,r.gb", 20000)
+GB_SERIAL_ROM_TEST("10-bit ops", "cpu_instrs/individual/10-bit ops.gb", 20000)
+GB_SERIAL_ROM_TEST("11-op a,(hl)", "cpu_instrs/individual/11-op a,(hl).gb", 20000)
+GB_SERIAL_ROM_TEST("02-interrupts", "cpu_instrs/individual/02-interrupts.gb", 20000)
+GB_SERIAL_ROM_TEST("instr_timing", "instr_timing/instr_timing.gb", 20000)
+GB_SERIAL_ROM_TEST("mem_timing", "mem_timing/mem_timing.gb", 20000)
+GB_SERIAL_ROM_TEST("cpu_instrs (combined)", "cpu_instrs/cpu_instrs.gb", 55000)
+// clang-format on
 
 TEST_CASE("halt_bug", "[GameBoy]")
 {
@@ -335,50 +182,22 @@ TEST_CASE("halt_bug", "[GameBoy]")
   gbemu::memoryOutput().clear();
 }
 
-TEST_CASE("mem_timing-2", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "mem_timing-2" /
-                      "mem_timing.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  // mem_timing-2 uses the newer shell, which reports its result via
-  // cartridge RAM (memoryOutput()) rather than the serial port.
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("interrupt_time", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
-                      "interrupt_time" / "interrupt_time.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
+// clang-format off
+GB_MEMORY_ROM_TEST("mem_timing-2", "mem_timing-2/mem_timing.gb", 20000)
+GB_MEMORY_ROM_TEST("interrupt_time", "interrupt_time/interrupt_time.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 01-registers", "dmg_sound/rom_singles/01-registers.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 02-len ctr", "dmg_sound/rom_singles/02-len ctr.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 03-trigger", "dmg_sound/rom_singles/03-trigger.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 04-sweep", "dmg_sound/rom_singles/04-sweep.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 05-sweep details", "dmg_sound/rom_singles/05-sweep details.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 06-overflow on trigger", "dmg_sound/rom_singles/06-overflow on trigger.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 07-len sweep period sync", "dmg_sound/rom_singles/07-len sweep period sync.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 08-len ctr during power", "dmg_sound/rom_singles/08-len ctr during power.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 11-regs after power", "dmg_sound/rom_singles/11-regs after power.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 09-wave read while on", "dmg_sound/rom_singles/09-wave read while on.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 10-wave trigger while on", "dmg_sound/rom_singles/10-wave trigger while on.gb", 20000)
+GB_MEMORY_ROM_TEST("dmg_sound 12-wave write while on", "dmg_sound/rom_singles/12-wave write while on.gb", 20000)
+// clang-format on
 
 TEST_CASE("dmg-acid2", "[GameBoy]")
 {
@@ -402,21 +221,11 @@ TEST_CASE("dmg-acid2", "[GameBoy]")
   // 200 matches too (the ROM's own animation is fully periodic once Main:
   // is running), so 120 gives a comfortable stable margin.
   constexpr int framesToStabilize = 120;
-  for (int i = 0; i < framesToStabilize - 1; ++i) {
-    const auto frameResult = gb.runNextFrame();
-    if (!frameResult) {
-      FAIL("Error : " + frameResult.error());
-    }
-  }
-  const auto frame = gb.runNextFrame();
-  if (!frame) {
-    FAIL("Error : " + frame.error());
-  }
-  REQUIRE(frame.has_value());
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(reference.size() == frame->pixels.size());
-  REQUIRE(std::equal(
-    reference.begin(), reference.end(), frame->pixels.data_handle()));
+  REQUIRE(reference.size() == frame.pixels.size());
+  REQUIRE(
+    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
 TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
@@ -430,321 +239,16 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
   REQUIRE(result.has_value());
 
   constexpr int framesToStabilize = 120;
-  for (int i = 0; i < framesToStabilize; ++i) {
-    const auto frameResult = gb.runNextFrame();
-    if (!frameResult) {
-      FAIL("Error : " + frameResult.error());
-    }
-  }
+  stabilizeAndGetFrame(gb, framesToStabilize);
 
   auto resetResult = gb.reset();
   REQUIRE(resetResult.has_value());
 
-  for (int i = 0; i < framesToStabilize - 1; ++i) {
-    const auto frameResult = gb.runNextFrame();
-    if (!frameResult) {
-      FAIL("Error : " + frameResult.error());
-    }
-  }
-  const auto frame = gb.runNextFrame();
-  if (!frame) {
-    FAIL("Error : " + frame.error());
-  }
-  REQUIRE(frame.has_value());
-
-  REQUIRE(reference.size() == frame->pixels.size());
-  REQUIRE(std::equal(
-    reference.begin(), reference.end(), frame->pixels.data_handle()));
-}
-
-TEST_CASE("cpu_instrs (combined)", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "cpu_instrs" /
-                      "cpu_instrs.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(55000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-  REQUIRE_THAT(gbemu::serialOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 01-registers", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "01-registers.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  // Reports via cartridge RAM (memoryOutput()), not the serial port - see
-  // Mmu.cppm's comment on memoryOutput() for why blargg's newer test
-  // shells use this channel instead of serial.
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 02-len ctr", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "02-len ctr.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 03-trigger", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "03-trigger.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 04-sweep", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "04-sweep.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 05-sweep details", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "05-sweep details.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 06-overflow on trigger", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "06-overflow on trigger.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 07-len sweep period sync", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "07-len sweep period sync.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 08-len ctr during power", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "08-len ctr during power.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 11-regs after power", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "11-regs after power.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 09-wave read while on", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "09-wave read while on.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 10-wave trigger while on", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "10-wave trigger while on.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
-}
-
-TEST_CASE("dmg_sound 12-wave write while on", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "dmg_sound" /
-                      "rom_singles" / "12-wave write while on.gb");
-  gbemu::GameBoy gb{};
-
-  auto result = gb.loadRom(rom);
-
-  REQUIRE(result.has_value());
-
-  result = runFor(std::chrono::milliseconds(20000), gb);
-  if (!result.has_value()) {
-    FAIL("Error : " + result.error());
-  }
-  REQUIRE(result.has_value());
-
-  REQUIRE_THAT(gbemu::memoryOutput(),
-               Catch::Matchers::ContainsSubstring("Passed"));
-
-  gbemu::memoryOutput().clear();
-  gbemu::serialOutput().clear();
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(reference.size() == frame.pixels.size());
+  REQUIRE(
+    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
 TEST_CASE("cgb-acid2", "[GameBoy]")
@@ -758,21 +262,11 @@ TEST_CASE("cgb-acid2", "[GameBoy]")
   REQUIRE(result.has_value());
 
   constexpr int framesToStabilize = 120;
-  for (int i = 0; i < framesToStabilize - 1; ++i) {
-    const auto frameResult = gb.runNextFrame();
-    if (!frameResult) {
-      FAIL("Error : " + frameResult.error());
-    }
-  }
-  const auto frame = gb.runNextFrame();
-  if (!frame) {
-    FAIL("Error : " + frame.error());
-  }
-  REQUIRE(frame.has_value());
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(reference.size() == frame->pixels.size());
-  REQUIRE(std::equal(
-    reference.begin(), reference.end(), frame->pixels.data_handle()));
+  REQUIRE(reference.size() == frame.pixels.size());
+  REQUIRE(
+    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
 TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",
@@ -788,6 +282,4 @@ TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",
   auto result = gb.loadRom(rom);
 
   REQUIRE_FALSE(result.has_value());
-}
-
 }
