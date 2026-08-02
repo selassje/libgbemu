@@ -53,10 +53,18 @@ target_sources(
 # own). CMake's CXX_MODULE_STD explicitly refuses Clang+MSVC-STL ("Only libc++
 # and libstdc++ are supported"), so clang needs std.ixx pointed out manually
 # instead - same workaround aoc uses for MSVC, repurposed here for the toolchain
-# CMake doesn't support at all.
+# CMake doesn't support at all. Excludes Emscripten: emcc also reports
+# CMAKE_CXX_COMPILER_ID "Clang" (it's a clang wrapper), but on a Windows host
+# targeting wasm there's no MSVC STL involved at all - the Emscripten
+# toolchain provides its own std module via
+# CMAKE_CXX_MODULE_STD/CMAKE_EXPERIMENTAL_CXX_IMPORT_STD instead, and
+# $ENV{VcToolsInstallDir} is unset outside an MSVC dev shell, which without
+# this guard resolved STD_MODULE_DIR to a bare "/modules" and failed to find
+# "/modules/std.ixx".
 if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
    AND ${CMAKE_GENERATOR} STREQUAL "Ninja"
-   AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+   AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang"
+   AND NOT EMSCRIPTEN)
   set(VC_TOOLS_INSTALL_DIR "$ENV{VcToolsInstallDir}")
   set(STD_MODULE_DIR ${VC_TOOLS_INSTALL_DIR}/modules)
   set(STD_MODULE ${STD_MODULE_DIR}/std.ixx)
