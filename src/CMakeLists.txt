@@ -55,11 +55,11 @@ target_sources(
 # instead - same workaround aoc uses for MSVC, repurposed here for the toolchain
 # CMake doesn't support at all. Excludes Emscripten: emcc also reports
 # CMAKE_CXX_COMPILER_ID "Clang" (it's a clang wrapper), but on a Windows host
-# targeting wasm there's no MSVC STL involved at all - the Emscripten
-# toolchain provides its own std module via
+# targeting wasm there's no MSVC STL involved at all - the Emscripten toolchain
+# provides its own std module via
 # CMAKE_CXX_MODULE_STD/CMAKE_EXPERIMENTAL_CXX_IMPORT_STD instead, and
-# $ENV{VcToolsInstallDir} is unset outside an MSVC dev shell, which without
-# this guard resolved STD_MODULE_DIR to a bare "/modules" and failed to find
+# $ENV{VcToolsInstallDir} is unset outside an MSVC dev shell, which without this
+# guard resolved STD_MODULE_DIR to a bare "/modules" and failed to find
 # "/modules/std.ixx".
 if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
    AND ${CMAKE_GENERATOR} STREQUAL "Ninja"
