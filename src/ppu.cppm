@@ -109,7 +109,11 @@ private:
       }
     }
 
-    void clear() { m_head = m_size = 0; }
+    void clear()
+    {
+      m_head = 0;
+      m_size = 0;
+    }
     [[nodiscard]] bool empty() const { return m_size == 0; }
     [[nodiscard]] std::size_t size() const { return m_size; }
 

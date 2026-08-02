@@ -169,7 +169,8 @@ private:
       // setting, not the live period counter (see PlaybackState).
       std::uint16_t period{ 0 };
       bool isLengthEnabled{ false };
-    } configuration;
+    };
+    Configuration configuration;
 
     // What's actually happening right now - mutated by runNextTCycle()/the
     // frame sequencer, not directly by register writes.
@@ -205,7 +206,8 @@ private:
       // duty waveform is a 1-bit-per-step multiplier, not an amplitude of
       // its own).
       std::uint8_t output{ 0 };
-    } playback;
+    };
+    PlaybackState playback;
 
     void runNextTCycle();
 
@@ -295,7 +297,8 @@ private:
       // via Apu::writeWaveRam() - 32 4-bit samples, two per byte (high
       // nibble played before low), read by runNextTCycle().
       std::array<std::uint8_t, 16> waveRam{};
-    } configuration;
+    };
+    Configuration configuration;
 
     struct PlaybackState
     {
@@ -322,7 +325,8 @@ private:
       // steady playback. CPU Wave RAM writes remain blocked until CH3's
       // first post-trigger fetch.
       bool hasFetchedWaveRam{ false };
-    } playback;
+    };
+    PlaybackState playback;
 
     void runNextTCycle();
 
@@ -348,7 +352,8 @@ private:
       // NR43 bits 2-0 - divider = 0 is treated as 0.5.
       std::uint8_t clockDivider{ 0 };
       bool isLengthEnabled{ false };
-    } configuration;
+    };
+    Configuration configuration;
 
     struct PlaybackState
     {
@@ -376,7 +381,8 @@ private:
       // volume gated by the LFSR's output bit (0 if the shifted-out bit is
       // 0, volume otherwise).
       std::uint8_t output{ 0 };
-    } playback;
+    };
+    PlaybackState playback;
 
     void runNextTCycle();
 
