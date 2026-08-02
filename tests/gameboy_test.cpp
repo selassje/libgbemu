@@ -374,19 +374,6 @@ TEST_CASE("interrupt_time", "[GameBoy]")
   }
   REQUIRE(result.has_value());
 
-  // interrupt_time.gb reports its result via cartridge RAM (memoryOutput()),
-  // not the serial port. Raw interrupt-dispatch cycle counts are already
-  // confirmed correct (0,13,0,13, matching a Mesen2 reference trace), but the
-  // ROM's own checksum still requires CGB double-speed switching (KEY1) and
-  // APU-timing-based CPU speed detection, neither of which is implemented
-  // yet -- so skip rather than fail until those exist.
-  if (!gbemu::memoryOutput().contains("Passed")) {
-    gbemu::memoryOutput().clear();
-    gbemu::serialOutput().clear();
-    SKIP("interrupt_time requires CGB double-speed switching (KEY1) and "
-         "APU-timing-based CPU speed detection, which aren't implemented "
-         "yet");
-  }
   REQUIRE_THAT(gbemu::memoryOutput(),
                Catch::Matchers::ContainsSubstring("Passed"));
   gbemu::memoryOutput().clear();

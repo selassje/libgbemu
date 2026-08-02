@@ -624,10 +624,13 @@ Cpu::rst()
 std::size_t
 Cpu::stop()
 {
-  // STOP is a 2-byte instruction (the second byte is a mandatory padding
-  // byte); real low-power/speed-switch behavior isn't implemented yet since
-  // nothing can wake the CPU from it, so this just skips both bytes.
+  // STOP is a 2-byte instruction (the second byte is mandatory padding).
+  // With KEY1 prepared on CGB it switches CPU speed; low-power STOP without
+  // a prepared switch remains modelled as a one-cycle no-op for now.
   m_PC += 2;
+  if (m_mmu.get().switchSpeed()) {
+    m_doubleSpeedPhase = false;
+  }
   return 1;
 }
 
@@ -1394,9 +1397,15 @@ Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
   // an M-cycle, not just at M-cycle boundaries, to land in or out of that
   // narrow window the same way real hardware's bus timing does.
   while (m_syncedTCycles < currentTCycles) {
-    m_ppu.get().runNextTCycle();
     m_mmu.get().runNextTCycle();
-    m_apu.get().runNextTCycle(m_mmu.get().divCounter());
+    const bool doubleSpeed = m_mmu.get().doubleSpeed();
+    const bool runBaseClock = !doubleSpeed || m_doubleSpeedPhase;
+    if (runBaseClock) {
+      m_ppu.get().runNextTCycle();
+      m_apu.get().runNextTCycle(m_mmu.get().divCounter(), doubleSpeed);
+      ++m_baseTCycles;
+    }
+    m_doubleSpeedPhase = doubleSpeed ? !m_doubleSpeedPhase : false;
     ++m_syncedTCycles;
   }
 
@@ -1453,6 +1462,8 @@ Cpu::reset()
   m_mcycles = 0;
   m_lastTimerMCycles = 0;
   m_syncedTCycles = 0;
+  m_baseTCycles = 0;
+  m_doubleSpeedPhase = false;
 }
 
 std::expected<std::size_t, std::string>

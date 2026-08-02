@@ -31,10 +31,14 @@ Apu::startFrame()
 }
 
 void
-Apu::runNextTCycle(std::uint16_t divCounter)
+Apu::runNextTCycle(std::uint16_t divCounter, bool doubleSpeed)
 {
+  constexpr std::uint16_t doubleSpeedFrameSequencerBitMask =
+    FRAME_SEQUENCER_BIT_MASK << 1U;
+  const auto frameSequencerBitMask =
+    doubleSpeed ? doubleSpeedFrameSequencerBitMask : FRAME_SEQUENCER_BIT_MASK;
   const bool currentFrameSequencerBit =
-    (divCounter & FRAME_SEQUENCER_BIT_MASK) != 0;
+    (divCounter & frameSequencerBitMask) != 0;
   // The frame sequencer's step counter is frozen while the APU is
   // powered off (real hardware quirk - see dmg_sound/07-len sweep period
   // sync.gb's "Powering up APU MODs next frame time with 8192": the

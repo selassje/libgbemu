@@ -124,6 +124,17 @@ Mmu::readByte(std::uint16_t address) const
       static_cast<unsigned>(value) |
       static_cast<unsigned>(INTERRUPT_FLAGS_UNUSED_BITS));
   }
+  if (address == regs::KEY1) {
+    if (!m_isCgbHardware) {
+      return 0xFF;
+    }
+    constexpr unsigned currentSpeedBit = 0x80U;
+    constexpr unsigned unusedBits = 0x7EU;
+    constexpr unsigned prepareBit = 0x01U;
+    return static_cast<std::uint8_t>((m_doubleSpeed ? currentSpeedBit : 0U) |
+                                     unusedBits |
+                                     (m_speedSwitchPrepared ? prepareBit : 0U));
+  }
   // DIV is just the upper 8 bits of the real 16-bit divider counter - see
   // divCounter(). Not stored in m_io at all (unlike most registers), so
   // this ignores the generic getByteRef()-derived value entirely.
@@ -398,6 +409,13 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
+  if (address == regs::KEY1) {
+    if (m_isCgbHardware) {
+      m_speedSwitchPrepared = (static_cast<unsigned>(value) & 0x01U) != 0;
+    }
+    return;
+  }
+
   // One-way latch: once disabled, the boot ROM can never be re-mapped, even
   // by writing 0 afterward - only a power cycle (a fresh Mmu) undoes this.
   if (address == regs::BOOT_ROM_DISABLE && value != 0) {
@@ -588,6 +606,18 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 
   getByteRef(address) = value;
+}
+
+bool
+Mmu::switchSpeed()
+{
+  if (!m_isCgbHardware || !m_speedSwitchPrepared) {
+    return false;
+  }
+  m_doubleSpeed = !m_doubleSpeed;
+  m_speedSwitchPrepared = false;
+  m_divCounter = 0;
+  return true;
 }
 
 void

@@ -24,6 +24,7 @@ public:
   void reset();
 
   std::expected<std::size_t, std::string> runNextInstruction();
+  [[nodiscard]] std::size_t baseTCycles() const { return m_baseTCycles; }
 
 private:
   enum class Flag : std::uint8_t
@@ -48,11 +49,14 @@ private:
 
   std::size_t m_mcycles{ 0 };
   std::size_t m_lastTimerMCycles{ 0 };
-  // How many Ppu/Mmu/Apu T-cycles have already been run, in the same
-  // absolute-T-cycle numbering advanceHardware() is called with (4x
-  // m_mcycles' numbering) - see advanceHardware()'s comment for why this
-  // needs T-cycle, not M-cycle, granularity.
+  // How many CPU T-cycles have already been synchronized. MMU's CPU-clocked
+  // state advances on every one; PPU/APU advance on every cycle at normal
+  // speed and every other cycle at double speed.
   std::size_t m_syncedTCycles{ 0 };
+  // Base-speed clock count used by GameBoy::runNextFrame(), so a frame keeps
+  // the same real duration even when speed changes partway through it.
+  std::size_t m_baseTCycles{ 0 };
+  bool m_doubleSpeedPhase{ false };
 
   std::reference_wrapper<Mmu> m_mmu;
   std::reference_wrapper<Ppu> m_ppu;

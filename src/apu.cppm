@@ -26,7 +26,7 @@ public:
   // Mmu and Apu circularly reference each other, since Mmu already holds
   // an Apu& for channel-register write forwarding); GameBoy::runNextFrame()
   // just passes it through each cycle instead.
-  void runNextTCycle(std::uint16_t divCounter);
+  void runNextTCycle(std::uint16_t divCounter, bool doubleSpeed);
 
   // Interleaved stereo samples (L, R, L, R, ...) accumulated so far this
   // frame - size() / 2 sample-frames. Normalized float in [-1, 1] (the DAC's
@@ -130,11 +130,8 @@ private:
 
   // Frame sequencer (drives length counter/envelope/sweep timing at
   // 512 Hz) - clocked not by a fixed T-cycle divisor but by watching bit 4
-  // of DIV (bit 12 of the full 16-bit counter Mmu passes into
-  // runNextTCycle()) for a 1->0 transition.
-  // TODO: CGB double speed mode watches bit 5 of DIV instead - not handled,
-  // since double speed mode itself isn't implemented anywhere in this
-  // codebase yet.
+  // of DIV (bit 12 of Mmu's full counter) at normal speed and bit 5
+  // (internal bit 13) at double speed for a 1->0 transition.
   bool m_previousFrameSequencerBit{ false };
   // Increments (wrapping 0-7) on each falling edge detected above - see
   // runNextTCycle() for which channel methods each step dispatches to

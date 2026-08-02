@@ -96,10 +96,10 @@ GameBoy::reset()
 std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
-  constexpr std::size_t mCyclesPerFrame = 17556;
+  constexpr std::size_t tCyclesPerFrame = 70224;
   m_apu.startFrame();
-  std::size_t mCycles = 0;
-  while (mCycles < mCyclesPerFrame) {
+  const auto targetBaseTCycles = m_cpu.baseTCycles() + tCyclesPerFrame;
+  while (m_cpu.baseTCycles() < targetBaseTCycles) {
     // Cpu::runNextInstruction() ticks Ppu/Mmu/Apu itself now (see
     // Cpu::advanceHardware()), at the specific memory-access points within
     // an instruction that already called it for timer-accuracy reasons,
@@ -114,7 +114,6 @@ gbemu::GameBoy::runNextFrame()
     if (!result) {
       return std::unexpected(result.error());
     }
-    mCycles += result.value();
   }
   const auto audioBuffer = m_apu.buffer();
   const EmulationFrame frame = {

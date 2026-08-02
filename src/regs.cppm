@@ -18,6 +18,7 @@ export constexpr std::uint16_t OBP0 = 0xFF48;
 export constexpr std::uint16_t OBP1 = 0xFF49;
 export constexpr std::uint16_t LY = 0xFF44;
 export constexpr std::uint16_t BOOT_ROM_DISABLE = 0xFF50;
+export constexpr std::uint16_t KEY1 = 0xFF4D;
 // CGB-only: VRAM bank select (bit 0) - real DMG hardware doesn't have this
 // register at all. See Mmu::setCgbMode().
 export constexpr std::uint16_t VBK = 0xFF4F;

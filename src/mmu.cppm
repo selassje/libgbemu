@@ -75,9 +75,7 @@ public:
   // group(s) JOYP currently selects at read time (see readByte()).
   void setButtonState(Button button, bool pressed);
 
-  // Advances an in-progress OAM DMA transfer (if any) by one T-cycle.
-  // Mirrors Ppu::runNextTCycle() - called once per T-cycle from
-  // GameBoy::runNextFrame()'s loop.
+  // Advances CPU-clocked MMU state (DIV, DMA and serial) by one CPU T-cycle.
   void runNextTCycle();
 
   // The real 16-bit free-running divider counter DIV (0xFF04) is just the
@@ -87,6 +85,11 @@ public:
   // specific bits of directly, bypassing readByte()'s 8-bit CPU-facing
   // view - those subsystems tap bits below DIV's own visible range.
   [[nodiscard]] std::uint16_t divCounter() const { return m_divCounter; }
+
+  [[nodiscard]] bool doubleSpeed() const { return m_doubleSpeed; }
+  // Performs a prepared CGB speed switch and resets DIV, as STOP does on
+  // hardware. Returns false when no switch was prepared or on DMG.
+  bool switchSpeed();
 
   // Called once by GameBoy::initializeFromRom() after resolving which
   // physical console this session actually boots as (see HardwareMode) -
@@ -139,6 +142,8 @@ private:
   // well-defined value before GameBoy calls setCgbMode() - always set
   // explicitly in practice, same reasoning as Apu::m_isCgbHardware.
   bool m_isCgbHardware{ false };
+  bool m_doubleSpeed{ false };
+  bool m_speedSwitchPrepared{ false };
 
   // Real hardware copies 1 byte per 4 T-cycles (160 bytes -> 640 T-cycles
   // total), not all 160 at once - std::nullopt when no transfer is active.
