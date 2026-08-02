@@ -97,6 +97,11 @@ void
 SaveStateReader::checkAvailable(std::size_t count) const
 {
   if (count > m_data.size() - m_offset) {
+    // MSVC STL's std::out_of_range base-class chain isn't visible to
+    // clang-tidy through `import std;`'s module boundary; not
+    // reproducible on libc++ (dev_ninja_clang_tidy_linux builds this file
+    // clean) - see Ppu::Fifo::push()'s identical comment.
+    // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::out_of_range("SaveStateReader: not enough data remaining");
   }
 }
