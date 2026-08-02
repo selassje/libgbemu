@@ -113,6 +113,16 @@ public:
     std::span<const std::uint8_t> data);
 
 private:
+  // The actual Cpu/Mmu/Ppu/Apu payload, factored out of saveState()/
+  // loadState() so loadState() can also use it to snapshot the current
+  // state before attempting to overwrite it, and restore that snapshot if
+  // a truncated/corrupt body throws partway through - deserializeComponents
+  // mutates the four components directly (in the same fixed order
+  // serializeComponents wrote them), it isn't itself responsible for the
+  // magic/version header both callers already handle around it.
+  void serializeComponents(SaveStateWriter& writer) const;
+  void deserializeComponents(SaveStateReader& reader);
+
   // Reconstructs Mmu/Ppu/Cpu from scratch (guaranteeing every field
   // returns to its true declared default, rather than a hand-maintained
   // per-field reset that could silently miss one) and re-runs the same

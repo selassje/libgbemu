@@ -406,3 +406,56 @@ TEST_CASE("GameBoy::loadState() rejects a bad magic or version mismatch",
   const auto badVersionResult = gb.loadState(writer.bytes());
   REQUIRE_FALSE(badVersionResult.has_value());
 }
+
+TEST_CASE("GameBoy::loadState() leaves state untouched when the body is "
+          "truncated",
+          "[GameBoy][Serialization]")
+{
+  auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
+                      "cpu_instrs/individual/06-ld r,r.gb");
+
+  gbemu::GameBoy reference{};
+  REQUIRE(reference.loadRom(rom).has_value());
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesBeforeTruncatedLoad = 30;
+  for (int i = 0; i < framesBeforeTruncatedLoad; ++i) {
+    REQUIRE(reference.runNextFrame().has_value());
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  // Valid magic/version, but cut off partway through the component data -
+  // passes the header check (which never touches component state) and
+  // only fails once deserializeComponents() is already mutating gb, the
+  // exact case the pre-load snapshot/restore in loadState() exists for.
+  const auto validState = gb.saveState();
+  const auto truncatedLength =
+    static_cast<std::ptrdiff_t>(validState.size() / 2);
+  const std::vector<std::uint8_t> truncatedState(
+    validState.begin(), validState.begin() + truncatedLength);
+  const auto result = gb.loadState(truncatedState);
+  REQUIRE_FALSE(result.has_value());
+
+  constexpr int framesAfterTruncatedLoad = 10;
+  for (int i = 0; i < framesAfterTruncatedLoad - 1; ++i) {
+    REQUIRE(reference.runNextFrame().has_value());
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+  // See the round-trip test above on why these are copied out immediately
+  // rather than compared as live EmulationFrame views.
+  const auto referenceFrame = reference.runNextFrame();
+  REQUIRE(referenceFrame.has_value());
+  const std::span<const std::uint8_t> referencePixelSpan(
+    referenceFrame->pixels.data_handle(), referenceFrame->pixels.size());
+  const std::vector<std::uint8_t> referencePixels(referencePixelSpan.begin(),
+                                                  referencePixelSpan.end());
+
+  const auto gbFrame = gb.runNextFrame();
+  REQUIRE(gbFrame.has_value());
+
+  REQUIRE(referencePixels.size() == gbFrame->pixels.size());
+  REQUIRE(std::equal(referencePixels.begin(),
+                     referencePixels.end(),
+                     gbFrame->pixels.data_handle()));
+}

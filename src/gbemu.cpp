@@ -147,16 +147,31 @@ GameBoy::setButtonState(Button button, bool pressed)
   m_mmu.setButtonState(button, pressed);
 }
 
+void
+GameBoy::serializeComponents(SaveStateWriter& writer) const
+{
+  m_cpu.serialize(writer);
+  m_mmu.serialize(writer);
+  m_ppu.serialize(writer);
+  m_apu.serialize(writer);
+}
+
+void
+GameBoy::deserializeComponents(SaveStateReader& reader)
+{
+  m_cpu.deserialize(reader);
+  m_mmu.deserialize(reader);
+  m_ppu.deserialize(reader);
+  m_apu.deserialize(reader);
+}
+
 std::vector<std::uint8_t>
 GameBoy::saveState() const
 {
   SaveStateWriter writer;
   writer.writeBytes(SAVE_STATE_MAGIC);
   writer.writeU32(SAVE_STATE_VERSION);
-  m_cpu.serialize(writer);
-  m_mmu.serialize(writer);
-  m_ppu.serialize(writer);
-  m_apu.serialize(writer);
+  serializeComponents(writer);
   return writer.bytes();
 }
 
@@ -188,17 +203,26 @@ GameBoy::loadState(std::span<const std::uint8_t> data)
   }
 
   // Magic and version are already verified above, so only a truncated or
-  // otherwise corrupt body can throw here - by this point some component's
-  // deserialize() may already have mutated its own state before the
-  // exception (unlike the magic/version check above, which never touches
-  // any component), so a save file that fails here shouldn't be trusted to
-  // resume correctly even after this returns an error.
+  // otherwise corrupt body can throw here - unlike that check (which never
+  // touches any component), deserializeComponents() mutates Cpu/Mmu/Ppu/Apu
+  // directly and in place, so a mid-body failure would otherwise leave the
+  // session partially overwritten with only some components updated,
+  // despite loadState() reporting failure via a std::expected a caller
+  // could reasonably treat as recoverable (i.e. safe to keep using this
+  // GameBoy). Snapshotting the pre-load state first and restoring it on
+  // failure keeps that std::expected contract honest: an error return means
+  // nothing changed. writer/backupReader never touch the magic/version
+  // header, only ever produced/consumed by this process's own
+  // serializeComponents()/deserializeComponents() moments apart, so the
+  // restore itself isn't expected to ever fail the same way.
+  SaveStateWriter backupWriter;
+  serializeComponents(backupWriter);
+
   try {
-    m_cpu.deserialize(reader);
-    m_mmu.deserialize(reader);
-    m_ppu.deserialize(reader);
-    m_apu.deserialize(reader);
+    deserializeComponents(reader);
   } catch (const std::out_of_range&) {
+    SaveStateReader backupReader{ backupWriter.bytes() };
+    deserializeComponents(backupReader);
     return std::unexpected("corrupt or truncated save state");
   }
   return {};
