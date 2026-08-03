@@ -2,6 +2,7 @@ export module gbemu:apu;
 
 import std;
 import :hardware_mode;
+import :serialization;
 
 namespace gbemu {
 
@@ -86,6 +87,13 @@ public:
     m_isCgbHardware = mode != HardwareMode::Dmg;
   }
 
+  // Save-state support (see GameBoy::saveState()/loadState()) - every data
+  // member below, including this frame's in-progress m_buffer/
+  // m_sampleCount (harmless to carry - startFrame() clears them again
+  // before the next frame runs regardless).
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
+
 private:
   // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples
   // is ~1476-1478 floats (see runNextTCycle()'s accumulator) - comfortable
@@ -152,6 +160,20 @@ private:
     // Bits 2-0 - ticks at 64 Hz, volume changes every pace-many ticks; 0
     // disables the envelope.
     std::uint8_t pace{ 0 };
+
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeU8(initialVolume);
+      writer.writeBool(increase);
+      writer.writeU8(pace);
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      initialVolume = reader.readU8();
+      increase = reader.readBool();
+      pace = reader.readU8();
+    }
   };
 
   // Shared by both pulse channels - CH1 (below) adds a period sweep on top
@@ -169,6 +191,24 @@ private:
       // setting, not the live period counter (see PlaybackState).
       std::uint16_t period{ 0 };
       bool isLengthEnabled{ false };
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeU8(duty);
+        writer.writeU8(lengthTimer);
+        envelope.serialize(writer);
+        writer.writeU16(period);
+        writer.writeBool(isLengthEnabled);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        duty = reader.readU8();
+        lengthTimer = reader.readU8();
+        envelope.deserialize(reader);
+        period = reader.readU16();
+        isLengthEnabled = reader.readBool();
+      }
     };
     Configuration configuration;
 
@@ -206,6 +246,28 @@ private:
       // duty waveform is a 1-bit-per-step multiplier, not an amplitude of
       // its own).
       std::uint8_t output{ 0 };
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeBool(enabled);
+        writer.writeU16(remainingLengthTicks);
+        writer.writeU8(envelopeTicksRemaining);
+        writer.writeU16(periodCounter);
+        writer.writeU8(dutyStep);
+        writer.writeU8(volume);
+        writer.writeU8(output);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        enabled = reader.readBool();
+        remainingLengthTicks = reader.readU16();
+        envelopeTicksRemaining = reader.readU8();
+        periodCounter = reader.readU16();
+        dutyStep = reader.readU8();
+        volume = reader.readU8();
+        output = reader.readU8();
+      }
     };
     PlaybackState playback;
 
@@ -215,6 +277,9 @@ private:
     // 4/6 (256 Hz) and 7 (64 Hz) respectively.
     void clockLength();
     void clockEnvelope();
+
+    void serialize(SaveStateWriter& writer) const;
+    void deserialize(SaveStateReader& reader);
   };
 
   // CH1-only, NR10's register layout - what a register write directly set.
@@ -233,6 +298,20 @@ private:
     // (Lt+1 = Lt +/- Lt / 2^shift), not related to the channel's period
     // itself.
     std::uint8_t shift{ 0 };
+
+    void serialize(SaveStateWriter& writer) const
+    {
+      writer.writeU8(pace);
+      writer.writeBool(isIncrease);
+      writer.writeU8(shift);
+    }
+
+    void deserialize(SaveStateReader& reader)
+    {
+      pace = reader.readU8();
+      isIncrease = reader.readBool();
+      shift = reader.readU8();
+    }
   };
 
   struct PulseChannel1 : PulseChannel
@@ -270,6 +349,16 @@ private:
     // computes shadowPeriod +/- shadowPeriod >> sweep.shift and disables
     // the channel if the result overflows the 11-bit period range (2047).
     [[nodiscard]] std::uint16_t calculateSweepFrequency();
+
+    // Deliberately not named serialize()/deserialize() (which would shadow
+    // - not override, nothing here is virtual - PulseChannel's own methods
+    // of the same name, flagged by
+    // bugprone-derived-method-shadowing-base-method): covers only
+    // PulseChannel1's own extra fields, not configuration/playback -
+    // Apu::serialize()/deserialize() call both this and the inherited
+    // PulseChannel::serialize()/deserialize() explicitly.
+    void serializeSweepState(SaveStateWriter& writer) const;
+    void deserializeSweepState(SaveStateReader& reader);
   };
 
   // CH3 - plays back Wave RAM (see regs::WAVE_RAM_START) instead of a
@@ -297,6 +386,26 @@ private:
       // via Apu::writeWaveRam() - 32 4-bit samples, two per byte (high
       // nibble played before low), read by runNextTCycle().
       std::array<std::uint8_t, 16> waveRam{};
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeBool(dacEnabled);
+        writer.writeU8(lengthTimer);
+        writer.writeU8(outputLevel);
+        writer.writeU16(period);
+        writer.writeBool(isLengthEnabled);
+        writer.writeBytes(waveRam);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        dacEnabled = reader.readBool();
+        lengthTimer = reader.readU8();
+        outputLevel = reader.readU8();
+        period = reader.readU16();
+        isLengthEnabled = reader.readBool();
+        reader.readBytes(waveRam);
+      }
     };
     Configuration configuration;
 
@@ -325,6 +434,28 @@ private:
       // steady playback. CPU Wave RAM writes remain blocked until CH3's
       // first post-trigger fetch.
       bool hasFetchedWaveRam{ false };
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeBool(enabled);
+        writer.writeU16(remainingLengthTicks);
+        writer.writeU16(periodCounter);
+        writer.writeU8(waveRamIndex);
+        writer.writeU8(output);
+        writer.writeBool(waveRamAccessWindow);
+        writer.writeBool(hasFetchedWaveRam);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        enabled = reader.readBool();
+        remainingLengthTicks = reader.readU16();
+        periodCounter = reader.readU16();
+        waveRamIndex = reader.readU8();
+        output = reader.readU8();
+        waveRamAccessWindow = reader.readBool();
+        hasFetchedWaveRam = reader.readBool();
+      }
     };
     PlaybackState playback;
 
@@ -333,6 +464,9 @@ private:
     // Frame-sequencer event - steps 0/2/4/6 (256 Hz). No envelope on this
     // channel (see the class comment above), so no clockEnvelope().
     void clockLength();
+
+    void serialize(SaveStateWriter& writer) const;
+    void deserialize(SaveStateReader& reader);
   };
 
   // CH4 - white noise via an LFSR instead of a duty cycle or wave table,
@@ -352,6 +486,26 @@ private:
       // NR43 bits 2-0 - divider = 0 is treated as 0.5.
       std::uint8_t clockDivider{ 0 };
       bool isLengthEnabled{ false };
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeU8(lengthTimer);
+        envelope.serialize(writer);
+        writer.writeU8(clockShift);
+        writer.writeBool(narrowLfsr);
+        writer.writeU8(clockDivider);
+        writer.writeBool(isLengthEnabled);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        lengthTimer = reader.readU8();
+        envelope.deserialize(reader);
+        clockShift = reader.readU8();
+        narrowLfsr = reader.readBool();
+        clockDivider = reader.readU8();
+        isLengthEnabled = reader.readBool();
+      }
     };
     Configuration configuration;
 
@@ -381,6 +535,28 @@ private:
       // volume gated by the LFSR's output bit (0 if the shifted-out bit is
       // 0, volume otherwise).
       std::uint8_t output{ 0 };
+
+      void serialize(SaveStateWriter& writer) const
+      {
+        writer.writeBool(enabled);
+        writer.writeU16(remainingLengthTicks);
+        writer.writeU8(envelopeTicksRemaining);
+        writer.writeU16(lfsr);
+        writer.writeU16(periodCounter);
+        writer.writeU8(volume);
+        writer.writeU8(output);
+      }
+
+      void deserialize(SaveStateReader& reader)
+      {
+        enabled = reader.readBool();
+        remainingLengthTicks = reader.readU16();
+        envelopeTicksRemaining = reader.readU8();
+        lfsr = reader.readU16();
+        periodCounter = reader.readU16();
+        volume = reader.readU8();
+        output = reader.readU8();
+      }
     };
     PlaybackState playback;
 
@@ -390,6 +566,9 @@ private:
     // 4/6 (256 Hz) and 7 (64 Hz) respectively.
     void clockLength();
     void clockEnvelope();
+
+    void serialize(SaveStateWriter& writer) const;
+    void deserialize(SaveStateReader& reader);
   };
 
   // Shared by the 5 NR12/22/42 (envelope write) and NR14/24/44 (trigger)

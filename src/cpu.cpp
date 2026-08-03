@@ -1466,6 +1466,48 @@ Cpu::reset()
   m_doubleSpeedPhase = false;
 }
 
+void
+Cpu::serialize(SaveStateWriter& writer) const
+{
+  writer.writeU16(m_AF);
+  writer.writeU16(m_BC);
+  writer.writeU16(m_DE);
+  writer.writeU16(m_HL);
+  writer.writeU16(m_SP);
+  writer.writeU16(m_PC);
+  writer.writeBool(m_ime);
+  writer.writeBool(m_halted);
+  writer.writeBool(m_haltBugPending);
+  writer.writeU8(m_currentOpcode);
+  writer.writeU8(m_imeEnableDelay);
+  writer.writeSize(m_mcycles);
+  writer.writeSize(m_lastTimerMCycles);
+  writer.writeSize(m_syncedTCycles);
+  writer.writeSize(m_baseTCycles);
+  writer.writeBool(m_doubleSpeedPhase);
+}
+
+void
+Cpu::deserialize(SaveStateReader& reader)
+{
+  m_AF = reader.readU16();
+  m_BC = reader.readU16();
+  m_DE = reader.readU16();
+  m_HL = reader.readU16();
+  m_SP = reader.readU16();
+  m_PC = reader.readU16();
+  m_ime = reader.readBool();
+  m_halted = reader.readBool();
+  m_haltBugPending = reader.readBool();
+  m_currentOpcode = reader.readU8();
+  m_imeEnableDelay = reader.readU8();
+  m_mcycles = reader.readSize();
+  m_lastTimerMCycles = reader.readSize();
+  m_syncedTCycles = reader.readSize();
+  m_baseTCycles = reader.readSize();
+  m_doubleSpeedPhase = reader.readBool();
+}
+
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {

@@ -19,7 +19,8 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
          ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm)
+         ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/serialization.cppm)
 
 if(MSVC)
   # MSBuild's real build infers /interface per module-interface file from
@@ -36,6 +37,7 @@ if(MSVC)
     ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
     ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
     ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/serialization.cppm
     PROPERTIES COMPILE_OPTIONS /interface)
 endif()
 
@@ -46,7 +48,8 @@ target_sources(
           ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
-          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp)
+          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp)
 
 # cl.exe already gets a working `std` module from CMake's own CXX_MODULE_STD=ON
 # mechanism (Ninja and the Visual Studio generator both resolve it on their

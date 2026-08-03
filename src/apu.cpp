@@ -780,6 +780,20 @@ Apu::PulseChannel::clockEnvelope()
 }
 
 void
+Apu::PulseChannel::serialize(SaveStateWriter& writer) const
+{
+  configuration.serialize(writer);
+  playback.serialize(writer);
+}
+
+void
+Apu::PulseChannel::deserialize(SaveStateReader& reader)
+{
+  configuration.deserialize(reader);
+  playback.deserialize(reader);
+}
+
+void
 Apu::PulseChannel1::clockSweep()
 {
   if (sweepTimer > 0) {
@@ -819,6 +833,26 @@ Apu::PulseChannel1::calculateSweepFrequency()
     playback.enabled = false;
   }
   return newPeriod;
+}
+
+void
+Apu::PulseChannel1::serializeSweepState(SaveStateWriter& writer) const
+{
+  sweep.serialize(writer);
+  writer.writeU16(shadowPeriod);
+  writer.writeU8(sweepTimer);
+  writer.writeBool(sweepEnabled);
+  writer.writeBool(negateModeUsedSinceTrigger);
+}
+
+void
+Apu::PulseChannel1::deserializeSweepState(SaveStateReader& reader)
+{
+  sweep.deserialize(reader);
+  shadowPeriod = reader.readU16();
+  sweepTimer = reader.readU8();
+  sweepEnabled = reader.readBool();
+  negateModeUsedSinceTrigger = reader.readBool();
 }
 
 void
@@ -876,6 +910,20 @@ Apu::WaveChannel::clockLength()
   if (playback.remainingLengthTicks == 0) {
     playback.enabled = false;
   }
+}
+
+void
+Apu::WaveChannel::serialize(SaveStateWriter& writer) const
+{
+  configuration.serialize(writer);
+  playback.serialize(writer);
+}
+
+void
+Apu::WaveChannel::deserialize(SaveStateReader& reader)
+{
+  configuration.deserialize(reader);
+  playback.deserialize(reader);
 }
 
 void
@@ -957,6 +1005,76 @@ Apu::NoiseChannel::clockEnvelope()
       --playback.volume;
     }
   }
+}
+
+void
+Apu::NoiseChannel::serialize(SaveStateWriter& writer) const
+{
+  configuration.serialize(writer);
+  playback.serialize(writer);
+}
+
+void
+Apu::NoiseChannel::deserialize(SaveStateReader& reader)
+{
+  configuration.deserialize(reader);
+  playback.deserialize(reader);
+}
+
+void
+Apu::serialize(SaveStateWriter& writer) const
+{
+  // Per-element via writeFloat(), not a raw std::as_bytes() dump - unlike
+  // the fixed-size uint8_t arrays elsewhere (VRAM, Wave RAM, ...) that are
+  // already just bytes, a float's own in-memory byte order still depends
+  // on host endianness, so dumping it raw would reintroduce exactly the
+  // host-endianness dependence the rest of this format deliberately
+  // avoids (see serialization.cppm's own comment).
+  for (const auto sample : m_buffer) {
+    writer.writeFloat(sample);
+  }
+  writer.writeSize(m_sampleCount);
+  writer.writeU32(m_sampleAccumulator);
+  writer.writeBool(m_powered);
+  writer.writeBool(m_isCgbHardware);
+  writer.writeU8(m_leftVolume);
+  writer.writeU8(m_rightVolume);
+  writer.writeU8(m_rightPanning);
+  writer.writeU8(m_leftPanning);
+  writer.writeFloat(m_leftCapacitor);
+  writer.writeFloat(m_rightCapacitor);
+  writer.writeBool(m_previousFrameSequencerBit);
+  writer.writeU8(m_frameSequencerStep);
+  m_pulse1.serialize(writer);
+  m_pulse1.serializeSweepState(writer);
+  m_pulse2.serialize(writer);
+  m_wave.serialize(writer);
+  m_noise.serialize(writer);
+}
+
+void
+Apu::deserialize(SaveStateReader& reader)
+{
+  for (auto& sample : m_buffer) {
+    sample = reader.readFloat();
+  }
+  m_sampleCount = reader.readSize();
+  m_sampleAccumulator = reader.readU32();
+  m_powered = reader.readBool();
+  m_isCgbHardware = reader.readBool();
+  m_leftVolume = reader.readU8();
+  m_rightVolume = reader.readU8();
+  m_rightPanning = reader.readU8();
+  m_leftPanning = reader.readU8();
+  m_leftCapacitor = reader.readFloat();
+  m_rightCapacitor = reader.readFloat();
+  m_previousFrameSequencerBit = reader.readBool();
+  m_frameSequencerStep = reader.readU8();
+  m_pulse1.deserialize(reader);
+  m_pulse1.deserializeSweepState(reader);
+  m_pulse2.deserialize(reader);
+  m_wave.deserialize(reader);
+  m_noise.deserialize(reader);
 }
 
 }

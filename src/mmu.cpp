@@ -762,4 +762,92 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
   return {};
 }
 
+void
+Mmu::serialize(SaveStateWriter& writer) const
+{
+  writer.writeBool(m_isCgbHardware);
+  writer.writeBool(m_doubleSpeed);
+  writer.writeBool(m_speedSwitchPrepared);
+
+  writer.writeBool(m_dmaState.has_value());
+  if (m_dmaState) {
+    writer.writeU16(m_dmaState->sourceBase);
+    writer.writeU8(m_dmaState->offset);
+    writer.writeU8(m_dmaState->tCyclesSinceLastByte);
+  }
+
+  writer.writeBool(m_serialTCyclesRemaining.has_value());
+  if (m_serialTCyclesRemaining) {
+    writer.writeU16(*m_serialTCyclesRemaining);
+  }
+
+  writer.writeU16(m_divCounter);
+  writer.writeBool(m_bootRomActive);
+  writer.writeBytes(m_vram);
+  writer.writeBytes(m_extRam);
+  writer.writeBytes(m_wram);
+  writer.writeBytes(m_oam);
+  writer.writeBytes(m_io);
+  writer.writeBytes(m_hram);
+  writer.writeSize(m_switchableRomBank);
+  writer.writeU8(m_mbc1RomBankLow);
+  writer.writeU8(m_mbc1BankHigh);
+  writer.writeBool(m_mbc1BankingMode);
+  writer.writeBool(m_usesMbc1);
+  writer.writeSize(m_switchableVRamBank);
+  writer.writeSize(m_switchableWRamBank);
+  writer.writeBytes(m_bgPaletteRam);
+  writer.writeBytes(m_objPaletteRam);
+  writer.writeU8(m_interruptEnableRegister);
+  writer.writeU8(m_unusable);
+  writer.writeU8(m_buttonState);
+  writer.writeBool(m_apuRegistersReadOnly);
+}
+
+void
+Mmu::deserialize(SaveStateReader& reader)
+{
+  m_isCgbHardware = reader.readBool();
+  m_doubleSpeed = reader.readBool();
+  m_speedSwitchPrepared = reader.readBool();
+
+  if (reader.readBool()) {
+    DmaState dmaState;
+    dmaState.sourceBase = reader.readU16();
+    dmaState.offset = reader.readU8();
+    dmaState.tCyclesSinceLastByte = reader.readU8();
+    m_dmaState = dmaState;
+  } else {
+    m_dmaState.reset();
+  }
+
+  if (reader.readBool()) {
+    m_serialTCyclesRemaining = reader.readU16();
+  } else {
+    m_serialTCyclesRemaining.reset();
+  }
+
+  m_divCounter = reader.readU16();
+  m_bootRomActive = reader.readBool();
+  reader.readBytes(m_vram);
+  reader.readBytes(m_extRam);
+  reader.readBytes(m_wram);
+  reader.readBytes(m_oam);
+  reader.readBytes(m_io);
+  reader.readBytes(m_hram);
+  m_switchableRomBank = reader.readSize();
+  m_mbc1RomBankLow = reader.readU8();
+  m_mbc1BankHigh = reader.readU8();
+  m_mbc1BankingMode = reader.readBool();
+  m_usesMbc1 = reader.readBool();
+  m_switchableVRamBank = reader.readSize();
+  m_switchableWRamBank = reader.readSize();
+  reader.readBytes(m_bgPaletteRam);
+  reader.readBytes(m_objPaletteRam);
+  m_interruptEnableRegister = reader.readU8();
+  m_unusable = reader.readU8();
+  m_buttonState = reader.readU8();
+  m_apuRegistersReadOnly = reader.readBool();
+}
+
 };

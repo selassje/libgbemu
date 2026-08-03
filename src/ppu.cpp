@@ -375,6 +375,38 @@ Ppu::Fetcher::reset(Mode mode)
 }
 
 void
+Ppu::Fetcher::serialize(SaveStateWriter& writer) const
+{
+  writer.writeU8(static_cast<std::uint8_t>(m_mState));
+  writer.writeU8(static_cast<std::uint8_t>(m_mode));
+  writer.writeBool(m_rowPushed);
+  writer.writeU8(m_tileX);
+  writer.writeU8(m_Y);
+  writer.writeU8(m_mTileIndex);
+  writer.writeU8(m_tileAttributes);
+  writer.writeU16(m_lastDotStateChange);
+  writer.writeU8(m_tileDataLow);
+  writer.writeU8(m_tileDataHigh);
+  m_currentObject.serialize(writer);
+}
+
+void
+Ppu::Fetcher::deserialize(SaveStateReader& reader)
+{
+  m_mState = static_cast<State>(reader.readU8());
+  m_mode = static_cast<Mode>(reader.readU8());
+  m_rowPushed = reader.readBool();
+  m_tileX = reader.readU8();
+  m_Y = reader.readU8();
+  m_mTileIndex = reader.readU8();
+  m_tileAttributes = reader.readU8();
+  m_lastDotStateChange = reader.readU16();
+  m_tileDataLow = reader.readU8();
+  m_tileDataHigh = reader.readU8();
+  m_currentObject.deserialize(reader);
+}
+
+void
 Ppu::runNextTCycle()
 {
   const bool lcdEnabled =
@@ -622,5 +654,53 @@ void
 Ppu::restoreFetcherState()
 {
   m_fetcher = m_savedFetcherState;
+}
+
+void
+Ppu::serialize(SaveStateWriter& writer) const
+{
+  writer.writeU8(static_cast<std::uint8_t>(m_hardwareMode));
+  for (const auto& object : m_objects) {
+    object.serialize(writer);
+  }
+  writer.writeSize(m_objectCount);
+  writer.writeU8(m_scanline);
+  writer.writeU8(m_activeWindowRow);
+  writer.writeU16(m_dot);
+  writer.writeU8(static_cast<std::uint8_t>(m_mode));
+  writer.writeBool(m_lcdEnabled);
+  writer.writeU8(m_pixelsRendered);
+  writer.writeU8(m_scx3LowBits);
+  writer.writeU8(m_scxDiscardedCount);
+  writer.writeBool(m_YCondition);
+  m_bgWndFifo.serialize(writer);
+  m_objFifo.serialize(writer);
+  writer.writeBytes(m_frameBuffer);
+  m_fetcher.serialize(writer);
+  m_savedFetcherState.serialize(writer);
+}
+
+void
+Ppu::deserialize(SaveStateReader& reader)
+{
+  m_hardwareMode = static_cast<HardwareMode>(reader.readU8());
+  for (auto& object : m_objects) {
+    object.deserialize(reader);
+  }
+  m_objectCount = reader.readSize();
+  m_scanline = reader.readU8();
+  m_activeWindowRow = reader.readU8();
+  m_dot = reader.readU16();
+  m_mode = static_cast<Mode>(reader.readU8());
+  m_lcdEnabled = reader.readBool();
+  m_pixelsRendered = reader.readU8();
+  m_scx3LowBits = reader.readU8();
+  m_scxDiscardedCount = reader.readU8();
+  m_YCondition = reader.readBool();
+  m_bgWndFifo.deserialize(reader);
+  m_objFifo.deserialize(reader);
+  reader.readBytes(m_frameBuffer);
+  m_fetcher.deserialize(reader);
+  m_savedFetcherState.deserialize(reader);
 }
 };

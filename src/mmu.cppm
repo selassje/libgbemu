@@ -3,6 +3,7 @@ export module gbemu:mmu;
 import std;
 import :apu;
 import :hardware_mode;
+import :serialization;
 
 namespace gbemu {
 
@@ -135,6 +136,16 @@ public:
   // masked from an attribute byte's own single bank bit.
   [[nodiscard]] std::uint8_t readVram(std::uint8_t bank,
                                       std::uint16_t address) const;
+
+  // Save-state support (see GameBoy::saveState()/loadState()) - every data
+  // member below except m_apu (owned separately) and m_rom/m_bootRom:
+  // both are reloaded from their own external source (the cartridge file,
+  // the built-in boot ROM data) by GameBoy::loadRom() rather than carried
+  // in the save file itself, the same way a save file doesn't embed the
+  // ROM it goes with. Callers are expected to loadRom() the same
+  // cartridge before calling deserialize() on a save made against it.
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
 
 private:
   std::reference_wrapper<Apu> m_apu;
