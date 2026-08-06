@@ -251,6 +251,31 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
     std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
+TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
+  auto reference =
+    readFile(std::filesystem::path(DMG_ACID2_DIR) / "reference.rgb");
+  // Starts on Cgb - setMode() switches it to Dmg below, so this exercises
+  // an actual model change, not a same-mode no-op reset.
+  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
+
+  auto result = gb.loadRom(rom);
+  REQUIRE(result.has_value());
+
+  constexpr int framesToStabilize = 120;
+  stabilizeAndGetFrame(gb, framesToStabilize);
+
+  auto setModeResult = gb.setMode(gbemu::Mode::Dmg);
+  REQUIRE(setModeResult.has_value());
+
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(reference.size() == frame.pixels.size());
+  REQUIRE(
+    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
+}
+
 TEST_CASE("cgb-acid2", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");

@@ -78,7 +78,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Run Tests
-        run: ctest --preset ${{ matrix.preset }}
+        run: ctest --preset ${{ matrix.preset }} --parallel $env:NUMBER_OF_PROCESSORS
 
       - name: Check Formatting
         run: cmake --build --preset ${{ matrix.preset }} --target clang-format-check
@@ -154,7 +154,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Run Tests
-        run: ctest --preset ${{ matrix.preset }}
+        run: ctest --preset ${{ matrix.preset }} --parallel $(nproc)
 
   build_and_test_linux_clang:
     name: Build and Test (${{ matrix.preset }})
@@ -224,7 +224,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.preset }}
 
       - name: Run Tests
-        run: ctest --preset ${{ matrix.preset }}
+        run: ctest --preset ${{ matrix.preset }} --parallel $(nproc)
 
       # Formatting doesn't vary by build type, so only check it once.
       - name: Check Formatting
