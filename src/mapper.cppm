@@ -17,7 +17,12 @@ namespace gbemu {
 // is static, via MapperVariant + std::visit below (see its own comment
 // on why); this class exists purely so RomOnlyMapper/Mbc1Mapper/future
 // mapper types don't each duplicate the same two data members and the
-// same two RAM accessors.
+// same two RAM accessors. Derived classes inherit from it privately, not
+// publicly - "implemented in terms of", not "is-a", matching the fact
+// that a Mapper is never substituted in through a base reference/pointer
+// anywhere. Each derived class re-exposes readRam()/writeRam() with a
+// `using` declaration since MapperLike (and Mmu's std::visit call sites)
+// need them public.
 class Mapper // NOLINT(misc-use-internal-linkage)
 {
 public:
@@ -110,9 +115,14 @@ concept MapperLike = requires(T& mapper,
 // treated every non-MBC1 type this way - not a new widening of scope
 // here).
 class RomOnlyMapper // NOLINT(misc-use-internal-linkage)
-  : public Mapper
+  : private Mapper
 {
 public:
+  // Mapper's own readRam()/writeRam() are otherwise private here (private
+  // inheritance) - see Mapper's own comment on why that's the intent.
+  using Mapper::readRam;
+  using Mapper::writeRam;
+
   RomOnlyMapper() = default;
   explicit RomOnlyMapper(std::span<const std::uint8_t> rom);
 
@@ -133,9 +143,14 @@ public:
 // either extends the switchable-bank number or selects a RAM bank,
 // depending on banking mode - see writeRom().
 class Mbc1Mapper // NOLINT(misc-use-internal-linkage)
-  : public Mapper
+  : private Mapper
 {
 public:
+  // Mapper's own readRam()/writeRam() are otherwise private here (private
+  // inheritance) - see Mapper's own comment on why that's the intent.
+  using Mapper::readRam;
+  using Mapper::writeRam;
+
   explicit Mbc1Mapper(std::span<const std::uint8_t> rom);
 
   [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
