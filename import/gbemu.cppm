@@ -90,6 +90,16 @@ public:
   // switch off/on.
   [[nodiscard]] std::expected<void, std::string> reset();
 
+  // Changes which physical console this instance emulates, then reset()s -
+  // matches unplugging the already-inserted cartridge, plugging it into a
+  // different physical console, and powering that on. Rejected the same
+  // way reset()/loadRom() reject an incompatible Mode::Dmg for a
+  // CGB-required cartridge (see initializeFromRom()) - m_model is still
+  // updated even on that error, matching what a real swap would leave you
+  // holding (the wrong console for this cartridge), so a caller correcting
+  // the model afterward isn't fighting a half-applied change.
+  [[nodiscard]] std::expected<void, std::string> setMode(Mode mode);
+
   std::expected<EmulationFrame, std::string> runNextFrame();
   void setButtonState(Button button, bool pressed);
 

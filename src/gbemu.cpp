@@ -107,6 +107,13 @@ GameBoy::reset()
   return initializeFromRom();
 }
 
+[[nodiscard]] std::expected<void, std::string>
+GameBoy::setMode(Mode mode)
+{
+  m_model = mode;
+  return reset();
+}
+
 std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
