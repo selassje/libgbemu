@@ -22,7 +22,7 @@ constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
 // serialization.cppm's own comment on C++26 reflection eventually
 // replacing the hand-maintained per-field serialize()/deserialize() calls
 // this version number protects against silently misreading.
-constexpr std::uint32_t SAVE_STATE_VERSION = 1;
+constexpr std::uint32_t SAVE_STATE_VERSION = 2;
 
 }
 

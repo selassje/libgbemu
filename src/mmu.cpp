@@ -1,11 +1,5 @@
 module gbemu;
 
-namespace {
-
-constexpr unsigned MBC1_BANK_HIGH_SHIFT = 5U;
-
-}
-
 namespace gbemu {
 
 #ifdef ENABLE_TESTS
@@ -27,26 +21,12 @@ memoryOutput()
 std::uint8_t&
 Mmu::getByteRef(std::uint16_t address)
 {
-  if (address < 0x4000) {
-    std::size_t bank = 0;
-    if (m_usesMbc1 && m_mbc1BankingMode) {
-      bank = static_cast<std::size_t>(m_mbc1BankHigh) << MBC1_BANK_HIGH_SHIFT;
-    }
-    const auto bankCount = std::max<std::size_t>(1, m_rom.size() / KB16);
-    bank %= bankCount;
-    return m_rom.at((bank * KB16) + address);
-  }
-  if (address < 0x8000) {
-    const auto bankCount = std::max<std::size_t>(1, m_rom.size() / KB16);
-    const auto bank = m_switchableRomBank % bankCount;
-    const std::size_t bankedAddress = (bank * KB16) + (address - KB16);
-    return m_rom.at(bankedAddress);
-  }
+  // ROM (0x0000-0x7FFF) and external RAM (0xA000-0xBFFF) are handled
+  // directly by readByte()/writeByte() instead, via the mapper - see
+  // their own comments. Both callers already guarantee address is
+  // outside those two ranges before reaching here.
   if (address < 0xA000) {
     return m_vram.at(address - (2 * KB16) + (m_switchableVRamBank * KB8));
-  }
-  if (address < 0xC000) {
-    return m_extRam.at(address - 0xA000);
   }
 
   if (address < 0xD000) {
@@ -86,13 +66,6 @@ constexpr std::uint16_t BOOT_ROM_SECOND_PART_START = 0x200;
 constexpr std::uint16_t BOOT_ROM_SECOND_PART_END = 0x900;
 constexpr std::uint8_t INTERRUPT_FLAGS_UNUSED_BITS = 0xE0;
 
-constexpr std::uint16_t MBC1_ROM_BANK_REGISTER_START = 0x2000;
-constexpr std::uint16_t MBC1_RAM_BANK_REGISTER_START = 0x4000;
-constexpr std::uint16_t MBC1_BANKING_MODE_REGISTER_START = 0x6000;
-constexpr unsigned MBC1_ROM_BANK_MASK = 0x1FU;
-constexpr unsigned MBC1_BANK_HIGH_MASK = 0x03U;
-constexpr unsigned MBC1_BANKING_MODE_MASK = 0x01U;
-
 constexpr unsigned STAT_INTERRUPT_FLAG_BIT = 0b0000'0010U;
 
 constexpr std::uint16_t APU_REGISTERS_START = 0xFF10;
@@ -112,6 +85,19 @@ Mmu::readByte(std::uint16_t address) const
     if (inFirstPart || inSecondPart) {
       return m_bootRom.at(address);
     }
+  }
+  // ROM - delegated to the mapper (see mapper.cppm's own comments on why
+  // this needs the whole 0x0000-0x7FFF range, not just 0x4000-0x7FFF).
+  if (address < 0x8000) {
+    return std::visit(
+      [address](const auto& mapper) { return mapper.readRom(address); },
+      m_mapper);
+  }
+  // External RAM - also delegated to the mapper.
+  if (address >= 0xA000 && address < 0xC000) {
+    return std::visit(
+      [address](const auto& mapper) { return mapper.readRam(address); },
+      m_mapper);
   }
   // Safe: getByteRef() is only ever read through here, never written to, so
   // no actual mutation of a const object can occur regardless of whether
@@ -382,30 +368,22 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 #endif
 
-  // Writes in the cartridge ROM area control the memory-bank controller; ROM
-  // itself is never writable. cpu_instrs.gb is an MBC1 cartridge and uses
-  // this register to dispatch each of its individual test banks.
+  // Writes in the cartridge ROM area control the mapper (bank switching,
+  // etc.) - ROM itself is never writable. cpu_instrs.gb is an MBC1
+  // cartridge and uses this register to dispatch each of its individual
+  // test banks.
   if (address < 0x8000) {
-    if (m_usesMbc1) {
-      const auto unsignedValue = static_cast<unsigned>(value);
-      if (address >= MBC1_ROM_BANK_REGISTER_START &&
-          address < MBC1_RAM_BANK_REGISTER_START) {
-        m_mbc1RomBankLow =
-          static_cast<std::uint8_t>(unsignedValue & MBC1_ROM_BANK_MASK);
-        if (m_mbc1RomBankLow == 0) {
-          m_mbc1RomBankLow = 1;
-        }
-      } else if (address >= MBC1_RAM_BANK_REGISTER_START &&
-                 address < MBC1_BANKING_MODE_REGISTER_START) {
-        m_mbc1BankHigh =
-          static_cast<std::uint8_t>(unsignedValue & MBC1_BANK_HIGH_MASK);
-      } else if (address >= MBC1_BANKING_MODE_REGISTER_START) {
-        m_mbc1BankingMode = (unsignedValue & MBC1_BANKING_MODE_MASK) != 0;
-      }
-      m_switchableRomBank =
-        (static_cast<std::size_t>(m_mbc1BankHigh) << MBC1_BANK_HIGH_SHIFT) |
-        m_mbc1RomBankLow;
-    }
+    std::visit(
+      [address, value](auto& mapper) { mapper.writeRom(address, value); },
+      m_mapper);
+    return;
+  }
+
+  // External RAM - also delegated to the mapper.
+  if (address >= 0xA000 && address < 0xC000) {
+    std::visit(
+      [address, value](auto& mapper) { mapper.writeRam(address, value); },
+      m_mapper);
     return;
   }
 
@@ -750,15 +728,16 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
     return std::unexpected(
       "ROM size is too small. Must be at least 0x150 bytes.");
   }
-  m_rom.assign(rom.begin(), rom.end());
   constexpr std::size_t cartridgeTypeAddress = 0x147;
-  const auto cartridgeType = m_rom.at(cartridgeTypeAddress);
-  m_usesMbc1 =
-    cartridgeType == 0x01 || cartridgeType == 0x02 || cartridgeType == 0x03;
-  m_mbc1RomBankLow = 1;
-  m_mbc1BankHigh = 0;
-  m_mbc1BankingMode = false;
-  m_switchableRomBank = 1;
+  // Bounds already verified by the size check above (cartridgeTypeAddress
+  // is well within MIN_ROM_SIZE).
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+  const auto cartridgeType = rom[cartridgeTypeAddress];
+  if (cartridgeType == 0x01 || cartridgeType == 0x02 || cartridgeType == 0x03) {
+    m_mapper.emplace<Mbc1Mapper>(rom);
+  } else {
+    m_mapper.emplace<RomOnlyMapper>(rom);
+  }
   return {};
 }
 
@@ -784,16 +763,12 @@ Mmu::serialize(SaveStateWriter& writer) const
   writer.writeU16(m_divCounter);
   writer.writeBool(m_bootRomActive);
   writer.writeBytes(m_vram);
-  writer.writeBytes(m_extRam);
+  std::visit([&writer](const auto& mapper) { mapper.serialize(writer); },
+             m_mapper);
   writer.writeBytes(m_wram);
   writer.writeBytes(m_oam);
   writer.writeBytes(m_io);
   writer.writeBytes(m_hram);
-  writer.writeSize(m_switchableRomBank);
-  writer.writeU8(m_mbc1RomBankLow);
-  writer.writeU8(m_mbc1BankHigh);
-  writer.writeBool(m_mbc1BankingMode);
-  writer.writeBool(m_usesMbc1);
   writer.writeSize(m_switchableVRamBank);
   writer.writeSize(m_switchableWRamBank);
   writer.writeBytes(m_bgPaletteRam);
@@ -830,16 +805,11 @@ Mmu::deserialize(SaveStateReader& reader)
   m_divCounter = reader.readU16();
   m_bootRomActive = reader.readBool();
   reader.readBytes(m_vram);
-  reader.readBytes(m_extRam);
+  std::visit([&reader](auto& mapper) { mapper.deserialize(reader); }, m_mapper);
   reader.readBytes(m_wram);
   reader.readBytes(m_oam);
   reader.readBytes(m_io);
   reader.readBytes(m_hram);
-  m_switchableRomBank = reader.readSize();
-  m_mbc1RomBankLow = reader.readU8();
-  m_mbc1BankHigh = reader.readU8();
-  m_mbc1BankingMode = reader.readBool();
-  m_usesMbc1 = reader.readBool();
   m_switchableVRamBank = reader.readSize();
   m_switchableWRamBank = reader.readSize();
   reader.readBytes(m_bgPaletteRam);

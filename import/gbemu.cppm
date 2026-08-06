@@ -14,6 +14,10 @@ export import :serialization;
 // isn't itself marked `export` - see its own comment for why that keeps
 // it out of this module's public API despite this line.
 export import :hardware_mode;
+// Same reasoning as :hardware_mode above - none of Mapper/RomOnlyMapper/
+// Mbc1Mapper/MapperVariant are marked `export` either (see mapper.cppm's
+// own comments); Mmu is their only consumer.
+export import :mapper;
 
 export namespace gbemu {
 

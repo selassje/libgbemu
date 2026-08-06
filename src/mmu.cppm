@@ -3,6 +3,7 @@ export module gbemu:mmu;
 import std;
 import :apu;
 import :hardware_mode;
+import :mapper;
 import :serialization;
 
 namespace gbemu {
@@ -54,6 +55,28 @@ public:
     : m_apu(apu)
   {
   }
+  // Explicit, not left implicit: GCC's (experimental, per the CMake
+  // configure-time warning on `import std;`) C++23 modules support
+  // otherwise re-derives this destructor as deleted when GameBoy's own
+  // implicit destructor needs it from import/gbemu.cppm - but only there,
+  // not when compiling this partition's own mmu.cppm/mmu.cpp, where it's
+  // genuinely well-formed (MapperVariant's own destructor is trivial).
+  // Defaulting it explicitly, right here, sidesteps whatever's going
+  // wrong with that cross-TU re-derivation instead of chasing it further.
+  ~Mmu() = default;
+
+  // Rule of five, once the destructor above is user-declared (clang-tidy's
+  // cppcoreguidelines/hicpp-special-member-functions) - deleted, not
+  // defaulted: Ppu/Cpu each hold a Mmu& into whichever Mmu instance they
+  // were constructed with (see GameBoy's own member layout comment), so a
+  // copy or move would leave those references pointing at a stale/moved-
+  // from object instead of the real, current Mmu. GameBoy::reset()
+  // already gets the equivalent of a fresh Mmu via placement-new
+  // destroy+reconstruct, never copy/move, for the same reason.
+  Mmu(const Mmu&) = delete;
+  Mmu& operator=(const Mmu&) = delete;
+  Mmu(Mmu&&) = delete;
+  Mmu& operator=(Mmu&&) = delete;
 
   [[nodiscard]] std::uint8_t readByte(std::uint16_t address) const;
   [[nodiscard]] std::uint16_t readWord(std::uint16_t address) const;
@@ -138,12 +161,14 @@ public:
                                       std::uint16_t address) const;
 
   // Save-state support (see GameBoy::saveState()/loadState()) - every data
-  // member below except m_apu (owned separately) and m_rom/m_bootRom:
-  // both are reloaded from their own external source (the cartridge file,
-  // the built-in boot ROM data) by GameBoy::loadRom() rather than carried
-  // in the save file itself, the same way a save file doesn't embed the
-  // ROM it goes with. Callers are expected to loadRom() the same
-  // cartridge before calling deserialize() on a save made against it.
+  // member below except m_apu (owned separately) and m_bootRom: both are
+  // reloaded from their own external source (the built-in boot ROM data,
+  // the cartridge file) by GameBoy::loadRom() rather than carried in the
+  // save file itself, the same way a save file doesn't embed the ROM it
+  // goes with - m_mapper's own ROM bytes are excluded from its
+  // serialize()/deserialize() for the same reason (see mapper.cppm).
+  // Callers are expected to loadRom() the same cartridge before calling
+  // deserialize() on a save made against it.
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
@@ -181,18 +206,18 @@ private:
 
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };
-  std::vector<std::uint8_t> m_rom;
+  // Handles every 0x0000-0x7FFF (ROM) and 0xA000-0xBFFF (external RAM)
+  // access - see readByte()/writeByte(). Which concrete alternative this
+  // holds is chosen by loadRom() from the cartridge header; default-
+  // constructed as RomOnlyMapper (empty ROM) purely so a default-
+  // constructed Mmu has a well-defined value before loadRom() is ever
+  // called, same reasoning as m_isCgbHardware above.
+  MapperVariant m_mapper;
   std::array<std::uint8_t, KB16> m_vram{};
-  std::array<std::uint8_t, KB8> m_extRam{};
   std::array<std::uint8_t, KB4 * 8> m_wram{};
   std::array<std::uint8_t, 0xA0> m_oam{};
   std::array<std::uint8_t, 0x80> m_io{};
   std::array<std::uint8_t, 0x7F> m_hram{};
-  std::size_t m_switchableRomBank{ 1 };
-  std::uint8_t m_mbc1RomBankLow{ 1 };
-  std::uint8_t m_mbc1BankHigh{ 0 };
-  bool m_mbc1BankingMode{ false };
-  bool m_usesMbc1{ false };
   std::size_t m_switchableVRamBank{ 0 };
   std::size_t m_switchableWRamBank{ 1 };
   // 8 palettes x 4 colors x 2 bytes/color (15-bit RGB555, little-endian) -

@@ -16,6 +16,7 @@ target_sources(
          ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
+         ${CMAKE_CURRENT_LIST_DIR}/mapper.cppm
          ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
          ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
          ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
@@ -33,6 +34,7 @@ if(MSVC)
     ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
     ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
     ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
+    ${CMAKE_CURRENT_LIST_DIR}/mapper.cppm
     ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
     ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
     ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
@@ -47,6 +49,7 @@ target_sources(
           ${CMAKE_CURRENT_LIST_DIR}/apu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mapper.cpp
           ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp
           ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp)
