@@ -62,16 +62,19 @@ levels).
 ## Architecture
 
 **Module structure**: `gbemu` is the primary module interface unit
-(`import/gbemu.cppm`), which re-exports four partitions —
-`:cpu`, `:mmu`, `:ppu`, `:boot_rom` — each living in `src/<name>.cppm`
-(interface: class declarations, exported free functions) paired with
-`src/<name>.cpp` (implementation, `module gbemu;` + `namespace gbemu { ... }`,
-no partition name repeated). `import/gbemu.cppm` itself also defines the
-top-level `GameBoy` facade class — the only type consumers construct
-directly. Adding a new source file means registering it in **both**
-`src/CMakeLists.txt`'s `CXX_MODULES` file set (interface) and its adjacent
-`PRIVATE` sources list (implementation) — CMake's C++ module dependency
-scanning does not discover partitions on its own.
+(`modules/gbemu.cppm`), which re-exports four partitions —
+`:cpu`, `:mmu`, `:ppu`, `:boot_rom` — each with its interface unit living in
+`modules/<name>.cppm` (class declarations, exported free functions) paired
+with `src/<name>.cpp` (implementation, `module gbemu;` +
+`namespace gbemu { ... }`, no partition name repeated). All module interface
+units - the primary unit and every partition alike - live together in
+`modules/`, separate from the `.cpp` implementation files in `src/`.
+`modules/gbemu.cppm` itself also defines the top-level `GameBoy` facade
+class - the only type consumers construct directly. Adding a new source file
+means registering it in **both** `src/CMakeLists.txt`'s `CXX_MODULES` file
+set (interface) and its adjacent `PRIVATE` sources list (implementation) -
+CMake's C++ module dependency scanning does not discover partitions on its
+own.
 
 **Component wiring**: `GameBoy` owns `Mmu`, then `Ppu` (constructed with a
 `Mmu&`), then `Cpu` (constructed with `Mmu&` + `Ppu&`) — declaration order in

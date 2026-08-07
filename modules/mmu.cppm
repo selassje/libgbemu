@@ -58,7 +58,7 @@ public:
   // Explicit, not left implicit: GCC's (experimental, per the CMake
   // configure-time warning on `import std;`) C++23 modules support
   // otherwise re-derives this destructor as deleted when GameBoy's own
-  // implicit destructor needs it from import/gbemu.cppm - but only there,
+  // implicit destructor needs it from modules/gbemu.cppm - but only there,
   // not when compiling this partition's own mmu.cppm/mmu.cpp, where it's
   // genuinely well-formed (MapperVariant's own destructor is trivial).
   // Defaulting it explicitly, right here, sidesteps whatever's going

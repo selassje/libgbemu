@@ -5,7 +5,7 @@ import std;
 namespace gbemu {
 
 // The actual, resolved hardware behavior this session runs as - distinct
-// from the caller-requested Mode (see import/gbemu.cppm): Mode is what the
+// from the caller-requested Mode (see modules/gbemu.cppm): Mode is what the
 // caller asked for (Auto/Dmg/Cgb), HardwareMode is what that resolves to
 // once the cartridge's own header CGB flag is taken into account (Auto in
 // particular can resolve to either Dmg or one of the two Cgb variants here,

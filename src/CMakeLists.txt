@@ -1,4 +1,4 @@
-set(MODULES ${CMAKE_CURRENT_LIST_DIR}/../import)
+set(MODULES ${CMAKE_CURRENT_LIST_DIR}/../modules)
 
 add_library(libgbemu STATIC)
 
@@ -10,18 +10,17 @@ target_sources(
          CXX_MODULES
          BASE_DIRS
          ${MODULES}
-         ${CMAKE_CURRENT_LIST_DIR}
          FILES
          ${MODULES}/gbemu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/mapper.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm
-         ${CMAKE_CURRENT_LIST_DIR}/serialization.cppm)
+         ${MODULES}/apu.cppm
+         ${MODULES}/cpu.cppm
+         ${MODULES}/mmu.cppm
+         ${MODULES}/mapper.cppm
+         ${MODULES}/ppu.cppm
+         ${MODULES}/boot_rom.cppm
+         ${MODULES}/regs.cppm
+         ${MODULES}/hardware_mode.cppm
+         ${MODULES}/serialization.cppm)
 
 if(MSVC)
   # MSBuild's real build infers /interface per module-interface file from
@@ -31,15 +30,15 @@ if(MSVC)
   # IntelliSense's command line matches the real one.
   set_source_files_properties(
     ${MODULES}/gbemu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/apu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/cpu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/mmu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/mapper.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/ppu.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/regs.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/hardware_mode.cppm
-    ${CMAKE_CURRENT_LIST_DIR}/serialization.cppm
+    ${MODULES}/apu.cppm
+    ${MODULES}/cpu.cppm
+    ${MODULES}/mmu.cppm
+    ${MODULES}/mapper.cppm
+    ${MODULES}/ppu.cppm
+    ${MODULES}/boot_rom.cppm
+    ${MODULES}/regs.cppm
+    ${MODULES}/hardware_mode.cppm
+    ${MODULES}/serialization.cppm
     PROPERTIES COMPILE_OPTIONS /interface)
 endif()
 
