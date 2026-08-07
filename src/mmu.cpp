@@ -739,10 +739,18 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
   // is well within MIN_ROM_SIZE).
   // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
   const auto cartridgeType = rom[cartridgeTypeAddress];
-  if (cartridgeType == 0x01 || cartridgeType == 0x02 || cartridgeType == 0x03) {
-    m_mapper.emplace<Mbc1Mapper>(rom);
-  } else {
-    m_mapper.emplace<RomOnlyMapper>(rom);
+  switch (cartridgeType) {
+    case 0x00:
+      m_mapper.emplace<RomOnlyMapper>(rom);
+      break;
+    case 0x01:
+    case 0x02:
+    case 0x03:
+      m_mapper.emplace<Mbc1Mapper>(rom);
+      break;
+    default:
+      return std::unexpected(
+        std::format("Unsupported cartridge type: 0x{:02X}", cartridgeType));
   }
   return {};
 }
