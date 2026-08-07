@@ -460,18 +460,24 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   // handling above) - Wave RAM (0xFF30-0xFF3F) is deliberately excluded,
   // it's always writable regardless of APU power state. The four length-
   // timer registers (NR11/NR21/NR31/NR41) are a second, narrower
-  // exception: real hardware's length-counter load circuit bypasses the
-  // power gate entirely - see dmg_sound/11-regs after power.gb's own
-  // "While powered off, writes to NR41 are NOT ignored" comment. But for
-  // NR11/NR21 specifically, only their length bits (0-5) bypass it; the
-  // duty bits (6-7) sharing that same register are ordinary NR10-NR51
-  // bits, still read-only while off (confirmed by
+  // exception, but only on DMG/MGB ("monochrome models" - Pan Docs'
+  // Audio_Registers.md, NR52's own footnote): real hardware's length-
+  // counter load circuit bypasses the power gate entirely there - see
+  // dmg_sound/11-regs after power.gb's own "While powered off, writes to
+  // NR41 are NOT ignored" check. CGB hardware doesn't have this bypass;
+  // writes to these registers while powered off are ignored the same as
+  // every other NR10-NR51 register there (confirmed by cgb_sound/11-regs
+  // after power.gb's own "Powering off should clear NR41" check, which
+  // fails if this bypass applies unconditionally). For NR11/NR21
+  // specifically (DMG/MGB only), only their length bits (0-5) bypass it;
+  // the duty bits (6-7) sharing that same register are ordinary
+  // NR10-NR51 bits, still read-only while off (confirmed by
   // dmg_sound/01-registers.gb's own "when off, should ignore writes to
   // registers" check) - so merge the new length bits into the existing
   // stored duty bits rather than letting the whole byte through.
   const bool isLengthTimerRegister =
-    address == regs::NR11 || address == regs::NR21 || address == regs::NR31 ||
-    address == regs::NR41;
+    !m_isCgbHardware && (address == regs::NR11 || address == regs::NR21 ||
+                         address == regs::NR31 || address == regs::NR41);
   if (address >= APU_REGISTERS_START && address < regs::NR52 &&
       m_apuRegistersReadOnly) {
     if (!isLengthTimerRegister) {
