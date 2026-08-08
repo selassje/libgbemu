@@ -10,6 +10,41 @@ static constexpr std::uint16_t RTC_M = 0x01;
 static constexpr std::uint16_t RTC_H = 0x2;
 static constexpr std::uint16_t RTC_DL = 0x3;
 static constexpr std::uint16_t RTC_DH = 0x4;
+
+// Real MBC3 hardware only implements a subset of the bits in each RTC
+// register - seconds/minutes are 6-bit counters, hours a 5-bit counter, DL
+// is a full 8-bit day-counter byte, and DH exposes only the day-counter high
+// bit (0), halt (6), and day-carry (7) bits. Writes to the remaining bits
+// are ignored and always read back as 0. Indexed the same way as
+// m_rtcRegisters/RTC_S../RTC_DH above.
+static constexpr std::array<std::uint8_t, 5> REGISTER_MASKS = { 0x3F, 0x3F,
+                                                                  0x1F, 0xFF,
+                                                                  0xC1 };
+
+// Advances one seconds/minutes/hours counter by a tick and reports whether
+// the next counter up should also tick. Real MBC3 hardware distinguishes
+// two kinds of rollover: a "valid" one, triggered only when the field held
+// exactly its normal maximum (validMax) beforehand, which resets to 0 *and*
+// carries into the next unit; and an "invalid" one, reached only when the
+// field already held an out-of-range value (e.g. seconds/minutes written as
+// 60-63, hours written as 24-31) and increments past the counter's bit
+// width (hardMax), which resets to 0 *without* carrying. A field sitting on
+// an invalid value that hasn't yet hit hardMax just keeps counting up
+// normally - see rtc3test's "range tests" subtest, which exercises exactly
+// this quirk.
+[[nodiscard]] bool
+tickField(std::uint8_t& field, std::uint8_t validMax, std::uint8_t hardMax)
+{
+  if (field == validMax) {
+    field = 0;
+    return true;
+  }
+  ++field;
+  if (field > hardMax) {
+    field = 0;
+  }
+  return false;
+}
 };
 
 Mbc3Mapper::Mbc3Mapper(std::span<const std::uint8_t> rom)
@@ -85,16 +120,15 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
     return;
   }
   if (m_selectedRtc.has_value()) {
-    m_rtcRegisters.at(*m_selectedRtc) = value;
     switch (*m_selectedRtc) {
       case mbc3::RTC_S:
-        m_rtc.seconds = value;
+        m_rtc.seconds = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_S);
         break;
       case mbc3::RTC_M:
-        m_rtc.minutes = value;
+        m_rtc.minutes = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_M);
         break;
       case mbc3::RTC_H:
-        m_rtc.hours = value;
+        m_rtc.hours = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_H);
         break;
       case mbc3::RTC_DL:
         m_rtc.days = (m_rtc.days & 0x100U) | static_cast<std::uint16_t>(value);
@@ -110,6 +144,8 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
       default:
         std::unreachable();
     }
+    m_rtcRegisters.at(*m_selectedRtc) =
+      value & mbc3::REGISTER_MASKS.at(*m_selectedRtc);
     return;
   }
   Mapper::writeRam(
@@ -193,21 +229,12 @@ Mbc3Mapper::RealTimeClock::runNextTCycle()
   if (tCycles >= mbc3::T_CYCLES_PER_SECOND) {
     tCycles = 0;
     if (!halt) {
-      ++seconds;
-      if (seconds >= 60) {
-        seconds = 0;
-        ++minutes;
-        if (minutes >= 60) {
-          minutes = 0;
-          ++hours;
-          if (hours >= 24) {
-            hours = 0;
-            ++days;
-            if (days > 511) {
-              days = 0;
-              dayCarry = true;
-            }
-          }
+      if (mbc3::tickField(seconds, 59, 63) && mbc3::tickField(minutes, 59, 63)
+          && mbc3::tickField(hours, 23, 31)) {
+        ++days;
+        if (days > 511) {
+          days = 0;
+          dayCarry = true;
         }
       }
     }
