@@ -17,7 +17,7 @@ export import :hardware_mode;
 // Same reasoning as :hardware_mode above - none of Mapper/RomOnlyMapper/
 // Mbc1Mapper/MapperVariant are marked `export` either (see mapper.cppm's
 // own comments); Mmu is their only consumer.
-export import :mapper;
+export import :mappers;
 
 export namespace gbemu {
 

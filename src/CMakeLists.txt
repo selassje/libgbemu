@@ -15,7 +15,7 @@ target_sources(
          ${MODULES}/apu.cppm
          ${MODULES}/cpu.cppm
          ${MODULES}/mmu.cppm
-         ${MODULES}/mapper.cppm
+         ${MODULES}/mappers.cppm
          ${MODULES}/ppu.cppm
          ${MODULES}/boot_rom.cppm
          ${MODULES}/regs.cppm
@@ -33,7 +33,7 @@ if(MSVC)
     ${MODULES}/apu.cppm
     ${MODULES}/cpu.cppm
     ${MODULES}/mmu.cppm
-    ${MODULES}/mapper.cppm
+    ${MODULES}/mappers.cppm
     ${MODULES}/ppu.cppm
     ${MODULES}/boot_rom.cppm
     ${MODULES}/regs.cppm
@@ -48,7 +48,10 @@ target_sources(
           ${CMAKE_CURRENT_LIST_DIR}/apu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/cpu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/mmu.cpp
-          ${CMAKE_CURRENT_LIST_DIR}/mapper.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mappers/mapper.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mappers/rom_only.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mappers/mbc1.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/mappers/mbc3.cpp
           ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp
           ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp)

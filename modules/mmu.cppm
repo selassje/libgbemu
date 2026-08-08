@@ -3,7 +3,7 @@ export module gbemu:mmu;
 import std;
 import :apu;
 import :hardware_mode;
-import :mapper;
+import :mappers;
 import :serialization;
 
 namespace gbemu {

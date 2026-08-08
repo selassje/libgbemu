@@ -1,4 +1,4 @@
-export module gbemu:mapper;
+export module gbemu:mappers;
 
 import std;
 import :serialization;
