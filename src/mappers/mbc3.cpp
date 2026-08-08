@@ -123,6 +123,10 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
     switch (*m_selectedRtc) {
       case mbc3::RTC_S:
         m_rtc.seconds = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_S);
+        // Real hardware resets the sub-second prescaler on any write to the
+        // seconds register - writes to the other RTC registers leave it
+        // running in place. See rtc3test's "sub-second writes" subtest.
+        m_rtc.tCycles = 0;
         break;
       case mbc3::RTC_M:
         m_rtc.minutes = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_M);
@@ -225,17 +229,23 @@ Mbc3Mapper::runNextTCycle()
 void
 Mbc3Mapper::RealTimeClock::runNextTCycle()
 {
+  // The sub-second prescaler itself is gated by halt too - real hardware
+  // freezes it in place while halted rather than letting it keep running
+  // and only masking the S/M/H/day fields, so it resumes from the exact
+  // sub-second position it was halted at. See rtc3test's "sub-second
+  // writes" subtest, specifically the "RTC off" case.
+  if (halt) {
+    return;
+  }
   ++tCycles;
   if (tCycles >= mbc3::T_CYCLES_PER_SECOND) {
     tCycles = 0;
-    if (!halt) {
-      if (mbc3::tickField(seconds, 59, 63) && mbc3::tickField(minutes, 59, 63)
-          && mbc3::tickField(hours, 23, 31)) {
-        ++days;
-        if (days > 511) {
-          days = 0;
-          dayCarry = true;
-        }
+    if (mbc3::tickField(seconds, 59, 63) && mbc3::tickField(minutes, 59, 63)
+        && mbc3::tickField(hours, 23, 31)) {
+      ++days;
+      if (days > 511) {
+        days = 0;
+        dayCarry = true;
       }
     }
   }
