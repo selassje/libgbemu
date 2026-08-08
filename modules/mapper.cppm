@@ -174,6 +174,38 @@ private:
   bool m_bankingMode{ false };
 };
 
+class Mbc3Mapper // NOLINT(misc-use-internal-linkage)
+  : private Mapper
+{
+public:
+  // Mapper's own readRam()/writeRam() are otherwise private here (private
+  // inheritance) - see Mapper's own comment on why that's the intent.
+  using Mapper::readRam;
+  using Mapper::writeRam;
+
+  explicit Mbc3Mapper(std::span<const std::uint8_t> rom);
+
+  [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
+  void writeRom(std::uint16_t address, std::uint8_t value);
+
+  void reset();
+
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
+
+private:
+  // Recomputed from m_romBankLow/m_bankHigh/m_bankingMode on every call
+  // rather than cached - it's cheap, and avoids a fourth piece of state
+  // that could drift out of sync with the three registers it's purely
+  // derived from (m_switchableRomBank, kept as a separate stored field,
+  // was exactly that risk before this refactor).
+  [[nodiscard]] std::size_t currentRomBank() const;
+
+  std::uint8_t m_romBankLow{ 1 };
+  std::uint8_t m_bankHigh{ 0 };
+  bool m_bankingMode{ false };
+};
+
 // Constrains std::variant itself to only ever hold types satisfying
 // MapperLike - MapperVariant below is built through this rather than a
 // bare std::variant<RomOnlyMapper, Mbc1Mapper> so a future mapper type
@@ -184,6 +216,6 @@ template<typename... Ts>
   requires(MapperLike<Ts> && ...)
 using MapperVariantOf = std::variant<Ts...>;
 
-using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper>;
+using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper>;
 
 }
