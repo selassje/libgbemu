@@ -281,6 +281,11 @@ Mbc3Mapper::reset()
   resetRam();
   m_romBank = 1;
   m_ramBank = 0;
+  m_ramAndTimerEnabled = false;
+  m_selectedRtc = std::nullopt;
+  m_rtcRegisters = {};
+  m_lastLatchValue = 0xFF;
+  m_rtc = RealTimeClock{};
 }
 
 void
@@ -288,6 +293,23 @@ Mbc3Mapper::serialize(SaveStateWriter& writer) const
 {
   writer.writeU8(m_romBank);
   writer.writeU8(m_ramBank);
+  writer.writeBool(m_ramAndTimerEnabled);
+
+  writer.writeBool(m_selectedRtc.has_value());
+  if (m_selectedRtc) {
+    writer.writeSize(*m_selectedRtc);
+  }
+  writer.writeBytes(m_rtcRegisters);
+  writer.writeU8(m_lastLatchValue);
+
+  writer.writeU8(m_rtc.seconds);
+  writer.writeU8(m_rtc.minutes);
+  writer.writeU8(m_rtc.hours);
+  writer.writeU16(m_rtc.days);
+  writer.writeBool(m_rtc.dayCarry);
+  writer.writeBool(m_rtc.halt);
+  writer.writeU64(m_rtc.tCycles);
+
   serializeRam(writer);
 }
 
@@ -296,6 +318,24 @@ Mbc3Mapper::deserialize(SaveStateReader& reader)
 {
   m_romBank = reader.readU8();
   m_ramBank = reader.readU8();
+  m_ramAndTimerEnabled = reader.readBool();
+
+  if (reader.readBool()) {
+    m_selectedRtc = reader.readSize();
+  } else {
+    m_selectedRtc = std::nullopt;
+  }
+  reader.readBytes(m_rtcRegisters);
+  m_lastLatchValue = reader.readU8();
+
+  m_rtc.seconds = reader.readU8();
+  m_rtc.minutes = reader.readU8();
+  m_rtc.hours = reader.readU8();
+  m_rtc.days = reader.readU16();
+  m_rtc.dayCarry = reader.readBool();
+  m_rtc.halt = reader.readBool();
+  m_rtc.tCycles = reader.readU64();
+
   deserializeRam(reader);
 }
 
