@@ -198,7 +198,7 @@ Mbc3Mapper::writeRom(std::uint16_t address, std::uint8_t value)
       m_ramAndTimerEnabled = false;
     }
   } else if (address < 0x4000) {
-    m_romBank = value & static_cast<std::uint8_t>(0x7F);
+    m_romBank = value;
     if (m_romBank == 0) {
       m_romBank = 1;
     }
