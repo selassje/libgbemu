@@ -38,6 +38,18 @@ cmake --build --preset dev_ninja_gcc
 ctest --preset dev_ninja_gcc
 ```
 
+**When actually running the test suite (not just building it), prefer a
+`release_*` preset with `ctest`'s own `--parallel`/`-j` flag** - e.g.
+`ctest --preset release_ninja_gcc -j$(nproc)`. `catch_discover_tests`
+registers one `ctest` entry per `TEST_CASE`, so `-j` runs many of them
+concurrently instead of one Catch2 process working through all of them
+serially; combined with `Release` optimizations, this took the full suite
+from several minutes (sequential, `dev_ninja_gcc`'s `Debug` build) to ~11
+seconds (parallel, `release_ninja_gcc`, 16 cores) - measured directly, not
+a guess. `dev_*` presets remain the right choice while iterating on a
+single failing test (faster incremental rebuilds, debug symbols), just not
+for running the whole suite.
+
 Or build/run the test binary directly (finer control, e.g. filtering to one
 `TEST_CASE` by name via Catch2's own CLI):
 
