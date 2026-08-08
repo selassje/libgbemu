@@ -748,10 +748,11 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
     case 0x03:
       m_mapper.emplace<Mbc1Mapper>(rom);
       break;
-    case 0x010:
-    case 0x011:
-    case 0x012:
-    case 0x013:
+    case 0x0F:
+    case 0x10:
+    case 0x11:
+    case 0x12:
+    case 0x13:
       m_mapper.emplace<Mbc3Mapper>(rom);
       break;
     default:
