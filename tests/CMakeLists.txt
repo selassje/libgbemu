@@ -18,6 +18,7 @@ target_compile_definitions(
     # come from the fetched zip like every other suite.
     DMG_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2"
     CGB_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cgb-acid2"
+    MBC3_TESTER_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc3-tester"
     # Fetched at configure time by cmake/fetch_test_roms.cmake - not vendored in
     # git, see that file for why.
     GB_TEST_ROMS_DIR="${TEST_ROMS_DIR}/blargg"

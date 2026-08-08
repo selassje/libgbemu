@@ -52,12 +52,11 @@ protected:
   void resetRam() { m_ram = {}; }
   void serializeRam(SaveStateWriter& writer) const { writer.writeBytes(m_ram); }
   void deserializeRam(SaveStateReader& reader) { reader.readBytes(m_ram); }
-  
+
   static constexpr std::size_t RAM_BANK_SIZE = 0x2000;
   static constexpr std::size_t RAM_SIZE = RAM_BANK_SIZE * 8;
 
 private:
-
   std::vector<std::uint8_t> m_rom;
   // Present unconditionally, matching this library's existing behavior of
   // always backing 0xA000-0xBFFF with 8KB regardless of whether the
@@ -203,7 +202,6 @@ public:
   void deserialize(SaveStateReader& reader);
 
 private:
-
   // Recomputed from m_romBankLow/m_bankHigh/m_bankingMode on every call
   // rather than cached - it's cheap, and avoids a fourth piece of state
   // that could drift out of sync with the three registers it's purely
