@@ -28,6 +28,9 @@ class Mapper // NOLINT(misc-use-internal-linkage)
 public:
   [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
   void writeRam(std::uint16_t address, std::uint8_t value);
+  void runNextTCycle()
+  { // not every mapper needs to implement this
+  }
 
 protected:
   static constexpr std::size_t KB16 = 0x4000;
@@ -49,9 +52,11 @@ protected:
   void resetRam() { m_ram = {}; }
   void serializeRam(SaveStateWriter& writer) const { writer.writeBytes(m_ram); }
   void deserializeRam(SaveStateReader& reader) { reader.readBytes(m_ram); }
+  
+  static constexpr std::size_t RAM_BANK_SIZE = 0x2000;
+  static constexpr std::size_t RAM_SIZE = RAM_BANK_SIZE * 8;
 
 private:
-  static constexpr std::size_t RAM_SIZE = 0x2000;
 
   std::vector<std::uint8_t> m_rom;
   // Present unconditionally, matching this library's existing behavior of
@@ -107,6 +112,8 @@ concept MapperLike = requires(T& mapper,
   // register state round-trip here.
   { constMapper.serialize(writer) } -> std::same_as<void>;
   { mapper.deserialize(reader) } -> std::same_as<void>;
+
+  { mapper.runNextTCycle() } -> std::same_as<void>;
 };
 
 // Cartridge type 0x00 ("ROM ONLY"): no bank switching. Also the fallback
@@ -121,6 +128,7 @@ public:
   // Mapper's own readRam()/writeRam() are otherwise private here (private
   // inheritance) - see Mapper's own comment on why that's the intent.
   using Mapper::readRam;
+  using Mapper::runNextTCycle;
   using Mapper::writeRam;
 
   RomOnlyMapper() = default;
@@ -149,6 +157,7 @@ public:
   // Mapper's own readRam()/writeRam() are otherwise private here (private
   // inheritance) - see Mapper's own comment on why that's the intent.
   using Mapper::readRam;
+  using Mapper::runNextTCycle;
   using Mapper::writeRam;
 
   explicit Mbc1Mapper(std::span<const std::uint8_t> rom);
@@ -178,10 +187,10 @@ class Mbc3Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
 public:
-  // Mapper's own readRam()/writeRam() are otherwise private here (private
-  // inheritance) - see Mapper's own comment on why that's the intent.
-  using Mapper::readRam;
-  using Mapper::writeRam;
+  [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
+  void writeRam(std::uint16_t address, std::uint8_t value);
+
+  void runNextTCycle();
 
   explicit Mbc3Mapper(std::span<const std::uint8_t> rom);
 
@@ -194,6 +203,7 @@ public:
   void deserialize(SaveStateReader& reader);
 
 private:
+
   // Recomputed from m_romBankLow/m_bankHigh/m_bankingMode on every call
   // rather than cached - it's cheap, and avoids a fourth piece of state
   // that could drift out of sync with the three registers it's purely
@@ -201,9 +211,26 @@ private:
   // was exactly that risk before this refactor).
   [[nodiscard]] std::size_t currentRomBank() const;
 
-  std::uint8_t m_romBankLow{ 1 };
-  std::uint8_t m_bankHigh{ 0 };
-  bool m_bankingMode{ false };
+  std::uint8_t m_romBank{};
+  std::uint8_t m_ramBank{};
+  bool m_ramAndTimerEnabled{ false };
+  std::optional<std::size_t> m_selectedRtc{ std::nullopt };
+  std::array<std::uint8_t, 5> m_rtcRegisters{};
+  std::uint8_t m_lastLatchValue{ 0xFF };
+
+  struct RealTimeClock
+  {
+    std::uint8_t seconds{ 0 };
+    std::uint8_t minutes{ 0 };
+    std::uint8_t hours{ 0 };
+    std::uint16_t days{ 0 };
+    bool dayCarry{ false };
+    bool halt{ false };
+    std::uint64_t tCycles{ 0 };
+    void runNextTCycle();
+  };
+
+  RealTimeClock m_rtc{};
 };
 
 // Constrains std::variant itself to only ever hold types satisfying
@@ -217,5 +244,4 @@ template<typename... Ts>
 using MapperVariantOf = std::variant<Ts...>;
 
 using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper>;
-
 }

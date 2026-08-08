@@ -607,6 +607,8 @@ Mmu::switchSpeed()
 void
 Mmu::runNextTCycle()
 {
+  std::visit([](auto& mapper) { mapper.runNextTCycle(); }, m_mapper);
+
   ++m_divCounter;
 
   if (m_dmaState.has_value()) {
