@@ -49,7 +49,11 @@ protected:
     return m_rom.at(index);
   }
 
-  void resetRam() { m_ram = {}; }
+  // fill(), not m_ram = {} - the latter's brace-init temporary trips MSVC
+  // /analyze's C6262 (excessive stack usage) for an array this size (now
+  // 8 RAM banks/64KB, since MBC30 support widened RAM_SIZE); fill()
+  // writes in place with no temporary to begin with.
+  void resetRam() { m_ram.fill(0); }
   void serializeRam(SaveStateWriter& writer) const { writer.writeBytes(m_ram); }
   void deserializeRam(SaveStateReader& reader) { reader.readBytes(m_ram); }
 
