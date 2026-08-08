@@ -59,7 +59,8 @@
       "toolchainFile": "${sourceDir}/builds/dev_ninja_clang/generators/conan_toolchain.cmake",
       "binaryDir": "${sourceDir}/builds/dev_ninja_clang/build",
       "cacheVariables": {
-        "CMAKE_CXX_MODULE_STD": "OFF"
+        "CMAKE_CXX_MODULE_STD": "OFF",
+        "CMAKE_TRY_COMPILE_CONFIGURATION": "Debug"
       },
       "environment": {
         "CXX": "clang++",
@@ -231,6 +232,37 @@
       }
     },
     {
+      "name": "release_ninja_msvc",
+      "displayName": "release (Ninja, MSVC) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_windows",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/release_ninja_msvc/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/release_ninja_msvc/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "ON"
+      }
+    },
+    {
+      "name": "release_ninja_clang",
+      "displayName": "release (Ninja, clang) - run from a Developer PowerShell/Command Prompt",
+      "inherits": "dev_windows",
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/builds/release_ninja_clang/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/release_ninja_clang/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "OFF",
+        "CMAKE_TRY_COMPILE_CONFIGURATION": "Release"
+      },
+      "environment": {
+        "CXX": "clang++",
+        "CC": "clang"
+      }
+    },
+    {
       "name": "dev_vs_msvc",
       "displayName": "development (Visual Studio, MSVC)",
       "inherits": "dev_windows",
@@ -252,6 +284,19 @@
       "cacheVariables": {
         "ENABLE_MSVC_ANALYSIS": "ON"
       }
+    },
+    {
+      "name": "release_vs_msvc",
+      "displayName": "release (Visual Studio, MSVC)",
+      "inherits": "dev_windows",
+      "generator": "Visual Studio 18 2026",
+      "toolchainFile": "${sourceDir}/builds/release_vs_msvc/generators/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_CONFIGURATION_TYPES": "Release",
+        "CMAKE_EXPERIMENTAL_CXX_IMPORT_STD": "f35a9ac6-8463-4d38-8eec-5d6008153e7d",
+        "CMAKE_CXX_MODULE_STD": "OFF"
+      },
+      "binaryDir": "${sourceDir}/builds/release_vs_msvc/build"
     }
   ],
   "buildPresets": [
@@ -316,6 +361,14 @@
       "configurePreset": "release_ninja_clang_linux"
     },
     {
+      "name": "release_ninja_msvc",
+      "configurePreset": "release_ninja_msvc"
+    },
+    {
+      "name": "release_ninja_clang",
+      "configurePreset": "release_ninja_clang"
+    },
+    {
       "name": "dev_vs_msvc",
       "configurePreset": "dev_vs_msvc",
       "configuration": "Debug"
@@ -324,6 +377,11 @@
       "name": "dev_vs_msvc_analysis",
       "configurePreset": "dev_vs_msvc_analysis",
       "configuration": "Debug"
+    },
+    {
+      "name": "release_vs_msvc",
+      "configurePreset": "release_vs_msvc",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
@@ -414,6 +472,16 @@
       "configurePreset": "release_ninja_clang_linux"
     },
     {
+      "name": "release_ninja_msvc",
+      "inherits": "default",
+      "configurePreset": "release_ninja_msvc"
+    },
+    {
+      "name": "release_ninja_clang",
+      "inherits": "default",
+      "configurePreset": "release_ninja_clang"
+    },
+    {
       "name": "dev_vs_msvc",
       "inherits": "default",
       "configurePreset": "dev_vs_msvc",
@@ -424,6 +492,12 @@
       "inherits": "default",
       "configurePreset": "dev_vs_msvc_analysis",
       "configuration": "Debug"
+    },
+    {
+      "name": "release_vs_msvc",
+      "inherits": "default",
+      "configurePreset": "release_vs_msvc",
+      "configuration": "Release"
     }
   ]
 }
