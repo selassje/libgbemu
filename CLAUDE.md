@@ -7,15 +7,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A Game Boy (DMG/CGB) emulator core library written in C++23 using named modules
 (`.cppm`), built with CMake + CMake Presets and Conan for dependencies (only
 Catch2 currently). Test correctness is validated against blargg's hardware
-test ROMs (a git submodule), not hand-written unit assertions of behavior.
+test ROMs and several other public test-ROM suites (Mooneye, SameSuite,
+Mealybug, gambatte hwtests, etc.), not hand-written unit assertions of
+behavior. Most of these ROMs aren't vendored in git at all - `tests/`'s own
+`CMakeLists.txt` fetches the `c-sp/game-boy-test-roms` release zip at
+configure time (`cmake/fetch_test_roms.cmake`) into the build tree instead,
+since the full set is ~177MB across 5000+ files; only `dmg-acid2`/`cgb-acid2`'s
+`reference.rgb` files stay vendored under `tests/`, since those are raw
+frame-buffer dumps specific to this project that no upstream source provides.
 
 ## Build / test commands
 
-First-time setup requires the test ROMs submodule:
-
-```
-git submodule update --init --recursive
-```
+No submodule init step is needed - test ROMs are fetched by CMake itself (see
+above), on first configure of any `ENABLE_TESTS=ON` preset.
 
 Building is preset-driven; there is no single "the" build — pick one from
 `CMakePresets.json` (`dev_ninja_gcc`, `dev_ninja_clang_linux`,

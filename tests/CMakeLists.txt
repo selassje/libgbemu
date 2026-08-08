@@ -1,5 +1,7 @@
 find_package(Catch2 REQUIRED CONFIG)
 
+include(${CMAKE_SOURCE_DIR}/cmake/fetch_test_roms.cmake)
+
 add_executable(gbemu-tests)
 
 target_sources(gbemu-tests PRIVATE gameboy_test.cpp)
@@ -8,9 +10,34 @@ target_link_libraries(gbemu-tests PRIVATE libgbemu Catch2::Catch2WithMain)
 
 target_compile_definitions(
   gbemu-tests
-  PRIVATE GB_TEST_ROMS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/gb-test-roms"
-          DMG_ACID2_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2"
-          CGB_ACID2_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cgb-acid2")
+  PRIVATE
+    # DMG_ACID2_EXPECTED_DIR/CGB_ACID2_EXPECTED_DIR still point at a small
+    # vendored dir under tests/ - reference.rgb is a raw dump of this
+    # project's own frame buffer, not something upstream (or the fetched
+    # zip below) provides. The ROMs themselves are unmodified upstream
+    # binaries, so those come from the fetched zip like every other suite.
+    DMG_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2"
+    CGB_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cgb-acid2"
+    # Fetched at configure time by cmake/fetch_test_roms.cmake - not
+    # vendored in git, see that file for why.
+    GB_TEST_ROMS_DIR="${TEST_ROMS_DIR}/blargg"
+    DMG_ACID2_DIR="${TEST_ROMS_DIR}/dmg-acid2"
+    CGB_ACID2_DIR="${TEST_ROMS_DIR}/cgb-acid2"
+    AGE_TEST_ROMS_DIR="${TEST_ROMS_DIR}/age-test-roms"
+    BULLY_DIR="${TEST_ROMS_DIR}/bully"
+    CGB_ACID_HELL_DIR="${TEST_ROMS_DIR}/cgb-acid-hell"
+    GAMBATTE_DIR="${TEST_ROMS_DIR}/gambatte"
+    GBMICROTEST_DIR="${TEST_ROMS_DIR}/gbmicrotest"
+    LITTLE_THINGS_GB_DIR="${TEST_ROMS_DIR}/little-things-gb"
+    MBC3_TESTER_DIR="${TEST_ROMS_DIR}/mbc3-tester"
+    MEALYBUG_TEAROOM_TESTS_DIR="${TEST_ROMS_DIR}/mealybug-tearoom-tests"
+    MOONEYE_TEST_SUITE_DIR="${TEST_ROMS_DIR}/mooneye-test-suite"
+    MOONEYE_TEST_SUITE_WILBERTPOL_DIR="${TEST_ROMS_DIR}/mooneye-test-suite-wilbertpol"
+    RTC3TEST_DIR="${TEST_ROMS_DIR}/rtc3test"
+    SAME_SUITE_DIR="${TEST_ROMS_DIR}/same-suite"
+    SCRIBBLTESTS_DIR="${TEST_ROMS_DIR}/scribbltests"
+    STRIKETHROUGH_DIR="${TEST_ROMS_DIR}/strikethrough"
+    TURTLE_TESTS_DIR="${TEST_ROMS_DIR}/turtle-tests")
 
 setup_compiler_warnings(gbemu-tests)
 setup_clang_tidy(gbemu-tests)

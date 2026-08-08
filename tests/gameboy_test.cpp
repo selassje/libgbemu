@@ -219,7 +219,7 @@ TEST_CASE("dmg-acid2", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
   auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_DIR) / "reference.rgb");
+    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
@@ -248,7 +248,7 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
   auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_DIR) / "reference.rgb");
+    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
@@ -271,7 +271,7 @@ TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
   auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_DIR) / "reference.rgb");
+    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
   // Starts on Cgb - setMode() switches it to Dmg below, so this exercises
   // an actual model change, not a same-mode no-op reset.
   gbemu::GameBoy gb{ gbemu::Mode::Cgb };
@@ -296,7 +296,7 @@ TEST_CASE("cgb-acid2", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
   auto reference =
-    readFile(std::filesystem::path(CGB_ACID2_DIR) / "reference.rgb");
+    readFile(std::filesystem::path(CGB_ACID2_EXPECTED_DIR) / "reference.rgb");
   gbemu::GameBoy gb{ gbemu::Mode::Cgb };
 
   auto result = gb.loadRom(rom);
