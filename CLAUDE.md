@@ -11,10 +11,13 @@ test ROMs and several other public test-ROM suites (Mooneye, SameSuite,
 Mealybug, gambatte hwtests, etc.), not hand-written unit assertions of
 behavior. Most of these ROMs aren't vendored in git at all - `tests/`'s own
 `CMakeLists.txt` fetches the `c-sp/game-boy-test-roms` release zip at
-configure time (`cmake/fetch_test_roms.cmake`) into the build tree instead,
-since the full set is ~177MB across 5000+ files; only `dmg-acid2`/`cgb-acid2`'s
-`reference.rgb` files stay vendored under `tests/`, since those are raw
-frame-buffer dumps specific to this project that no upstream source provides.
+configure time (`cmake/fetch_test_roms.cmake`) into `tests/game-boy-test-roms`
+instead (gitignored), since the full set is ~177MB across 5000+ files; that
+location is deliberately under `tests/`, not a per-preset `builds/<preset>/`
+dir, so every preset shares one download/extraction instead of repeating it.
+Only `dmg-acid2`/`cgb-acid2`'s `reference.rgb` files stay vendored under
+`tests/`, since those are raw frame-buffer dumps specific to this project
+that no upstream source provides.
 
 ## Build / test commands
 
