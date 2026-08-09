@@ -72,6 +72,27 @@ Mbc1Mapper::writeRom(std::uint16_t address, std::uint8_t value)
   m_bankingMode = (unsignedValue & MBC1_BANKING_MODE_MASK) != 0;
 }
 
+std::uint8_t
+Mbc1Mapper::readRam(std::uint16_t address) const
+{
+  // Real MBC1 hardware only routes m_bankHigh to RAM (instead of extending
+  // the ROM bank number) while in "RAM banking mode" - see writeRom()'s own
+  // comment on the ROM-banking half of this same shared mode bit. Bank 0
+  // otherwise, regardless of whatever m_bankHigh currently holds.
+  const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
+  return Mapper::readRam(
+    static_cast<std::uint16_t>(address + (bank * RAM_BANK_SIZE)));
+}
+
+void
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+Mbc1Mapper::writeRam(std::uint16_t address, std::uint8_t value)
+{
+  const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
+  Mapper::writeRam(static_cast<std::uint16_t>(address + (bank * RAM_BANK_SIZE)),
+                   value);
+}
+
 void
 Mbc1Mapper::reset()
 {

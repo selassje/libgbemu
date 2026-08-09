@@ -147,26 +147,32 @@ public:
 };
 
 // Cartridge types 0x01-0x03 (MBC1, MBC1+RAM, MBC1+RAM+BATTERY - the RAM/
-// battery distinction isn't yet meaningfully modeled, see Mapper's own
-// comment on RAM always being present regardless of header declaration).
-// ROM banking only: a 5-bit low register (bank 0 reads back as 1, real
-// hardware's own well-known quirk) plus a 2-bit high register that
-// either extends the switchable-bank number or selects a RAM bank,
-// depending on banking mode - see writeRom().
+// battery distinction isn't yet meaningfully modeled: battery-backed saves
+// don't persist across sessions yet, and RAM stays readable/writable
+// regardless of the RAM-enable register, see Mapper's own comment on RAM
+// always being present regardless of header declaration). ROM and RAM
+// banking both: a 5-bit low register (bank 0 reads back as 1, real
+// hardware's own well-known quirk) plus a 2-bit high register that either
+// extends the switchable ROM bank number or selects a RAM bank, depending
+// on banking mode - see writeRom()/readRam()/writeRam().
 class Mbc1Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
 public:
-  // Mapper's own readRam()/writeRam() are otherwise private here (private
+  // Mapper's own runNextTCycle() is otherwise private here (private
   // inheritance) - see Mapper's own comment on why that's the intent.
-  using Mapper::readRam;
+  // readRam()/writeRam() are overridden below instead of reused as-is
+  // (unlike RomOnlyMapper) - RAM banking needs m_bankHigh/m_bankingMode,
+  // which Mapper's own flat, unbanked implementation knows nothing about.
   using Mapper::runNextTCycle;
-  using Mapper::writeRam;
 
   explicit Mbc1Mapper(std::span<const std::uint8_t> rom);
 
   [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
   void writeRom(std::uint16_t address, std::uint8_t value);
+
+  [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
+  void writeRam(std::uint16_t address, std::uint8_t value);
 
   void reset();
 
