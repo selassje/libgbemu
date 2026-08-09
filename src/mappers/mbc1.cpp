@@ -52,9 +52,14 @@ Mbc1Mapper::writeRom(std::uint16_t address, std::uint8_t value)
 {
   const auto unsignedValue = static_cast<unsigned>(value);
   if (address < MBC1_ROM_BANK_REGISTER_START) {
-    // RAM-enable register (0x0000-0x1FFF) - not modeled yet (see Mapper's
-    // own comment on RAM always being accessible regardless of any
-    // header/register gating).
+    // RAM-enable register (0x0000-0x1FFF) - matches Mbc3Mapper's own
+    // writeRom() convention: exactly 0x0A enables, exactly 0x00 disables,
+    // any other value leaves the current state alone.
+    if (value == 0x0A) {
+      m_ramEnabled = true;
+    } else if (value == 0x00) {
+      m_ramEnabled = false;
+    }
     return;
   }
   if (address < MBC1_RAM_BANK_REGISTER_START) {
@@ -75,20 +80,34 @@ Mbc1Mapper::writeRom(std::uint16_t address, std::uint8_t value)
 std::uint8_t
 Mbc1Mapper::readRam(std::uint16_t address) const
 {
+  // Disabled RAM reads back as 0xFF on real hardware (open bus/pull-ups,
+  // not whatever's actually stored) - see the class's own comment. RAM
+  // starts disabled at power-on/reset, before any cartridge ever writes to
+  // the enable register.
+  if (!m_ramEnabled) {
+    return 0xFF;
+  }
   // Real MBC1 hardware only routes m_bankHigh to RAM (instead of extending
   // the ROM bank number) while in "RAM banking mode" - see writeRom()'s own
   // comment on the ROM-banking half of this same shared mode bit. Bank 0
-  // otherwise, regardless of whatever m_bankHigh currently holds.
-  const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
-  return Mapper::readRam(address, bank);
+  // otherwise, regardless of whatever m_bankHigh currently holds. Wrapped
+  // by ramBankCount() the same way currentRomBank() already wraps by ROM's
+  // own bank count - see its own comment on why an under-populated
+  // cartridge aliases rather than getting distinct per-bank storage it
+  // doesn't physically have.
+  const std::uint8_t rawBank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
+  return Mapper::readRam(address, rawBank % ramBankCount());
 }
 
 void
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Mbc1Mapper::writeRam(std::uint16_t address, std::uint8_t value)
 {
-  const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
-  Mapper::writeRam(address, bank, value);
+  if (!m_ramEnabled) {
+    return;
+  }
+  const std::uint8_t rawBank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
+  Mapper::writeRam(address, rawBank % ramBankCount(), value);
 }
 
 void
@@ -98,6 +117,7 @@ Mbc1Mapper::reset()
   m_romBankLow = 1;
   m_bankHigh = 0;
   m_bankingMode = false;
+  m_ramEnabled = false;
 }
 
 void
@@ -106,6 +126,7 @@ Mbc1Mapper::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_romBankLow);
   writer.writeU8(m_bankHigh);
   writer.writeBool(m_bankingMode);
+  writer.writeBool(m_ramEnabled);
   serializeRam(writer);
 }
 
@@ -115,6 +136,7 @@ Mbc1Mapper::deserialize(SaveStateReader& reader)
   m_romBankLow = reader.readU8();
   m_bankHigh = reader.readU8();
   m_bankingMode = reader.readBool();
+  m_ramEnabled = reader.readBool();
   deserializeRam(reader);
 }
 

@@ -49,6 +49,41 @@ protected:
     return m_rom.at(index);
   }
 
+  // Real hardware only ever exposes as many *distinct* RAM banks as the
+  // cartridge's own SRAM chip actually has, declared in its header at
+  // 0x0149 - a cartridge with, say, a single 8KB chip has no physical
+  // bank 1/2/3 for a mapper's bank-select register to reach, so selecting
+  // one of those aliases back onto the bank(s) that do exist instead (mod
+  // ramBankCount(), the same wraparound convention readRom() already
+  // applies for ROM banks) rather than reading/writing distinct storage
+  // per bank number regardless of what's actually populated. Every code
+  // in the table below is already a power of two, so mod and mask would
+  // be equivalent - mod purely for readability, not a rejected mask.
+  [[nodiscard]] std::size_t ramBankCount() const
+  {
+    constexpr std::uint16_t ramSizeHeaderAddress = 0x0149;
+    if (ramSizeHeaderAddress >= romSize()) {
+      return 1;
+    }
+    switch (romByte(ramSizeHeaderAddress)) {
+      case 0x02:
+        return 1; // 8 KB
+      case 0x03:
+        return 4; // 32 KB
+      case 0x04:
+        return 16; // 128 KB
+      case 0x05:
+        return 8; // 64 KB
+      default:
+        // 0x00 (no RAM) or an unrecognized/reserved code - stay
+        // permissive (bank 0 always resolves, matching this library's own
+        // existing behavior of backing 0xA000-0xBFFF unconditionally even
+        // when the header declares no RAM at all - see m_ram's own
+        // comment) rather than rejecting bank-select writes outright.
+        return 1;
+    }
+  }
+
   // For mappers with RAM banking (Mbc1Mapper/Mbc3Mapper's real-RAM path) -
   // NOT `readRam(static_cast<uint16_t>(address + bank * RAM_BANK_SIZE))`,
   // a real bug this replaced: that truncates the sum back down to 16 bits
@@ -165,13 +200,16 @@ public:
 
 // Cartridge types 0x01-0x03 (MBC1, MBC1+RAM, MBC1+RAM+BATTERY - the RAM/
 // battery distinction isn't yet meaningfully modeled: battery-backed saves
-// don't persist across sessions yet, and RAM stays readable/writable
-// regardless of the RAM-enable register, see Mapper's own comment on RAM
+// don't persist across sessions yet, see Mapper's own comment on RAM
 // always being present regardless of header declaration). ROM and RAM
 // banking both: a 5-bit low register (bank 0 reads back as 1, real
 // hardware's own well-known quirk) plus a 2-bit high register that either
 // extends the switchable ROM bank number or selects a RAM bank, depending
-// on banking mode - see writeRom()/readRam()/writeRam().
+// on banking mode - see writeRom()/readRam()/writeRam(). RAM reads/writes
+// are also gated by the RAM-enable register, same as Mbc3Mapper's own
+// m_ramAndTimerEnabled - disabled RAM reads back as 0xFF and ignores
+// writes, matching real hardware's open-bus behavior for a disconnected
+// SRAM chip.
 class Mbc1Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
@@ -207,6 +245,7 @@ private:
   std::uint8_t m_romBankLow{ 1 };
   std::uint8_t m_bankHigh{ 0 };
   bool m_bankingMode{ false };
+  bool m_ramEnabled{ false };
 };
 
 class Mbc3Mapper // NOLINT(misc-use-internal-linkage)

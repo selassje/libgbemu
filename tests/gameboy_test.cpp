@@ -424,6 +424,59 @@ TEST_CASE("mbc1_ram_banks doesn't crash", "[GameBoy]")
   }
 }
 
+// The two mooneye-test-suite ROMs that specifically probe MBC1 RAM banking
+// against real hardware behavior: a cartridge declaring only 1 RAM bank
+// (any bank-select value must alias back onto that same bank - see
+// ramBankCount()'s own comment) and one declaring the full 4 banks (real,
+// distinct per-bank storage). Both used to show "FAIL: Round 1" - RAM is
+// disabled at power-on, and disabled RAM must read back as 0xFF, not
+// whatever's actually stored (see Mbc1Mapper::m_ramEnabled's own comment);
+// with that and the crash fix above, both now reach a static "Test OK"
+// screen by frame 600 (stable at least through frame 800, confirmed
+// identical while finding this frame count) - not mooneye's own
+// register-state pass/fail protocol (see gb-ctr upstream for what that
+// looks like), which would need new GameBoy API surface to read CPU
+// register state that doesn't exist yet, but the screen it draws is an
+// equally direct signal. Self-captured references (see
+// MBC1_TEST_EXPECTED_DIR above), same reasoning as dmg-acid2/cgb-acid2's
+// own reference.rgb - mooneye-test-suite doesn't ship its own screenshots
+// the way game-boy-test-roms does for rtc3test/mbc3-tester.
+TEST_CASE("mbc1 ram_64kb", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc1/ram_64kb.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC1_TEST_EXPECTED_DIR) /
+                     "ram_64kb_reference_dmg.png"));
+}
+
+TEST_CASE("mbc1 ram_256kb", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc1/ram_256kb.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC1_TEST_EXPECTED_DIR) /
+                     "ram_256kb_reference_dmg.png"));
+}
+
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
 // tests/Range tests/Sub-second writes; see rtc3test-*.png in this
 // directory for what each looks like once running). This one compares

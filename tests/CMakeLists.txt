@@ -38,6 +38,11 @@ target_compile_definitions(
     DMG_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2"
     CGB_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cgb-acid2"
     MBC3_TESTER_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc3-tester"
+    # mooneye-test-suite doesn't ship its own reference screenshots the way
+    # game-boy-test-roms does for rtc3test/mbc3-tester - self-captured PNGs (via
+    # png.cpp's writePixelsAsPng(), same as dmg-acid2/cgb-acid2's own
+    # reference.rgb) instead.
+    MBC1_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc1"
     # Fetched at configure time by cmake/fetch_test_roms.cmake - not vendored in
     # git, see that file for why.
     GB_TEST_ROMS_DIR="${TEST_ROMS_DIR}/blargg"
