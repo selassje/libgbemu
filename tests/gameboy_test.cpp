@@ -451,6 +451,51 @@ TEST_CASE("rtc3test basic tests", "[GameBoy]")
     std::filesystem::path(RTC3TEST_DIR) / "rtc3test-basic-tests-dmg.png"));
 }
 
+// Same menu-navigation approach as "rtc3test basic tests" above, but one
+// entry further down: Range tests is the menu's second item. The Down
+// press here is deliberately held for only a single frame, then released
+// and given time to settle before A - unlike A itself (which this ROM
+// only samples occasionally, so needs a few held frames to be seen at
+// all), the cursor responds to Down immediately, and this menu has no
+// input debouncing of its own; holding Down for several frames the way A
+// is held below moves the cursor multiple steps and overshoots past Range
+// tests onto Sub-second writes instead. Confirmed empirically by dumping
+// the settled frame and checking the cursor landed on the right line
+// before turning this into a real assertion.
+TEST_CASE("rtc3test range tests", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(RTC3TEST_DIR) / "rtc3test.gb");
+  gbemu::GameBoy gb{ gbemu::Mode::Dmg };
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToReachMenu = 150;
+  for (int i = 0; i < framesToReachMenu; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  gb.setButtonState(gbemu::Button::Down, true);
+  REQUIRE(gb.runNextFrame().has_value());
+  gb.setButtonState(gbemu::Button::Down, false);
+
+  constexpr int framesToSettleCursor = 20;
+  for (int i = 0; i < framesToSettleCursor; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  gb.setButtonState(gbemu::Button::A, true);
+  REQUIRE(gb.runNextFrame().has_value());
+  gb.setButtonState(gbemu::Button::A, false);
+
+  constexpr int framesToStabilize = 1500;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(pixelsMatchPng(
+    std::span(frame.pixels.data_handle(), frame.pixels.size()),
+    gbemu::SCREEN_WIDTH,
+    gbemu::SCREEN_HEIGHT,
+    std::filesystem::path(RTC3TEST_DIR) / "rtc3test-range-tests-dmg.png"));
+}
+
 TEST_CASE("SaveStateWriter/SaveStateReader round-trip every field type",
           "[Serialization]")
 {
