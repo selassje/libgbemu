@@ -21,10 +21,25 @@ on top of it.
   boot-palette colorization of DMG-only games), and CGB double-speed mode
   (KEY1).
 - All four APU channels (two pulse, wave, noise), sample-accurate.
-- ROM-only and MBC1 cartridges (ROM banking only - no external RAM/battery
-  saves yet).
+- ROM-only, MBC1, and MBC3 cartridges: real ROM and RAM banking (a
+  bank-select value beyond what a cartridge's own header actually declares
+  aliases back onto the bank(s) it does have, matching real hardware) and
+  RAM-enable gating (disabled RAM reads back as 0xFF, writes are ignored).
+  MBC3 also implements its real-time clock register set, including its own
+  range/rollover and sub-second-write quirks. No battery-backed save
+  persistence across sessions yet - `saveState()`/`loadState()` round-trip
+  an in-memory snapshot, not a `.sav` file.
 - No test target exists that skips correctness checks: every behavior claim
   above is backed by a passing hardware test ROM (see Testing).
+
+## Known limitations
+
+- MBC5 - the most common mapper in the CGB-era game library - along with
+  MBC2, MBC6, MBC7, and HuC1/HuC3 aren't implemented; only ROM-only, MBC1,
+  and MBC3 are (see Features).
+- CGB HDMA (general-purpose and HBlank VRAM-to-VRAM DMA, registers
+  0xFF51-0xFF55) isn't implemented.
+- No battery-backed save persistence (see Features).
 
 ## Testing
 
@@ -33,13 +48,27 @@ unit assertions of expected behavior:
 
 - [blargg's test ROMs](https://github.com/retrio/gb-test-roms) (`cpu_instrs`,
   `instr_timing`, `mem_timing`, `mem_timing-2`, `halt_bug`, `interrupt_time`,
-  `dmg_sound`) - vendored as a git submodule.
+  `dmg_sound`, `cgb_sound`).
 - [dmg-acid2](https://github.com/mattcurrie/dmg-acid2) and
   [cgb-acid2](https://github.com/mattcurrie/cgb-acid2), by Matt Currie -
-  pixel-exact PPU rendering tests, vendored directly under `tests/`.
+  pixel-exact PPU rendering tests.
+- [MBC3 Tester](https://github.com/EricKirschenmann/MBC3-Tester-gb), by Eric
+  Kirschenmann, and [rtc3test](https://github.com/aaaaaa123456789/rtc3test),
+  by ax6 - MBC3 ROM/RAM banking (including MBC30's full 8-bit bank register)
+  and real-time clock correctness, including its range/rollover and
+  sub-second-write quirks.
+- [Mooneye Test Suite](https://github.com/Gekkio/mooneye-test-suite)'s
+  `emulator-only/mbc1/ram_64kb`/`ram_256kb` - MBC1 RAM banking and
+  RAM-enable gating, against both an under- and a fully-populated
+  cartridge.
+
+All of the above are fetched at configure time, not vendored in git (the
+full test-ROM set is ~177MB across 5000+ files) - only a handful of small
+reference frame buffers dmg-acid2/cgb-acid2/the MBC1 tests compare against
+(no upstream source provides these) are vendored under `tests/`. See
+`CLAUDE.md` for details.
 
 ```
-git submodule update --init --recursive
 cmake --preset dev_ninja_gcc
 cmake --build --preset dev_ninja_gcc
 ctest --preset dev_ninja_gcc
