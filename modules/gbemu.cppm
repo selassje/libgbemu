@@ -104,6 +104,14 @@ public:
   // the model afterward isn't fighting a half-applied change.
   [[nodiscard]] std::expected<void, std::string> setMode(Mode mode);
 
+  // The console model this instance currently emulates - the setting
+  // passed to the constructor or the last setMode() call, not the
+  // per-cartridge resolved HardwareMode (Mode::Auto included: this stays
+  // Auto even once a real cartridge has resolved it to DMG or CGB
+  // internally). Lets a caller read this back directly instead of having
+  // to separately track its own copy of whatever Mode it last requested.
+  [[nodiscard]] Mode getMode() const { return m_model; }
+
   std::expected<EmulationFrame, std::string> runNextFrame();
   void setButtonState(Button button, bool pressed);
 
