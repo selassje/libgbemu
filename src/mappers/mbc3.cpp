@@ -114,8 +114,7 @@ Mbc3Mapper::readRam(std::uint16_t address) const
   if (m_selectedRtc.has_value()) {
     return m_rtcRegisters.at(*m_selectedRtc);
   }
-  return Mapper::readRam(
-    static_cast<std::uint16_t>(address + (m_ramBank * RAM_BANK_SIZE)));
+  return Mapper::readRam(address, m_ramBank);
 }
 
 void
@@ -157,8 +156,7 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
       value & mbc3::REGISTER_MASKS.at(*m_selectedRtc);
     return;
   }
-  Mapper::writeRam(
-    static_cast<std::uint16_t>(address + (m_ramBank * RAM_BANK_SIZE)), value);
+  Mapper::writeRam(address, m_ramBank, value);
 }
 
 void

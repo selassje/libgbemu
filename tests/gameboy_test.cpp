@@ -392,6 +392,38 @@ TEST_CASE("mbc3-tester (cgb)", "[GameBoy]")
     std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
+// Regression test for a real crash: Mbc1Mapper::readRam()/writeRam() used
+// to compute the RAM-bank-relative address as
+// `static_cast<uint16_t>(address + bank * RAM_BANK_SIZE)`, truncating that
+// sum back down to 16 bits *before* subtracting the external-RAM window's
+// own base address - for bank 3 (reachable on any real MBC1+RAM cartridge
+// with the full 32KB/4-bank RAM size, like this ROM's own header declares)
+// at any address in 0xA000-0xBFFF, that sum overflows uint16_t, wraps
+// around, and lands outside the RAM array entirely, throwing
+// std::out_of_range and crashing the whole process - exactly what an
+// actual game did in practice (see this test's own commit). This ROM
+// (from gbmicrotest, chosen for declaring the full 4 RAM banks in its
+// header - see its own 0x0149) exercises writes/reads across every RAM
+// bank; not decoding its own pass/fail signal yet (unlike the rtc3test/
+// mbc3-tester ROMs above), so this only guards against the crash itself
+// reappearing, not against a correctness regression in what gets stored.
+TEST_CASE("mbc1_ram_banks doesn't crash", "[GameBoy]")
+{
+  auto rom =
+    readFile(std::filesystem::path(GBMICROTEST_DIR) / "mbc1_ram_banks.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToRun = 300;
+  for (int i = 0; i < framesToRun; ++i) {
+    const auto result = gb.runNextFrame();
+    if (!result) {
+      FAIL("Error : " + result.error());
+    }
+    REQUIRE(result.has_value());
+  }
+}
+
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
 // tests/Range tests/Sub-second writes; see rtc3test-*.png in this
 // directory for what each looks like once running). This one compares

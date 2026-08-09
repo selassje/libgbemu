@@ -80,8 +80,7 @@ Mbc1Mapper::readRam(std::uint16_t address) const
   // comment on the ROM-banking half of this same shared mode bit. Bank 0
   // otherwise, regardless of whatever m_bankHigh currently holds.
   const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
-  return Mapper::readRam(
-    static_cast<std::uint16_t>(address + (bank * RAM_BANK_SIZE)));
+  return Mapper::readRam(address, bank);
 }
 
 void
@@ -89,8 +88,7 @@ void
 Mbc1Mapper::writeRam(std::uint16_t address, std::uint8_t value)
 {
   const std::uint8_t bank = m_bankingMode ? m_bankHigh : std::uint8_t{ 0 };
-  Mapper::writeRam(static_cast<std::uint16_t>(address + (bank * RAM_BANK_SIZE)),
-                   value);
+  Mapper::writeRam(address, bank, value);
 }
 
 void

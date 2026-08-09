@@ -49,6 +49,23 @@ protected:
     return m_rom.at(index);
   }
 
+  // For mappers with RAM banking (Mbc1Mapper/Mbc3Mapper's real-RAM path) -
+  // NOT `readRam(static_cast<uint16_t>(address + bank * RAM_BANK_SIZE))`,
+  // a real bug this replaced: that truncates the sum back down to 16 bits
+  // *before* readRam()/writeRam() subtracts EXT_RAM_START, so for banks/
+  // addresses where address + bank*RAM_BANK_SIZE overflows std::uint16_t
+  // (e.g. bank 3 at any address, reachable on real MBC1 cartridges - see
+  // this pair's own git history for the crash report that caught it), the
+  // wraparound lands outside RAM_SIZE and .at() throws. Computed here
+  // entirely in std::size_t instead, only ever subtracting EXT_RAM_START
+  // from the original address (never adding to it first), so nothing
+  // overflows before the final bounds check.
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  [[nodiscard]] std::uint8_t readRam(std::uint16_t address,
+                                     std::size_t bank) const;
+  // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+  void writeRam(std::uint16_t address, std::size_t bank, std::uint8_t value);
+
   // fill(), not m_ram = {} - the latter's brace-init temporary trips MSVC
   // /analyze's C6262 (excessive stack usage) for an array this size (now
   // 8 RAM banks/64KB, since MBC30 support widened RAM_SIZE); fill()
