@@ -496,6 +496,50 @@ TEST_CASE("rtc3test range tests", "[GameBoy]")
     std::filesystem::path(RTC3TEST_DIR) / "rtc3test-range-tests-dmg.png"));
 }
 
+// Same approach as "rtc3test range tests" above, one more entry down:
+// Sub-second writes is the menu's third item, reached with two separate
+// single-frame Down presses (each fully settled before the next) rather
+// than one held-longer press - see that test's own comment on why a held
+// press is the fragile option here (it depends on this menu's exact
+// auto-repeat delay/rate to land on exactly 2 steps, where two discrete
+// press-and-release edges land on exactly 2 steps unconditionally).
+TEST_CASE("rtc3test sub-second writes", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(RTC3TEST_DIR) / "rtc3test.gb");
+  gbemu::GameBoy gb{ gbemu::Mode::Dmg };
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToReachMenu = 150;
+  for (int i = 0; i < framesToReachMenu; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  constexpr int menuStepsToSubSecondWrites = 2;
+  constexpr int framesToSettleCursor = 20;
+  for (int press = 0; press < menuStepsToSubSecondWrites; ++press) {
+    gb.setButtonState(gbemu::Button::Down, true);
+    REQUIRE(gb.runNextFrame().has_value());
+    gb.setButtonState(gbemu::Button::Down, false);
+    for (int i = 0; i < framesToSettleCursor; ++i) {
+      REQUIRE(gb.runNextFrame().has_value());
+    }
+  }
+
+  gb.setButtonState(gbemu::Button::A, true);
+  REQUIRE(gb.runNextFrame().has_value());
+  gb.setButtonState(gbemu::Button::A, false);
+
+  constexpr int framesToStabilize = 1500;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(pixelsMatchPng(
+    std::span(frame.pixels.data_handle(), frame.pixels.size()),
+    gbemu::SCREEN_WIDTH,
+    gbemu::SCREEN_HEIGHT,
+    std::filesystem::path(RTC3TEST_DIR) /
+      "rtc3test-sub-second-writes-dmg.png"));
+}
+
 TEST_CASE("SaveStateWriter/SaveStateReader round-trip every field type",
           "[Serialization]")
 {
