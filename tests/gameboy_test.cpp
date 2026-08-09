@@ -3,6 +3,7 @@
 
 import std;
 import gbemu;
+import png;
 
 namespace {
 
@@ -389,6 +390,65 @@ TEST_CASE("mbc3-tester (cgb)", "[GameBoy]")
   REQUIRE(reference.size() == frame.pixels.size());
   REQUIRE(
     std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
+}
+
+// rtc3test.gb boots to a menu picking among its three subtests (Basic
+// tests/Range tests/Sub-second writes; see rtc3test-*.png in this
+// directory for what each looks like once running). This one compares
+// directly against rtc3test-basic-tests-dmg.png - the expected-passing
+// screenshot the game-boy-test-roms release itself ships alongside this
+// ROM (fetched, not vendored - see RTC3TEST_DIR above) - the same
+// independently-sourced-reference approach mbc3-tester (dmg) above uses,
+// via png_reader's readPngAsRgb()/pixelsMatchPng() instead of a
+// pre-decoded reference_dmg.rgb.
+//
+// A few things found empirically here, worth keeping in mind for the other
+// two subtests later:
+// - The ROM's own on-screen hint reads "Run tests", and it's the A button
+//   (not Start) that actually advances past the menu - Start does nothing
+//   on this screen.
+// - rtc3test.gb's header declares CGB support (0x0143 = 0x80, supported but
+//   not required), so Mode::Auto resolves it to CGB hardware (see Mode's
+//   own comment) and its color-palette auto-expansion, not the plain
+//   grayscale DMG rendering this "-dmg" reference image was captured
+//   against - forced explicitly below, the same way cgb-acid2's test
+//   forces Mode::Cgb against its own ROM that would otherwise auto-resolve
+//   the "wrong" way for what's being verified.
+// - DMG's own boot ROM animation runs noticeably longer than CGB's (see
+//   dmg-acid2's own comment on the same difference) - a button press needs
+//   more settling margin here than a CGB-booting ROM would.
+// - Basic tests isn't done after 600 frames (its "Overflow"/"Overflow
+//   stickiness" rows are still mid-test, showing "..." rather than PASS);
+//   1500 comfortably reaches the same fully-passed, static screen
+//   rtc3test-basic-tests-dmg.png shows.
+TEST_CASE("rtc3test basic tests", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(RTC3TEST_DIR) / "rtc3test.gb");
+  gbemu::GameBoy gb{ gbemu::Mode::Dmg };
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToReachMenu = 150;
+  for (int i = 0; i < framesToReachMenu; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  // Held for a few frames rather than one, in case the ROM only samples
+  // input once every few frames rather than every single one.
+  constexpr int framesToHoldButton = 4;
+  gb.setButtonState(gbemu::Button::A, true);
+  for (int i = 0; i < framesToHoldButton; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+  gb.setButtonState(gbemu::Button::A, false);
+
+  constexpr int framesToStabilize = 1500;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(pixelsMatchPng(
+    std::span(frame.pixels.data_handle(), frame.pixels.size()),
+    gbemu::SCREEN_WIDTH,
+    gbemu::SCREEN_HEIGHT,
+    std::filesystem::path(RTC3TEST_DIR) / "rtc3test-basic-tests-dmg.png"));
 }
 
 TEST_CASE("SaveStateWriter/SaveStateReader round-trip every field type",

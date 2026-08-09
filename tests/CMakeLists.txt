@@ -4,7 +4,26 @@ include(${CMAKE_SOURCE_DIR}/cmake/fetch_test_roms.cmake)
 
 add_executable(gbemu-tests)
 
-target_sources(gbemu-tests PRIVATE gameboy_test.cpp)
+target_sources(
+  gbemu-tests
+  PRIVATE FILE_SET
+          modules
+          TYPE
+          CXX_MODULES
+          BASE_DIRS
+          ${CMAKE_CURRENT_SOURCE_DIR}
+          FILES
+          ${CMAKE_CURRENT_SOURCE_DIR}/png.cppm)
+
+if(MSVC)
+  # See src/CMakeLists.txt's own copy of this workaround - VS IntelliSense's
+  # design-time build reconstruction drops the /interface flag MSBuild's real
+  # build infers from FILE_SET CXX_MODULES, misdiagnosing this file's `export`
+  # as C3378.
+  set_source_files_properties(png.cppm PROPERTIES COMPILE_OPTIONS /interface)
+endif()
+
+target_sources(gbemu-tests PRIVATE gameboy_test.cpp png.cpp)
 
 target_link_libraries(gbemu-tests PRIVATE libgbemu Catch2::Catch2WithMain)
 
