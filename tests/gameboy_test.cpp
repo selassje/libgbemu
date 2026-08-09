@@ -532,12 +532,12 @@ TEST_CASE("rtc3test sub-second writes", "[GameBoy]")
   constexpr int framesToStabilize = 1500;
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(pixelsMatchPng(
-    std::span(frame.pixels.data_handle(), frame.pixels.size()),
-    gbemu::SCREEN_WIDTH,
-    gbemu::SCREEN_HEIGHT,
-    std::filesystem::path(RTC3TEST_DIR) /
-      "rtc3test-sub-second-writes-dmg.png"));
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(RTC3TEST_DIR) /
+                     "rtc3test-sub-second-writes-dmg.png"));
 }
 
 TEST_CASE("SaveStateWriter/SaveStateReader round-trip every field type",

@@ -17,10 +17,13 @@ static constexpr std::uint16_t RTC_DH = 0x4;
 // bit (0), halt (6), and day-carry (7) bits. Writes to the remaining bits
 // are ignored and always read back as 0. Indexed the same way as
 // m_rtcRegisters/RTC_S../RTC_DH above.
-static constexpr std::array<std::uint8_t, 5> REGISTER_MASKS = { 0x3F, 0x3F,
-                                                                  0x1F, 0xFF,
-                                                                  0xC1 };
+static constexpr std::array<std::uint8_t, 5> REGISTER_MASKS = { 0x3F,
+                                                                0x3F,
+                                                                0x1F,
+                                                                0xFF,
+                                                                0xC1 };
 
+namespace {
 // Advances one seconds/minutes/hours counter by a tick and reports whether
 // the next counter up should also tick. Real MBC3 hardware distinguishes
 // two kinds of rollover: a "valid" one, triggered only when the field held
@@ -33,6 +36,7 @@ static constexpr std::array<std::uint8_t, 5> REGISTER_MASKS = { 0x3F, 0x3F,
 // normally - see rtc3test's "range tests" subtest, which exercises exactly
 // this quirk.
 [[nodiscard]] bool
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 tickField(std::uint8_t& field, std::uint8_t validMax, std::uint8_t hardMax)
 {
   if (field == validMax) {
@@ -44,6 +48,7 @@ tickField(std::uint8_t& field, std::uint8_t validMax, std::uint8_t hardMax)
     field = 0;
   }
   return false;
+}
 }
 };
 
@@ -240,8 +245,8 @@ Mbc3Mapper::RealTimeClock::runNextTCycle()
   ++tCycles;
   if (tCycles >= mbc3::T_CYCLES_PER_SECOND) {
     tCycles = 0;
-    if (mbc3::tickField(seconds, 59, 63) && mbc3::tickField(minutes, 59, 63)
-        && mbc3::tickField(hours, 23, 31)) {
+    if (mbc3::tickField(seconds, 59, 63) && mbc3::tickField(minutes, 59, 63) &&
+        mbc3::tickField(hours, 23, 31)) {
       ++days;
       if (days > 511) {
         days = 0;
