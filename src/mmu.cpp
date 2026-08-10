@@ -28,7 +28,7 @@ Mmu::getByteRef(this Self& self, std::uint16_t address)
   // outside those two ranges before reaching here.
   if (address < 0xA000) {
     return self.m_vram.at(address - (2 * KB16) +
-                           (self.m_switchableVRamBank * KB8));
+                          (self.m_switchableVRamBank * KB8));
   }
 
   if (address < 0xD000) {
@@ -36,8 +36,7 @@ Mmu::getByteRef(this Self& self, std::uint16_t address)
   }
 
   if (address < 0xE000) {
-    return self.m_wram.at(address - 0xD000 +
-                           (self.m_switchableWRamBank * KB4));
+    return self.m_wram.at(address - 0xD000 + (self.m_switchableWRamBank * KB4));
   }
 
   if (address < 0xFE00) {
