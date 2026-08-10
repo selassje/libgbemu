@@ -300,7 +300,6 @@ class Mbc5Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
 public:
-  
   using Mapper::runNextTCycle;
 
   Mbc5Mapper(std::span<const std::uint8_t> rom, bool rumblerEnabled);
@@ -318,7 +317,7 @@ public:
 
 private:
   [[nodiscard]] std::size_t currentRomBank() const;
-  
+
   // Real MBC5 hardware presents ROM bank 1 at 0x4000-0x7FFF from power-on,
   // the same as every other mapper here (see Mbc1Mapper's own m_romBankLow
   // above) - well-behaved ROMs rely on this and jump straight into that
@@ -342,5 +341,6 @@ template<typename... Ts>
   requires(MapperLike<Ts> && ...)
 using MapperVariantOf = std::variant<Ts...>;
 
-using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper, Mbc5Mapper>;
+using MapperVariant =
+  MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper, Mbc5Mapper>;
 }
