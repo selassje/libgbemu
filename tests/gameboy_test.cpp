@@ -523,6 +523,29 @@ TEST_CASE("mbc5 rom_64Mb", "[GameBoy]")
                      "rom_64Mb_reference_dmg.png"));
 }
 
+// rom_32Mb.gb (4MB/256 banks) is the complementary edge case to rom_64Mb
+// above: bank 255 (0xFF) is the largest value reachable through the 8-bit
+// low register alone, with the high bit (m_romBankHigh) staying 0 the
+// entire time - as opposed to rom_64Mb's banks 256-511, which need that
+// high bit set.
+TEST_CASE("mbc5 rom_32Mb", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc5/rom_32Mb.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
+                     "rom_32Mb_reference_dmg.png"));
+}
+
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
 // tests/Range tests/Sub-second writes; see rtc3test-*.png in this
 // directory for what each looks like once running). This one compares
