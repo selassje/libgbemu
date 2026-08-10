@@ -1,5 +1,3 @@
-module;
-#include <utility>
 module gbemu;
 
 namespace gbemu {

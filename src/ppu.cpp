@@ -59,19 +59,17 @@ Ppu::Fetcher::checkForObject()
   if (m_mode == Mode::Object) {
     return;
   }
-  for (std::size_t i = 0; i < m_ppu.get().m_objectCount; ++i) {
-    auto& object = m_ppu.get().m_objects.at(i);
-    if (object.isFetched) {
-      continue;
-    }
-    const auto xPos = object.xPos;
-    if (m_ppu.get().m_pixelsRendered + 8 >= xPos) {
-      object.isFetched = true;
-      m_currentObject = object;
-      m_ppu.get().saveFetcherState();
-      reset(Mode::Object);
-      break;
-    }
+  auto& objects = m_ppu.get().m_objects;
+  auto it = std::ranges::find_if(objects, [&](const auto& object) {
+    return !object.isFetched &&
+           (m_ppu.get().m_pixelsRendered + 8 >= object.xPos);
+  });
+
+  if (it != objects.end()) {
+    it->isFetched = true;
+    m_currentObject = *it;
+    m_ppu.get().saveFetcherState();
+    reset(Mode::Object);
   }
 }
 
