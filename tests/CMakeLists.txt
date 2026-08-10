@@ -43,6 +43,7 @@ target_compile_definitions(
     # png.cpp's writePixelsAsPng(), same as dmg-acid2/cgb-acid2's own
     # reference.rgb) instead.
     MBC1_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc1"
+    MBC5_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc5"
     # Fetched at configure time by cmake/fetch_test_roms.cmake - not vendored in
     # git, see that file for why.
     GB_TEST_ROMS_DIR="${TEST_ROMS_DIR}/blargg"

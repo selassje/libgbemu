@@ -12,7 +12,7 @@ Mbc5Mapper::Mbc5Mapper(std::span<const std::uint8_t> rom, bool rumblerEnabled)
 std::size_t
 Mbc5Mapper::currentRomBank() const
 {
-  return (static_cast<std::size_t>(m_romBankHigh) << 8) |
+  return (static_cast<std::size_t>(m_romBankHigh) << 8U) |
          static_cast<std::size_t>(m_romBankLow);
 }
 
