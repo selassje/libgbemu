@@ -32,11 +32,7 @@ void
 Mbc5Mapper::writeRom(std::uint16_t address, std::uint8_t value)
 {
   if (address < 0x2000) {
-    if (value == 0x0A) {
-      m_ramEnabled = true;
-    } else if (value == 0x00) {
-      m_ramEnabled = false;
-    }
+    m_ramEnabled = (value & 0x0FU) == 0x0AU;
     return;
   }
   if (address < 0x3000) {

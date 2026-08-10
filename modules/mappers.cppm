@@ -319,7 +319,13 @@ public:
 private:
   [[nodiscard]] std::size_t currentRomBank() const;
   
-  std::uint8_t m_romBankLow{ 0 };
+  // Real MBC5 hardware presents ROM bank 1 at 0x4000-0x7FFF from power-on,
+  // the same as every other mapper here (see Mbc1Mapper's own m_romBankLow
+  // above) - well-behaved ROMs rely on this and jump straight into that
+  // region before ever writing the bank-select registers themselves
+  // (confirmed against mooneye-test-suite's mbc5 rom_*.gb tests, whose very
+  // first instructions CALL into 0x4000+ with no prior bank-select write).
+  std::uint8_t m_romBankLow{ 1 };
   std::uint8_t m_romBankHigh{ 0 };
   bool m_rumblerEnabled{ false };
   bool m_ramEnabled{ false };
