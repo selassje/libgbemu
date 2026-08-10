@@ -757,6 +757,16 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
     case 0x13:
       m_mapper.emplace<Mbc3Mapper>(rom);
       break;
+    case 0x19:
+    case 0x1A:
+    case 0x1B:
+      m_mapper.emplace<Mbc5Mapper>(rom, false);
+      break;
+    case 0x1C:
+    case 0x1D:
+    case 0x1E:
+      m_mapper.emplace<Mbc5Mapper>(rom, true);
+      break;
     default:
       return std::unexpected(
         std::format("Unsupported cartridge type: 0x{:02X}", cartridgeType));

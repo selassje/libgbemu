@@ -296,6 +296,35 @@ private:
 
   RealTimeClock m_rtc{};
 };
+class Mbc5Mapper // NOLINT(misc-use-internal-linkage)
+  : private Mapper
+{
+public:
+  
+  using Mapper::runNextTCycle;
+
+  Mbc5Mapper(std::span<const std::uint8_t> rom, bool rumblerEnabled);
+
+  [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
+  void writeRom(std::uint16_t address, std::uint8_t value);
+
+  [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
+  void writeRam(std::uint16_t address, std::uint8_t value);
+
+  void reset();
+
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
+
+private:
+  [[nodiscard]] std::size_t currentRomBank() const;
+  
+  std::uint8_t m_romBankLow{ 0 };
+  std::uint8_t m_romBankHigh{ 0 };
+  bool m_rumblerEnabled{ false };
+  bool m_ramEnabled{ false };
+  std::uint8_t m_ramBank{ 0 };
+};
 
 // Constrains std::variant itself to only ever hold types satisfying
 // MapperLike - MapperVariant below is built through this rather than a
@@ -307,5 +336,5 @@ template<typename... Ts>
   requires(MapperLike<Ts> && ...)
 using MapperVariantOf = std::variant<Ts...>;
 
-using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper>;
+using MapperVariant = MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper, Mbc5Mapper>;
 }
