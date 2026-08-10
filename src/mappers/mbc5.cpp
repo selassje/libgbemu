@@ -80,7 +80,6 @@ Mbc5Mapper::reset()
   resetRam();
   m_romBankLow = 1;
   m_romBankHigh = 0;
-  m_rumblerEnabled = false;
   m_ramEnabled = false;
   m_ramBank = 0;
 }
