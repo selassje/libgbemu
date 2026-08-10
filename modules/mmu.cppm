@@ -238,7 +238,21 @@ private:
   // (0xFF30-0xFF3F) and NR52 itself are unaffected either way.
   bool m_apuRegistersReadOnly{ true };
 
-  [[nodiscard]] std::uint8_t& getByteRef(std::uint16_t address);
+  // Single definition serving both the const (read-only, from readByte())
+  // and non-const (read/write, from writeByte()/friends) cases via an
+  // explicit object parameter - Self deduces to Mmu or const Mmu depending
+  // on the constness of whatever calls it, so the return type follows
+  // automatically (std::uint8_t& or const std::uint8_t&) without needing a
+  // const_cast to reuse this logic from readByte(). Defined in mmu.cpp;
+  // relies on implicit instantiation (both Self=Mmu and Self=const Mmu are
+  // only ever needed from calls within that same file) rather than explicit
+  // instantiation - MSVC (confirmed on 19.51/VS 2026) miscompiles explicit
+  // instantiation of an explicit-object-parameter member function template,
+  // rejecting every ordinary member-call-syntax call to it afterwards as if
+  // the object argument had to be passed explicitly, even though implicit
+  // instantiation of the identical template works correctly.
+  template<typename Self>
+  [[nodiscard]] auto& getByteRef(this Self& self, std::uint16_t address);
 };
 
 }

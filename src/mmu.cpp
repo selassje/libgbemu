@@ -18,45 +18,48 @@ memoryOutput()
 }
 #endif
 
-std::uint8_t&
-Mmu::getByteRef(std::uint16_t address)
+template<typename Self>
+auto&
+Mmu::getByteRef(this Self& self, std::uint16_t address)
 {
   // ROM (0x0000-0x7FFF) and external RAM (0xA000-0xBFFF) are handled
   // directly by readByte()/writeByte() instead, via the mapper - see
   // their own comments. Both callers already guarantee address is
   // outside those two ranges before reaching here.
   if (address < 0xA000) {
-    return m_vram.at(address - (2 * KB16) + (m_switchableVRamBank * KB8));
+    return self.m_vram.at(address - (2 * KB16) +
+                           (self.m_switchableVRamBank * KB8));
   }
 
   if (address < 0xD000) {
-    return m_wram.at(address - 0xC000);
+    return self.m_wram.at(address - 0xC000);
   }
 
   if (address < 0xE000) {
-    return m_wram.at(address - 0xD000 + (m_switchableWRamBank * KB4));
+    return self.m_wram.at(address - 0xD000 +
+                           (self.m_switchableWRamBank * KB4));
   }
 
   if (address < 0xFE00) {
-    return getByteRef(address - (0xE000 - 0xC000));
+    return self.getByteRef(address - (0xE000 - 0xC000));
   }
 
   if (address < 0xFEA0) {
-    return m_oam.at(address - 0xFE00);
+    return self.m_oam.at(address - 0xFE00);
   }
 
   if (address < 0xFF00) {
-    return m_unusable;
+    return self.m_unusable;
   }
 
   if (address < 0xFF80) {
-    return m_io.at(address - 0xFF00);
+    return self.m_io.at(address - 0xFF00);
   }
 
   if (address < 0xFFFF) {
-    return m_hram.at(address - 0xFF80);
+    return self.m_hram.at(address - 0xFF80);
   }
-  return m_interruptEnableRegister;
+  return self.m_interruptEnableRegister;
 }
 
 namespace {
@@ -99,12 +102,10 @@ Mmu::readByte(std::uint16_t address) const
       [address](const auto& mapper) { return mapper.readRam(address); },
       m_mapper);
   }
-  // Safe: getByteRef() is only ever read through here, never written to, so
-  // no actual mutation of a const object can occur regardless of whether
-  // *this genuinely refers to a const Mmu.
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast)
-  auto& self = const_cast<Mmu&>(*this);
-  const auto value = self.getByteRef(address);
+  // getByteRef()'s explicit-object-parameter overload deduces Self as
+  // const Mmu here (readByte() is const), so this returns a
+  // const std::uint8_t& - no const_cast needed to reuse it read-only.
+  const auto value = getByteRef(address);
   if (address == regs::IF) {
     return static_cast<std::uint8_t>(
       static_cast<unsigned>(value) |
@@ -274,7 +275,7 @@ Mmu::readByte(std::uint16_t address) const
     constexpr unsigned indexMask = 0b0011'1111U;
     const auto controlAddress = address == regs::BCPD ? regs::BCPS : regs::OCPS;
     const auto index =
-      static_cast<unsigned>(self.getByteRef(controlAddress)) & indexMask;
+      static_cast<unsigned>(getByteRef(controlAddress)) & indexMask;
     const auto& paletteRam =
       address == regs::BCPD ? m_bgPaletteRam : m_objPaletteRam;
     return paletteRam.at(index);
