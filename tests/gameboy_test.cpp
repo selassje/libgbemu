@@ -477,10 +477,12 @@ TEST_CASE("mbc1 ram_256kb", "[GameBoy]")
                      "ram_256kb_reference_dmg.png"));
 }
 
-// mooneye-test-suite's MBC5 ROM-bank-switching test, at the smallest ROM
-// size it ships (512KB/32 banks) - same self-captured-reference approach as
-// the mbc1 tests above (see MBC1_TEST_EXPECTED_DIR's own comment), reaching
-// the same static "Test OK" screen by frame 600.
+// mooneye-test-suite's MBC5 ROM-bank-switching tests. Its rom_*Mb.gb names
+// are in kilobits/megabits (cartridge-chip-capacity convention), not
+// kilobytes/megabytes - rom_512kb.gb is actually a 64KB/4-bank file. Same
+// self-captured-reference approach as the mbc1 tests above (see
+// MBC1_TEST_EXPECTED_DIR's own comment), reaching the same static "Test OK"
+// screen by frame 600.
 TEST_CASE("mbc5 rom_512kb", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
@@ -497,6 +499,28 @@ TEST_CASE("mbc5 rom_512kb", "[GameBoy]")
                    gbemu::SCREEN_HEIGHT,
                    std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
                      "rom_512kb_reference_dmg.png"));
+}
+
+// rom_64Mb.gb (actually 8MB/512 banks - see naming-convention comment
+// above) specifically needs bank numbers past 255, exercising the 9-bit
+// bank-select register's high bit (Mbc5Mapper::m_romBankHigh) that
+// rom_512kb.gb's 4 banks never touch.
+TEST_CASE("mbc5 rom_64Mb", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc5/rom_64Mb.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
+                     "rom_64Mb_reference_dmg.png"));
 }
 
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
