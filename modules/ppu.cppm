@@ -18,13 +18,24 @@ public:
   void runNextTCycle();
 
   [[nodiscard]] std::uint16_t dot() const { return m_dot; }
+
   using FrameBuffer =
     std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;
 
-  // Only ever read externally (GameBoy::runNextFrame() wraps it in a
-  // const-element mdspan) - Ppu's own rendering writes go straight to
-  // m_frameBuffer, bypassing this accessor entirely, so there's no
-  // legitimate need for a mutable view out of it.
+  // Returns the last *fully rendered* frame, not whatever's currently being
+  // drawn into mid-scanline - GameBoy::runNextFrame() runs a fixed 70224
+  // T-cycles per call, but CPU instructions are variable-length, so that
+  // loop can stop anywhere within a frame's timing, not necessarily inside
+  // VBlank - reading the actively-rendered buffer at an arbitrary stop
+  // point could return something part this frame's pixels and part the
+  // previous frame's leftovers (visible as sprites/scanline bands that
+  // look like they're from two different frames at once). Real rendering
+  // always writes into m_frameBuffer; runNextTCycle() copies it into
+  // m_completedFrameBuffer (what this actually returns) the instant a
+  // frame finishes (LY reaches 144), so this is always a complete,
+  // internally-consistent snapshot regardless of when between frames the
+  // caller happens to read it - at most one frame's latency behind, the
+  // same as any double-buffered renderer.
   [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
   // Called once by GameBoy::initializeFromRom() after resolving which
@@ -316,10 +327,22 @@ private:
   std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
+  // WX < 7 has no valid on-screen X = WX-7 (it'd be negative) - the window
+  // still triggers at screen X=0 in that case, same as WX=7, just with its
+  // own leftmost (7-WX) pixels clipped rather than shown. Set once by
+  // Fetcher::reset(Mode::Window) when the window triggers, then counted
+  // down in handlePixelTransfer() - a dedicated counter, not reusing
+  // m_scxDiscardedCount above, since that one already has its own job
+  // (disabling itself, not counting anything, once window mode starts -
+  // see reset()'s own comment) and both can't be mid-countdown at once.
+  std::uint8_t m_windowPixelsToDiscard{ 0 };
   bool m_YCondition{ false };
   Fifo<BackgroundPixel> m_bgWndFifo{};
   Fifo<ObjectPixel> m_objFifo{};
   FrameBuffer m_frameBuffer{};
+  // What frameBuffer() actually returns - see its own comment. Copied from
+  // m_frameBuffer the instant a frame finishes rendering (LY reaches 144).
+  FrameBuffer m_completedFrameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
   // Snapshot of m_fetcher's state, captured/restored around an object fetch
   // pausing/resuming the background/window fetch it interrupted. Never run

@@ -92,7 +92,16 @@ Ppu::Fetcher::checkForWindow()
   const auto wx = m_mmu.get().readByte(regs::WX);
   const auto windowEnabled = (m_mmu.get().readByte(regs::LCDC) & 0x20U) != 0;
   const auto yCondition = m_ppu.get().m_YCondition;
-  const auto wxReached = m_ppu.get().m_pixelsRendered + 7 == wx;
+  // wx + 7 == m_pixelsRendered would never match any wx below 7, since
+  // m_pixelsRendered can't go negative - real hardware still triggers at
+  // screen X=0 for wx < 7 (see m_windowPixelsToDiscard's own comment for
+  // the clipping that handles the rest), so this compares the other way
+  // around instead, clamped at 0.
+  constexpr unsigned wxOffset = 7;
+  const auto windowStartX =
+    wx >= wxOffset ? static_cast<unsigned>(wx - wxOffset) : 0U;
+  const auto wxReached =
+    static_cast<unsigned>(m_ppu.get().m_pixelsRendered) == windowStartX;
   if (windowEnabled && yCondition && wxReached) {
     reset(Mode::Window);
   }
@@ -371,7 +380,20 @@ Ppu::Fetcher::reset(Mode mode)
   if (m_mode == Mode::Window) {
     m_Y = m_ppu.get().m_activeWindowRow;
     m_ppu.get().m_activeWindowRow += 1;
+    // Satisfied already (not "reset to 0" the way a real countdown would
+    // be) - the window has no SCX-driven fine scroll of its own, so this
+    // just neutralizes the background's own SCX discard check in
+    // handlePixelTransfer() for the rest of the scanline, rather than
+    // counting anything down itself.
     m_ppu.get().m_scxDiscardedCount = m_ppu.get().m_scx3LowBits;
+    // See checkForWindow(): WX < 7 triggers here at screen X=0 same as
+    // WX == 7, but still owes (7 - WX) pixels of clipping from its own
+    // left edge - handlePixelTransfer() counts this down before any
+    // window pixel actually reaches the screen.
+    constexpr std::uint8_t wxOffset = 7;
+    const auto wx = m_mmu.get().readByte(regs::WX);
+    m_ppu.get().m_windowPixelsToDiscard =
+      wx < wxOffset ? static_cast<std::uint8_t>(wxOffset - wx) : 0;
   } else {
     m_Y = m_ppu.get().m_scanline;
   }
@@ -501,6 +523,9 @@ Ppu::incrementDot()
         m_mmu.get().writeByte(
           regs::IF,
           static_cast<std::uint8_t>(interruptFlags | VBLANK_INTERRUPT_BIT));
+        // The frame just finished rendering - publish it as the one
+        // frameBuffer() returns (see its own comment).
+        m_completedFrameBuffer = m_frameBuffer;
       }
     } else {
       m_mode = Mode::OAMSearch;
@@ -515,6 +540,11 @@ Ppu::incrementDot()
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
+        // Not strictly required (always set fresh by reset(Mode::Window)
+        // whenever the window actually triggers - see its own comment) -
+        // cleared here anyway so no stale value from a previous scanline
+        // could ever be read as meaningful.
+        m_windowPixelsToDiscard = 0;
         m_objFifo.clear();
         m_fetcher.reset(Fetcher::Mode::Background);
         if (!m_YCondition && m_scanline == m_mmu.get().readByte(regs::WY)) {
@@ -570,6 +600,11 @@ Ppu::handlePixelTransfer()
   if (m_scxDiscardedCount < m_scx3LowBits) {
     m_bgWndFifo.pop();
     ++m_scxDiscardedCount;
+    return false;
+  }
+  if (m_windowPixelsToDiscard > 0) {
+    m_bgWndFifo.pop();
+    --m_windowPixelsToDiscard;
     return false;
   }
   const auto pixelIndex =
@@ -649,7 +684,7 @@ Ppu::handlePixelTransfer()
 const Ppu::FrameBuffer&
 Ppu::frameBuffer() const
 {
-  return m_frameBuffer;
+  return m_completedFrameBuffer;
 }
 
 void
@@ -680,10 +715,12 @@ Ppu::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_pixelsRendered);
   writer.writeU8(m_scx3LowBits);
   writer.writeU8(m_scxDiscardedCount);
+  writer.writeU8(m_windowPixelsToDiscard);
   writer.writeBool(m_YCondition);
   m_bgWndFifo.serialize(writer);
   m_objFifo.serialize(writer);
   writer.writeBytes(m_frameBuffer);
+  writer.writeBytes(m_completedFrameBuffer);
   m_fetcher.serialize(writer);
   m_savedFetcherState.serialize(writer);
 }
@@ -704,10 +741,12 @@ Ppu::deserialize(SaveStateReader& reader)
   m_pixelsRendered = reader.readU8();
   m_scx3LowBits = reader.readU8();
   m_scxDiscardedCount = reader.readU8();
+  m_windowPixelsToDiscard = reader.readU8();
   m_YCondition = reader.readBool();
   m_bgWndFifo.deserialize(reader);
   m_objFifo.deserialize(reader);
   reader.readBytes(m_frameBuffer);
+  reader.readBytes(m_completedFrameBuffer);
   m_fetcher.deserialize(reader);
   m_savedFetcherState.deserialize(reader);
 }

@@ -360,6 +360,50 @@ TEST_CASE("mbc3-tester (dmg)", "[GameBoy]")
     std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
 }
 
+// turtle-tests' own shipped reference screenshots - an independently-sourced
+// ground truth (same reasoning as mbc3-tester/rtc3test above) specifically
+// for WY/WX window-trigger timing, the exact area WX < 7 handling (see
+// checkForWindow()'s own comment) lives in.
+TEST_CASE("window_y_trigger", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(TURTLE_TESTS_DIR) /
+                      "window_y_trigger/window_y_trigger.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(TURTLE_TESTS_DIR) /
+                     "window_y_trigger/window_y_trigger.png"));
+}
+
+// Same as window_y_trigger above, but with WX set off-screen (< 7) -
+// specifically exercises the m_windowPixelsToDiscard clipping path.
+TEST_CASE("window_y_trigger_wx_offscreen", "[GameBoy]")
+{
+  auto rom =
+    readFile(std::filesystem::path(TURTLE_TESTS_DIR) /
+             "window_y_trigger_wx_offscreen/window_y_trigger_wx_offscreen.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(TURTLE_TESTS_DIR) /
+                     "window_y_trigger_wx_offscreen/"
+                     "window_y_trigger_wx_offscreen.png"));
+}
+
 TEST_CASE("mbc3-tester (cgb)", "[GameBoy]")
 {
   auto rom =

@@ -117,6 +117,10 @@ GameBoy::setMode(Mode mode)
 std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
+  // Fixed 70224-cycle audio cadence, same as always - frameBuffer() below
+  // is now always safe to read regardless of exactly where in that window
+  // this loop happens to stop (see its own comment for why), so this loop
+  // no longer needs to reason about LCD/VBlank state at all.
   constexpr std::size_t tCyclesPerFrame = 70224;
   m_apu.startFrame();
   const auto targetBaseTCycles = m_cpu.baseTCycles() + tCyclesPerFrame;
