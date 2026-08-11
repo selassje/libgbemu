@@ -21,7 +21,7 @@ on top of it.
   boot-palette colorization of DMG-only games), and CGB double-speed mode
   (KEY1).
 - All four APU channels (two pulse, wave, noise), sample-accurate.
-- ROM-only, MBC1, and MBC3 cartridges: real ROM and RAM banking (a
+- ROM-only, MBC1, MBC3, and MBC5 cartridges: real ROM and RAM banking (a
   bank-select value beyond what a cartridge's own header actually declares
   aliases back onto the bank(s) it does have, matching real hardware) and
   RAM-enable gating (disabled RAM reads back as 0xFF, writes are ignored).
@@ -34,11 +34,23 @@ on top of it.
 
 ## Known limitations
 
-- MBC5 - the most common mapper in the CGB-era game library - along with
-  MBC2, MBC6, MBC7, and HuC1/HuC3 aren't implemented; only ROM-only, MBC1,
-  and MBC3 are (see Features).
+- MBC2, MBC6, MBC7, and HuC1/HuC3 aren't implemented; only ROM-only, MBC1,
+  MBC3, and MBC5 are (see Features).
 - CGB HDMA (general-purpose and HBlank VRAM-to-VRAM DMA, registers
-  0xFF51-0xFF55) isn't implemented.
+  0xFF51-0xFF55) isn't implemented - writes to $FF55 are stored as a plain
+  register with no actual VRAM transfer taking place. Confirmed to cause
+  real, visible corruption: The Legend of Zelda: Oracle of Ages' title-screen
+  intro issues a General-Purpose DMA (mode bit clear) to populate a window
+  tilemap row shortly before displaying it; since the transfer never
+  happens, that row keeps whatever was already in VRAM (typically zeroed),
+  rendering as a solid color instead of the intended tile art. `c-sp/
+  game-boy-test-roms` has extensive coverage for this once it's
+  implemented - see `same-suite/dma/` (gdma_addr_mask, hdma_lcd_off,
+  hdma_mode0) and `mealybug-tearoom-tests/dma/` (hdma_during_halt,
+  hdma_timing) for fundamental correctness, and `gambatte/dma/` for a much
+  larger set of cycle-timing edge cases (HALT/double-speed-transition/
+  interrupt-precedence interactions during a transfer) beyond what's
+  needed for basic correctness.
 - No battery-backed save persistence (see Features).
 
 ## Testing
