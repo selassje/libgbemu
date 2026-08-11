@@ -294,22 +294,22 @@ Mmu::readByte(std::uint16_t address) const
       address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
     return m_apu.get().readWaveRam(address);
   }
-  if (m_isCgbHardware) {
-    switch (address) {
-      case regs::CGB_DMA_1:
-        return m_cgbDmaState.sourceLow;
-      case regs::CGB_DMA_2:
-        return m_cgbDmaState.sourceHigh;  
-      case regs::CGB_DMA_3:
-        return m_cgbDmaState.destLow;
-      case regs::CGB_DMA_4:
-        return m_cgbDmaState.destHigh;
-        break;
-      case regs::CGB_DMA_5:
-          return 0xFF;
-      default:
-        break;
-    }
+  // FF51-FF55 (HDMA1-5, VRAM DMA source/destination/length-mode-start) all
+  // currently read back as $FF unconditionally: FF51-FF54 are write-only
+  // on real hardware (matching NR13/NR23/NR33/NR31/NR41 above - they never
+  // expose their stored value back to the CPU), and FF55's real
+  // in-progress transfer-status encoding (bit 7 clear + remaining length
+  // in bits 0-6) isn't implemented yet since no HDMA block execution
+  // exists in runNextTCycle(); GDMA is synchronous, so software could
+  // never observe it in progress here either way. True on both DMG (which
+  // doesn't have these registers at all) and CGB hardware alike - no
+  // m_isCgbHardware check needed, unlike VBK/SVBK/BCPS/OPRI/BCPD/OCPD
+  // below.
+  // TODO: once HDMA block execution exists, FF55 needs its real
+  // in-progress encoding instead of this unconditional $FF.
+  if (address >= regs::CGB_DMA_1 && address <= regs::CGB_DMA_5) {
+    constexpr std::uint8_t writeOnlyOrUnimplementedReadsAsAllOnes = 0xFF;
+    return writeOnlyOrUnimplementedReadsAsAllOnes;
   }
   return value;
 }
@@ -609,24 +609,30 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   if (m_isCgbHardware) {
     switch (address) {
       case regs::CGB_DMA_1:
-        m_cgbDmaState.sourceLow = value & 0xF0U;
+        m_cgbDmaState.sourceLow =
+          static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xF0U);
         break;
       case regs::CGB_DMA_2:
         m_cgbDmaState.sourceHigh = value;
         break;
       case regs::CGB_DMA_3:
-        m_cgbDmaState.destLow = value & 0xF0U;
+        m_cgbDmaState.destLow =
+          static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xF0U);
         break;
       case regs::CGB_DMA_4:
-        m_cgbDmaState.destHigh = value & 0x1FU;
+        m_cgbDmaState.destHigh =
+          static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0x1FU);
         break;
-      case regs::CGB_DMA_5:
-        m_cgbDmaState.isHDMA = (static_cast<unsigned>(value) & 0x80U) != 0;
-        {
-          const auto length = static_cast<std::uint16_t>(value & 0x7FU);
-          m_cgbDmaState.bytesRemaining = (length + 1) * 0x10U;
-        }
+      case regs::CGB_DMA_5: {
+        constexpr unsigned modeBit = 0x80U;
+        constexpr unsigned lengthMask = 0x7FU;
+        constexpr unsigned blockSize = 0x10U;
+        m_cgbDmaState.isHDMA = (static_cast<unsigned>(value) & modeBit) != 0;
+        const auto lengthInBlocks = static_cast<unsigned>(value) & lengthMask;
+        m_cgbDmaState.bytesRemaining =
+          static_cast<std::uint16_t>((lengthInBlocks + 1) * blockSize);
         break;
+      }
       default:
         break;
     }
@@ -823,6 +829,13 @@ Mmu::serialize(SaveStateWriter& writer) const
   writer.writeBool(m_doubleSpeed);
   writer.writeBool(m_speedSwitchPrepared);
 
+  writer.writeU8(m_cgbDmaState.sourceLow);
+  writer.writeU8(m_cgbDmaState.sourceHigh);
+  writer.writeU8(m_cgbDmaState.destLow);
+  writer.writeU8(m_cgbDmaState.destHigh);
+  writer.writeU16(m_cgbDmaState.bytesRemaining);
+  writer.writeBool(m_cgbDmaState.isHDMA);
+
   writer.writeBool(m_dmaState.has_value());
   if (m_dmaState) {
     writer.writeU16(m_dmaState->sourceBase);
@@ -860,6 +873,13 @@ Mmu::deserialize(SaveStateReader& reader)
   m_isCgbHardware = reader.readBool();
   m_doubleSpeed = reader.readBool();
   m_speedSwitchPrepared = reader.readBool();
+
+  m_cgbDmaState.sourceLow = reader.readU8();
+  m_cgbDmaState.sourceHigh = reader.readU8();
+  m_cgbDmaState.destLow = reader.readU8();
+  m_cgbDmaState.destHigh = reader.readU8();
+  m_cgbDmaState.bytesRemaining = reader.readU16();
+  m_cgbDmaState.isHDMA = reader.readBool();
 
   if (reader.readBool()) {
     DmaState dmaState;

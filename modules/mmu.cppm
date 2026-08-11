@@ -178,7 +178,6 @@ public:
            !m_cgbDmaState.isHDMA;
   }
 
-
 private:
   std::reference_wrapper<Apu> m_apu;
   // Defaults to false (DMG) purely so a default-constructed Mmu has a
@@ -205,7 +204,6 @@ private:
     std::uint8_t destLow{ 0 };
     std::uint8_t destHigh{ 0 };
     std::uint16_t bytesRemaining{ 0 };
-    std::uint8_t tCyclesSinceLastByte{ 0 };
     bool isHDMA{ false };
 
     [[nodiscard]] std::uint16_t sourceAddress() const
@@ -219,7 +217,6 @@ private:
       return static_cast<std::uint16_t>(
         (static_cast<unsigned>(destHigh) << 8U) | destLow);
     }
-
   };
 
   CgbDmaState m_cgbDmaState;
