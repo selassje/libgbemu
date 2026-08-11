@@ -59,7 +59,17 @@ Ppu::Fetcher::checkForObject()
   if (m_mode == Mode::Object) {
     return;
   }
-  auto& objects = m_ppu.get().m_objects;
+  // Only the first m_objectCount entries are valid for this scanline -
+  // m_objects is a fixed 10-slot array that's never cleared, only
+  // overwritten slot-by-slot as handleOAMSearch() finds objects (which
+  // resets m_objectCount, not m_objects, at the start of each scanline),
+  // so slots beyond m_objectCount hold stale data from whichever earlier
+  // scanline last wrote there. Searching the whole array picked up that
+  // stale data as if it were real sprites for the current scanline - a
+  // real bug, not just theoretical (visible as spurious sprite-tile
+  // corruption).
+  auto objects =
+    std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
   auto it = std::ranges::find_if(objects, [&](const auto& object) {
     return !object.isFetched &&
            (m_ppu.get().m_pixelsRendered + 8 >= object.xPos);
