@@ -590,6 +590,38 @@ TEST_CASE("mbc5 rom_32Mb", "[GameBoy]")
                      "rom_32Mb_reference_dmg.png"));
 }
 
+// gbc_dma_cont.gb (SameSuite) exercises genuine GDMA (bit 7 clear when
+// writing HDMA5), unlike gdma_addr_mask.gb in this same directory, which
+// actually triggers HDMA with the LCD off (real hardware runs that like
+// GDMA, with no H-Blank to gate it a block at a time - a case this codebase
+// doesn't implement yet, so that ROM can't pass here). SameSuite doesn't
+// print "Passed"/"Failed" text - per its own howto.md, a passing ROM sets
+// B=3, C=5, D=8, E=13, H=21, L=34 (a Fibonacci sequence) just before
+// halting on a debugger breakpoint. This particular ROM also sends those
+// same six register values as raw bytes over the serial port
+// (SerialSendByte, using the same SB/SC "write $81 to SC" convention
+// gSerialOutput() already captures for the older blargg shells above), so
+// that existing capture doubles as this suite's own report channel here -
+// checked byte-for-byte instead of via a Passed substring.
+TEST_CASE("gbc_dma_cont (SameSuite, pure GDMA)", "[GameBoy]")
+{
+  auto rom =
+    readFile(std::filesystem::path(SAME_SUITE_DIR) / "dma/gbc_dma_cont.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  auto result = runFor(std::chrono::milliseconds(2000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+
+  const std::string expected = { static_cast<char>(3),  static_cast<char>(5),
+                                 static_cast<char>(8),  static_cast<char>(13),
+                                 static_cast<char>(21), static_cast<char>(34) };
+  REQUIRE(gbemu::serialOutput() == expected);
+  gbemu::serialOutput().clear();
+}
+
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
 // tests/Range tests/Sub-second writes; see rtc3test-*.png in this
 // directory for what each looks like once running). This one compares

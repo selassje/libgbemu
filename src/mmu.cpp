@@ -608,20 +608,24 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 
   if (m_isCgbHardware) {
     switch (address) {
+      // HDMA1/HDMA3 are the *high* byte of source/dest respectively, and
+      // HDMA2/HDMA4 the *low* byte (confirmed against gdma_addr_mask.asm's
+      // own register writes: HIGH(SrcBuf) -> rHDMA1, LOW(SrcBuf) -> rHDMA2)
+      // - only the low-byte registers get the 0x10-byte-alignment mask.
       case regs::CGB_DMA_1:
+        m_cgbDmaState.sourceHigh = value;
+        break;
+      case regs::CGB_DMA_2:
         m_cgbDmaState.sourceLow =
           static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xF0U);
         break;
-      case regs::CGB_DMA_2:
-        m_cgbDmaState.sourceHigh = value;
-        break;
       case regs::CGB_DMA_3:
-        m_cgbDmaState.destLow =
-          static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xF0U);
-        break;
-      case regs::CGB_DMA_4:
         m_cgbDmaState.destHigh =
           static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0x1FU);
+        break;
+      case regs::CGB_DMA_4:
+        m_cgbDmaState.destLow =
+          static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xF0U);
         break;
       case regs::CGB_DMA_5: {
         constexpr unsigned modeBit = 0x80U;
