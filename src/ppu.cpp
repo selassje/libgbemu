@@ -98,8 +98,7 @@ Ppu::Fetcher::checkForWindow()
   // the clipping that handles the rest), so this compares the other way
   // around instead, clamped at 0.
   constexpr unsigned wxOffset = 7;
-  const auto windowStartX =
-    wx >= wxOffset ? static_cast<unsigned>(wx - wxOffset) : 0U;
+  const auto windowStartX = wx >= wxOffset ? (wx - wxOffset) : 0U;
   const auto wxReached =
     static_cast<unsigned>(m_ppu.get().m_pixelsRendered) == windowStartX;
   if (windowEnabled && yCondition && wxReached) {
