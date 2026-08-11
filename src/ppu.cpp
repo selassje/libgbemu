@@ -13,6 +13,8 @@ constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
 constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
 constexpr std::uint8_t LCD_ENABLE_BIT = 0x80;
 
+int gDebugFrameCounter = 0;
+
 // Standard grayscale mapping for the DMG's 4 shades, indexed by BGP-mapped
 // shade (0 = lightest, 3 = darkest).
 constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
@@ -249,6 +251,15 @@ Ppu::Fetcher::runNextTCycle()
         m_tileAttributes = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative
                              ? m_mmu.get().readVram(vramBank1, tileMapAddress)
                              : 0;
+        if (m_mode == Mode::Window && m_tileX == 0 &&
+            gDebugFrameCounter >= 1198 && gDebugFrameCounter <= 1201) {
+          std::cerr << "DEBUG f=" << gDebugFrameCounter
+                    << " tileY=" << static_cast<int>(tileY)
+                    << " addr=0x" << std::hex << tileMapAddress << std::dec
+                    << " idx=" << static_cast<int>(m_mTileIndex)
+                    << " attr=" << static_cast<int>(m_tileAttributes)
+                    << " m_Y=" << static_cast<int>(m_Y) << '\n';
+        }
         m_mState = State::ReadTileDataLow;
       }
       break;
@@ -526,6 +537,10 @@ Ppu::incrementDot()
         // The frame just finished rendering - publish it as the one
         // frameBuffer() returns (see its own comment).
         m_completedFrameBuffer = m_frameBuffer;
+        ++gDebugFrameCounter;
+        if (gDebugFrameCounter >= 1090) {
+          std::cerr << "DEBUG frameCounter=" << gDebugFrameCounter << '\n';
+        }
       }
     } else {
       m_mode = Mode::OAMSearch;

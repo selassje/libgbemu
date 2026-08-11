@@ -913,3 +913,29 @@ TEST_CASE("GameBoy::loadState() leaves state untouched when the body is "
                      referencePixels.end(),
                      gbFrame->pixels.data_handle()));
 }
+
+TEST_CASE("DEBUG zelda intro scan", "[GameBoy]")
+{
+  auto rom = readFile(
+    "F:/Repos/gbemu/roms/Legend of Zelda, The_ Oracle of Ages/"
+    "Legend of Zelda, The - Oracle of Ages (USA, Australia).gbc");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int totalFrames = 1201;
+  for (int i = 0; i < totalFrames; ++i) {
+    const auto frame = gb.runNextFrame();
+    REQUIRE(frame.has_value());
+    if (i == totalFrames - 1) {
+      for (std::size_t y = 0; y < gbemu::SCREEN_HEIGHT; ++y) {
+        const auto pixelIndex = (y * gbemu::SCREEN_WIDTH + 80) * 3;
+        const auto r = frame->pixels.data_handle()[pixelIndex];
+        const auto g = frame->pixels.data_handle()[pixelIndex + 1];
+        const auto b = frame->pixels.data_handle()[pixelIndex + 2];
+        std::cerr << "y=" << y << " rgb=(" << static_cast<int>(r) << ","
+                  << static_cast<int>(g) << "," << static_cast<int>(b)
+                  << ")\n";
+      }
+    }
+  }
+}
