@@ -70,4 +70,10 @@ export constexpr std::uint16_t NR52 = 0xFF26;
 // range with no register-specific behavior of its own to name individually.
 export constexpr std::uint16_t WAVE_RAM_START = 0xFF30;
 
+export constexpr std::uint16_t CGB_DMA_1 = 0xFF51;
+export constexpr std::uint16_t CGB_DMA_2 = 0xFF52;
+export constexpr std::uint16_t CGB_DMA_3 = 0xFF53;
+export constexpr std::uint16_t CGB_DMA_4 = 0xFF54;
+export constexpr std::uint16_t CGB_DMA_5 = 0xFF55;
+
 }

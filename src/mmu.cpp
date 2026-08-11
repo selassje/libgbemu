@@ -294,6 +294,23 @@ Mmu::readByte(std::uint16_t address) const
       address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
     return m_apu.get().readWaveRam(address);
   }
+  if (m_isCgbHardware) {
+    switch (address) {
+      case regs::CGB_DMA_1:
+        return m_cgbDmaState.sourceLow;
+      case regs::CGB_DMA_2:
+        return m_cgbDmaState.sourceHigh;  
+      case regs::CGB_DMA_3:
+        return m_cgbDmaState.destLow;
+      case regs::CGB_DMA_4:
+        return m_cgbDmaState.destHigh;
+        break;
+      case regs::CGB_DMA_5:
+          return 0xFF;
+      default:
+        break;
+    }
+  }
   return value;
 }
 
@@ -589,6 +606,31 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     m_serialTCyclesRemaining = tCyclesPerByte;
   }
 
+  if (m_isCgbHardware) {
+    switch (address) {
+      case regs::CGB_DMA_1:
+        m_cgbDmaState.sourceLow = value & 0xF0U;
+        break;
+      case regs::CGB_DMA_2:
+        m_cgbDmaState.sourceHigh = value;
+        break;
+      case regs::CGB_DMA_3:
+        m_cgbDmaState.destLow = value & 0xF0U;
+        break;
+      case regs::CGB_DMA_4:
+        m_cgbDmaState.destHigh = value & 0x1FU;
+        break;
+      case regs::CGB_DMA_5:
+        m_cgbDmaState.isHDMA = (static_cast<unsigned>(value) & 0x80U) != 0;
+        {
+          const auto length = static_cast<std::uint16_t>(value & 0x7FU);
+          m_cgbDmaState.bytesRemaining = (length + 1) * 0x10U;
+        }
+        break;
+      default:
+        break;
+    }
+  }
   getByteRef(address) = value;
 }
 

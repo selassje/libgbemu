@@ -172,6 +172,13 @@ public:
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
+  [[nodiscard]] bool isCgbGdmaActive() const
+  {
+    return m_isCgbHardware && m_cgbDmaState.bytesRemaining > 0 &&
+           !m_cgbDmaState.isHDMA;
+  }
+
+
 private:
   std::reference_wrapper<Apu> m_apu;
   // Defaults to false (DMG) purely so a default-constructed Mmu has a
@@ -191,6 +198,31 @@ private:
   };
   std::optional<DmaState> m_dmaState;
 
+  struct CgbDmaState
+  {
+    std::uint8_t sourceLow{ 0 };
+    std::uint8_t sourceHigh{ 0 };
+    std::uint8_t destLow{ 0 };
+    std::uint8_t destHigh{ 0 };
+    std::uint16_t bytesRemaining{ 0 };
+    std::uint8_t tCyclesSinceLastByte{ 0 };
+    bool isHDMA{ false };
+
+    [[nodiscard]] std::uint16_t sourceAddress() const
+    {
+      return static_cast<std::uint16_t>(
+        (static_cast<unsigned>(sourceHigh) << 8U) | sourceLow);
+    }
+
+    [[nodiscard]] std::uint16_t destAddress() const
+    {
+      return static_cast<std::uint16_t>(
+        (static_cast<unsigned>(destHigh) << 8U) | destLow);
+    }
+
+  };
+
+  CgbDmaState m_cgbDmaState;
   // An internally-clocked transfer (SC bit 0 set) completes on its own
   // fixed timing regardless of whether a real link partner is present -
   // real hardware shifts 8 bits at ~8192 Hz (512 T-cycles/bit), so 4096
