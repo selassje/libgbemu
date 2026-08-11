@@ -678,6 +678,38 @@ Mmu::runNextTCycle()
     }
   }
 
+  // HDMA isn't implemented yet - it needs to copy one 16-byte block per
+  // H-Blank without stalling the CPU in between, not continuously like
+  // GDMA. Excluding it here (rather than just via Cpu's isCgbGdmaActive()
+  // check) keeps a pending HDMA's bytesRemaining/addresses untouched until
+  // that block-per-H-Blank logic exists, instead of silently draining it
+  // at GDMA's rate in the background.
+  if (m_cgbDmaState.bytesRemaining > 0 && !m_cgbDmaState.isHDMA) {
+    constexpr std::uint8_t tCyclesPerByte = 2;
+    ++m_cgbDmaState.tCyclesSinceLastByte;
+    if (m_cgbDmaState.tCyclesSinceLastByte >= tCyclesPerByte) {
+      m_cgbDmaState.tCyclesSinceLastByte = 0;
+
+      const auto sourceAddress = m_cgbDmaState.sourceAddress();
+      const auto destAddress = m_cgbDmaState.destAddress();
+      writeByte(destAddress, readByte(sourceAddress));
+
+      // 16-bit source/dest addresses, but sourceLow/destLow are only the
+      // low byte - carry into the high byte on wraparound, same as any
+      // normal 16-bit increment. Without this, a transfer crossing a
+      // 256-byte boundary (common - max length is 0x800 bytes) would wrap
+      // back to the start of the same page instead of advancing into the
+      // next one.
+      if (++m_cgbDmaState.sourceLow == 0) {
+        ++m_cgbDmaState.sourceHigh;
+      }
+      if (++m_cgbDmaState.destLow == 0) {
+        ++m_cgbDmaState.destHigh;
+      }
+      --m_cgbDmaState.bytesRemaining;
+    }
+  }
+
   if (m_serialTCyclesRemaining.has_value()) {
     --(*m_serialTCyclesRemaining);
     if (*m_serialTCyclesRemaining == 0) {

@@ -204,6 +204,7 @@ private:
     std::uint8_t destLow{ 0 };
     std::uint8_t destHigh{ 0 };
     std::uint16_t bytesRemaining{ 0 };
+    std::uint8_t tCyclesSinceLastByte{ 0 };
     bool isHDMA{ false };
 
     [[nodiscard]] std::uint16_t sourceAddress() const
@@ -212,10 +213,17 @@ private:
         (static_cast<unsigned>(sourceHigh) << 8U) | sourceLow);
     }
 
+    // destHigh/destLow only ever store a 13-bit offset within VRAM (destHigh
+    // is masked to 0x1F on write - see writeByte()'s CGB_DMA_4 handling),
+    // relative to VRAM's own 0x8000 base - real hardware forces the
+    // destination's top 3 address bits to 0b100 regardless of what's
+    // written, so that base has to be added back in here rather than
+    // treating destHigh:destLow as a standalone 16-bit address.
     [[nodiscard]] std::uint16_t destAddress() const
     {
+      constexpr std::uint16_t vramBase = 0x8000;
       return static_cast<std::uint16_t>(
-        (static_cast<unsigned>(destHigh) << 8U) | destLow);
+        vramBase | (static_cast<unsigned>(destHigh) << 8U) | destLow);
     }
   };
 

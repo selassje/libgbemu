@@ -1511,7 +1511,22 @@ Cpu::deserialize(SaveStateReader& reader)
 std::expected<std::size_t, std::string>
 Cpu::runNextInstruction()
 {
+  // GDMA halts CPU instruction dispatch for the whole transfer, but Ppu/Mmu/
+  // Apu must keep ticking throughout it - same shape as the m_halted idle
+  // loop below (m_mcycles advances in lockstep with advanceHardware()'s own
+  // T-cycle target), not a separate m_baseTCycles-keyed scheme: that target
+  // is compared against m_syncedTCycles, which only equals m_baseTCycles in
+  // single-speed mode, and leaving m_mcycles frozen here would desync it
+  // from m_syncedTCycles for the rest of execution, permanently stalling
+  // every future advanceHardware(m_mcycles * 4) call once GDMA ends.
+  if (m_mmu.get().isCgbGdmaActive()) {
+    constexpr std::size_t dmaIdleCycles = 1;
+    m_mcycles += dmaIdleCycles;
+    advanceHardware(m_mcycles * 4);
+    return dmaIdleCycles;
+  }
   advanceHardware(m_mcycles * 4);
+
   const auto lastMCycles = m_mcycles;
 
   if (m_halted) {
