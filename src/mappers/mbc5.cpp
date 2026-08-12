@@ -71,16 +71,6 @@ Mbc5Mapper::writeRam(std::uint16_t address, std::uint8_t value)
 }
 
 void
-Mbc5Mapper::reset()
-{
-  resetRam();
-  m_romBankLow = 1;
-  m_romBankHigh = 0;
-  m_ramEnabled = false;
-  m_ramBank = 0;
-}
-
-void
 Mbc5Mapper::serialize(SaveStateWriter& writer) const
 {
   writer.writeU8(m_romBankLow);

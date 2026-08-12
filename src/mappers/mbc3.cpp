@@ -162,19 +162,6 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
 }
 
 void
-Mbc3Mapper::reset()
-{
-  resetRam();
-  m_romBank = 1;
-  m_ramBank = 0;
-  m_ramAndTimerEnabled = false;
-  m_selectedRtc = std::nullopt;
-  m_rtcRegisters = {};
-  m_lastLatchValue = 0xFF;
-  m_rtc = RealTimeClock{};
-}
-
-void
 Mbc3Mapper::serialize(SaveStateWriter& writer) const
 {
   writer.writeU8(m_romBank);

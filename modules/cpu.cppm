@@ -11,18 +11,20 @@ namespace gbemu {
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
+  // Every member below already default-initializes to true hardware
+  // power-on/reset state (PC=0, SP=0xFFFF, all other registers/flags
+  // zero), so this constructor alone - with no separate reset() needed -
+  // reaches it; GameBoy::reset()/loadRom() get a fresh reset CPU simply by
+  // reconstructing this in place. The boot ROM (see :boot_rom) is what
+  // brings the CPU to a real *post-boot* state by actually executing, the
+  // same as on real hardware; this is not a "seed the post-boot values"
+  // shortcut.
   Cpu(Mmu& mmu, Ppu& ppu, Apu& apu)
     : m_mmu(mmu)
     , m_ppu(ppu)
     , m_apu(apu)
   {
   }
-
-  // True hardware power-on/reset state (PC=0, SP=0xFFFF, all other
-  // registers/flags zero) - the boot ROM (see :boot_rom) is what brings the
-  // CPU to a real post-boot state by actually executing, the same as on
-  // real hardware; this is not a "seed the post-boot values" shortcut.
-  void reset();
 
   std::expected<std::size_t, std::string> runNextInstruction();
   [[nodiscard]] std::size_t baseTCycles() const { return m_baseTCycles; }

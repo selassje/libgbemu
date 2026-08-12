@@ -101,11 +101,6 @@ protected:
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   void writeRam(std::uint16_t address, std::size_t bank, std::uint8_t value);
 
-  // fill(), not m_ram = {} - the latter's brace-init temporary trips MSVC
-  // /analyze's C6262 (excessive stack usage) for an array this size (now
-  // 8 RAM banks/64KB, since MBC30 support widened RAM_SIZE); fill()
-  // writes in place with no temporary to begin with.
-  void resetRam() { m_ram.fill(0); }
   void serializeRam(SaveStateWriter& writer) const { writer.writeBytes(m_ram); }
   void deserializeRam(SaveStateReader& reader) { reader.readBytes(m_ram); }
 
@@ -155,12 +150,12 @@ concept MapperLike = requires(T& mapper,
   { mapper.writeRom(address, value) } -> std::same_as<void>;
   { constMapper.readRam(address) } -> std::same_as<std::uint8_t>;
   { mapper.writeRam(address, value) } -> std::same_as<void>;
-  // Restores RAM and every register to power-on defaults, as if the
-  // cartridge were being run for the very first time - used by
-  // GameBoy::reset()'s power-cycle semantics. Battery-backed RAM
-  // persistence across sessions is saveState()/loadState()'s job, not
-  // this one.
-  { mapper.reset() } -> std::same_as<void>;
+  // No reset() requirement here - GameBoy::reset()'s power-cycle
+  // semantics reconstruct Mmu (and so m_mapper) from scratch, and
+  // Mmu::loadRom() picks the mapper type via m_mapper.emplace<T>(rom),
+  // itself a fresh construction; every field a hand-written reset() would
+  // touch already reaches power-on defaults via construction alone (see
+  // e.g. Mbc1Mapper's own default member initializers).
   // ROM bytes are never part of a save state (same reasoning as Mmu's
   // own m_rom/m_bootRom before this refactor - the caller is expected to
   // loadRom() the same cartridge before deserialize()); only RAM and
@@ -191,8 +186,6 @@ public:
 
   [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
   void writeRom(std::uint16_t address, std::uint8_t value);
-
-  void reset();
 
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
@@ -229,8 +222,6 @@ public:
   [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
   void writeRam(std::uint16_t address, std::uint8_t value);
 
-  void reset();
-
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
@@ -262,20 +253,18 @@ public:
   [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
   void writeRom(std::uint16_t address, std::uint8_t value);
 
-  void reset();
-
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
 private:
-  // Recomputed from m_romBankLow/m_bankHigh/m_bankingMode on every call
-  // rather than cached - it's cheap, and avoids a fourth piece of state
-  // that could drift out of sync with the three registers it's purely
-  // derived from (m_switchableRomBank, kept as a separate stored field,
-  // was exactly that risk before this refactor).
   [[nodiscard]] std::size_t currentRomBank() const;
 
-  std::uint8_t m_romBank{};
+  // { 1 }, not { } - bank 0 is always mapped at the fixed 0x0000-0x3FFF
+  // window, so real hardware never lets 0 mean anything in the
+  // switchable 0x4000-0x7FFF one either (writeRom() re-enforces this on
+  // every write too) - matches Mbc1Mapper's own m_romBankLow{ 1 }/
+  // Mbc5Mapper's own m_romBankLow{ 1 } for the same reason.
+  std::uint8_t m_romBank{ 1 };
   std::uint8_t m_ramBank{};
   bool m_ramAndTimerEnabled{ false };
   std::optional<std::size_t> m_selectedRtc{ std::nullopt };
@@ -309,8 +298,6 @@ public:
 
   [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
   void writeRam(std::uint16_t address, std::uint8_t value);
-
-  void reset();
 
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);

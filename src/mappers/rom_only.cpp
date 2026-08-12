@@ -29,12 +29,6 @@ RomOnlyMapper::writeRom(std::uint16_t /*address*/, std::uint8_t /*value*/)
 }
 
 void
-RomOnlyMapper::reset()
-{
-  resetRam();
-}
-
-void
 RomOnlyMapper::serialize(SaveStateWriter& writer) const
 {
   serializeRam(writer);

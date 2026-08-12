@@ -1446,27 +1446,6 @@ Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
 }
 
 void
-Cpu::reset()
-{
-  m_AF = 0;
-  m_BC = 0;
-  m_DE = 0;
-  m_HL = 0;
-  m_SP = 0xFFFF;
-  m_PC = 0;
-  m_ime = false;
-  m_halted = false;
-  m_haltBugPending = false;
-  m_currentOpcode = 0;
-  m_imeEnableDelay = 0;
-  m_mcycles = 0;
-  m_lastTimerMCycles = 0;
-  m_syncedTCycles = 0;
-  m_baseTCycles = 0;
-  m_doubleSpeedPhase = false;
-}
-
-void
 Cpu::serialize(SaveStateWriter& writer) const
 {
   writer.writeU16(m_AF);

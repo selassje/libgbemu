@@ -72,7 +72,6 @@ GameBoy::initializeFromRom()
   m_apu.setHardwareMode(m_hardwareMode);
   m_mmu.setHardwareMode(m_hardwareMode);
   m_ppu.setHardwareMode(m_hardwareMode);
-  m_cpu.reset();
 
   return result;
 }
@@ -80,8 +79,15 @@ GameBoy::initializeFromRom()
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::loadRom(std::span<const std::uint8_t> rom)
 {
+  // Delegates to reset() (rather than calling initializeFromRom()
+  // directly, as this used to) so a ROM loaded onto an already-running
+  // GameBoy - not just a freshly-constructed one - gets the same fully
+  // reset Apu/Mmu/Ppu/Cpu a power cycle would give it, instead of
+  // inheriting stale VRAM/WRAM/PPU/APU state left over from whatever was
+  // running before. m_romBytes is assigned first since reset()'s own
+  // initializeFromRom() call reads it, not a parameter.
   m_romBytes.assign(rom.begin(), rom.end());
-  return initializeFromRom();
+  return reset();
 }
 
 [[nodiscard]] std::expected<void, std::string>
@@ -103,7 +109,13 @@ GameBoy::reset()
   // m_ppu.
   m_ppu.~Ppu();
   new (&m_ppu) Ppu(m_mmu);
-  m_cpu = Cpu(m_mmu, m_ppu, m_apu);
+  // Not m_cpu = Cpu(m_mmu, m_ppu, m_apu) - Cpu's own copy/move assignment
+  // isn't actually deleted (it holds reference_wrappers, not raw
+  // references, so unlike Mmu/Ppu above it would compile), but
+  // reconstructing in place keeps this consistent with them rather than
+  // being the only one of the three that goes through a temporary.
+  m_cpu.~Cpu();
+  new (&m_cpu) Cpu(m_mmu, m_ppu, m_apu);
   return initializeFromRom();
 }
 
