@@ -664,10 +664,28 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
         constexpr unsigned modeBit = 0x80U;
         constexpr unsigned lengthMask = 0x7FU;
         constexpr unsigned blockSize = 0x10U;
+        constexpr unsigned statModeMask = 0x03U;
+        constexpr unsigned hblankStatMode = 0x00U;
         m_cgbDmaState.isHDMA = (static_cast<unsigned>(value) & modeBit) != 0;
         const auto lengthInBlocks = static_cast<unsigned>(value) & lengthMask;
         m_cgbDmaState.bytesRemaining =
           static_cast<std::uint16_t>((lengthInBlocks + 1) * blockSize);
+        // Real hardware doesn't special-case "LCD off" for HDMA - it just
+        // checks whether STAT's mode is already 0 (H-Blank) at the moment
+        // of this write. Disabling the LCD forces STAT to permanently read
+        // mode 0 (see Ppu::runNextTCycle()'s own comment on this), so it's
+        // indistinguishable from genuinely being mid-H-Blank: one block
+        // starts immediately instead of waiting for the next H-Blank
+        // *entry* - same-suite/dma/gdma_addr_mask.asm relies on exactly
+        // this (LCD off, one block transferred, the rest of its nominally
+        // longer request left untouched since no further H-Blank entry
+        // ever comes with the LCD staying off) - and hdma_mode0.gb almost
+        // certainly covers the LCD-on, genuinely-mid-H-Blank case the same
+        // way. notifyHBlankStart() handles every subsequent block the
+        // normal way; this only special-cases the very first one.
+        m_cgbDmaState.isHDMABlockInTransfer =
+          m_cgbDmaState.isHDMA && (static_cast<unsigned>(readByte(regs::STAT)) &
+                                   statModeMask) == hblankStatMode;
         break;
       }
       default:

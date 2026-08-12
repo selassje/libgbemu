@@ -54,6 +54,20 @@ loadAndRun(gbemu::GameBoy& gb,
   REQUIRE(result.has_value());
 }
 
+// SameSuite's common pass report (see the TEST_CASEs using this below for
+// the full explanation) - a function rather than a static-duration
+// constant so its std::string construction can't trip clang-tidy's
+// bugprone-throwing-static-initialization (a global whose constructor
+// could throw bad_alloc, uncatchable before main()).
+std::string
+sameSuiteFibonacciPass()
+{
+  return {
+    static_cast<char>(3),  static_cast<char>(5),  static_cast<char>(8),
+    static_cast<char>(13), static_cast<char>(21), static_cast<char>(34)
+  };
+}
+
 void
 expectSerialPass(gbemu::GameBoy& gb,
                  const std::filesystem::path& romPath,
@@ -590,19 +604,18 @@ TEST_CASE("mbc5 rom_32Mb", "[GameBoy]")
                      "rom_32Mb_reference_dmg.png"));
 }
 
-// gbc_dma_cont.gb (SameSuite) exercises genuine GDMA (bit 7 clear when
-// writing HDMA5), unlike gdma_addr_mask.gb in this same directory, which
-// actually triggers HDMA with the LCD off (real hardware runs that like
-// GDMA, with no H-Blank to gate it a block at a time - a case this codebase
-// doesn't implement yet, so that ROM can't pass here). SameSuite doesn't
-// print "Passed"/"Failed" text - per its own howto.md, a passing ROM sets
-// B=3, C=5, D=8, E=13, H=21, L=34 (a Fibonacci sequence) just before
-// halting on a debugger breakpoint. This particular ROM also sends those
-// same six register values as raw bytes over the serial port
-// (SerialSendByte, using the same SB/SC "write $81 to SC" convention
-// gSerialOutput() already captures for the older blargg shells above), so
-// that existing capture doubles as this suite's own report channel here -
-// checked byte-for-byte instead of via a Passed substring.
+// Both ROMs below share SameSuite's common report mechanism (see
+// base.inc, and sameSuiteFibonacciPass() above): no "Passed"/"Failed"
+// text - per the suite's own howto.md, a passing ROM sets B=3, C=5, D=8,
+// E=13, H=21, L=34 (a Fibonacci sequence) just before halting on a
+// debugger breakpoint, and also sends those same six register values as
+// raw bytes over the serial port (SerialSendByte, the same SB/SC "write
+// $81 to SC" convention gSerialOutput() already captures for the older
+// blargg shells above) - so that existing capture doubles as this suite's
+// own report channel here, checked byte-for-byte instead of via a Passed
+// substring.
+
+// gbc_dma_cont.gb exercises genuine GDMA (bit 7 clear when writing HDMA5).
 TEST_CASE("gbc_dma_cont (SameSuite, pure GDMA)", "[GameBoy]")
 {
   auto rom =
@@ -615,10 +628,33 @@ TEST_CASE("gbc_dma_cont (SameSuite, pure GDMA)", "[GameBoy]")
     FAIL("Error : " + result.error());
   }
 
-  const std::string expected = { static_cast<char>(3),  static_cast<char>(5),
-                                 static_cast<char>(8),  static_cast<char>(13),
-                                 static_cast<char>(21), static_cast<char>(34) };
-  REQUIRE(gbemu::serialOutput() == expected);
+  REQUIRE(gbemu::serialOutput() == sameSuiteFibonacciPass());
+  gbemu::serialOutput().clear();
+}
+
+// gdma_addr_mask.gb requests HDMA (bit 7 set) with the LCD off. Real
+// hardware doesn't special-case "LCD off" for HDMA - it just checks
+// whether STAT's mode is already 0 (H-Blank) at the moment of the write,
+// and disabling the LCD forces STAT to permanently read mode 0 (see
+// Ppu::runNextTCycle()'s own comment on this) - so one block transfers
+// immediately, then the transfer gets stuck (no further H-Blank *entry*
+// ever comes with the LCD staying off), leaving the rest of its nominally
+// longer request untouched. Confirmed against Mesen's own output for this
+// ROM before wiring this up - only the first 16 bytes of its comparison
+// buffer should differ from their zero-initialized state.
+TEST_CASE("gdma_addr_mask (SameSuite, HDMA with LCD off)", "[GameBoy]")
+{
+  auto rom =
+    readFile(std::filesystem::path(SAME_SUITE_DIR) / "dma/gdma_addr_mask.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  auto result = runFor(std::chrono::milliseconds(2000), gb);
+  if (!result.has_value()) {
+    FAIL("Error : " + result.error());
+  }
+
+  REQUIRE(gbemu::serialOutput() == sameSuiteFibonacciPass());
   gbemu::serialOutput().clear();
 }
 
