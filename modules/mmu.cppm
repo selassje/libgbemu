@@ -178,6 +178,20 @@ public:
            !m_cgbDmaState.isHDMA;
   }
 
+  [[nodiscard]] bool isCgbHdmaActive() const
+  {
+    return m_isCgbHardware && m_cgbDmaState.bytesRemaining > 0 &&
+           m_cgbDmaState.isHDMA && m_cgbDmaState.isHDMABlockInTransfer;
+  }
+
+  void notifyHBlankStart()
+  {
+    if (m_isCgbHardware && m_cgbDmaState.isHDMA &&
+        m_cgbDmaState.bytesRemaining > 0) {
+      m_cgbDmaState.isHDMABlockInTransfer = true;
+    }
+  }
+
 private:
   std::reference_wrapper<Apu> m_apu;
   // Defaults to false (DMG) purely so a default-constructed Mmu has a
@@ -206,6 +220,7 @@ private:
     std::uint16_t bytesRemaining{ 0 };
     std::uint8_t tCyclesSinceLastByte{ 0 };
     bool isHDMA{ false };
+    bool isHDMABlockInTransfer{ false };
 
     [[nodiscard]] std::uint16_t sourceAddress() const
     {

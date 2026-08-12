@@ -494,6 +494,9 @@ Ppu::runNextTCycle()
       if (handlePixelTransfer()) {
         m_mode = Mode::HBlank;
         m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+        if (m_scanline <= LAST_VISIBLE_SCANLINE) {
+          m_mmu.get().notifyHBlankStart();
+        }
       }
       break;
   }

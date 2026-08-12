@@ -1519,7 +1519,7 @@ Cpu::runNextInstruction()
   // single-speed mode, and leaving m_mcycles frozen here would desync it
   // from m_syncedTCycles for the rest of execution, permanently stalling
   // every future advanceHardware(m_mcycles * 4) call once GDMA ends.
-  if (m_mmu.get().isCgbGdmaActive()) {
+  if (m_mmu.get().isCgbGdmaActive() || m_mmu.get().isCgbHdmaActive()) {
     constexpr std::size_t dmaIdleCycles = 1;
     m_mcycles += dmaIdleCycles;
     advanceHardware(m_mcycles * 4);

@@ -74,6 +74,27 @@ constexpr std::uint16_t APU_REGISTERS_START = 0xFF10;
 
 constexpr std::uint16_t WAVE_RAM_SIZE = 16;
 
+// A release-mode-active assertion for internal invariants that genuinely
+// should be unreachable (as opposed to std::expected, this codebase's usual
+// error-reporting path for conditions a caller can legitimately hit, like a
+// malformed ROM or save state) - plain <cassert>/assert() compiles out under
+// NDEBUG (every Release preset here defines it), which would silently turn
+// a real logic bug into undefined behavior instead of a diagnosable crash.
+// Deliberately not a thrown exception either: nothing up the call stack
+// from readByte()/writeByte() (called on every single memory access) has a
+// try/catch the way GameBoy::loadState() does for SaveStateReader's own
+// throws, so an uncaught exception here would just crash with no
+// diagnostic. std::abort() is what a debugger/crash dump can actually
+// point at the real failure site.
+void
+hardAssert(bool condition, std::string_view message)
+{
+  if (!condition) {
+    std::cerr << "gbemu: internal error: " << message << '\n';
+    std::abort();
+  }
+}
+
 }
 
 std::uint8_t
@@ -294,20 +315,32 @@ Mmu::readByte(std::uint16_t address) const
       address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
     return m_apu.get().readWaveRam(address);
   }
-  // FF51-FF55 (HDMA1-5, VRAM DMA source/destination/length-mode-start) all
-  // currently read back as $FF unconditionally: FF51-FF54 are write-only
-  // on real hardware (matching NR13/NR23/NR33/NR31/NR41 above - they never
-  // expose their stored value back to the CPU), and FF55's real
-  // in-progress transfer-status encoding (bit 7 clear + remaining length
-  // in bits 0-6) isn't implemented yet since no HDMA block execution
-  // exists in runNextTCycle(); GDMA is synchronous, so software could
-  // never observe it in progress here either way. True on both DMG (which
-  // doesn't have these registers at all) and CGB hardware alike - no
-  // m_isCgbHardware check needed, unlike VBK/SVBK/BCPS/OPRI/BCPD/OCPD
-  // below.
-  // TODO: once HDMA block execution exists, FF55 needs its real
-  // in-progress encoding instead of this unconditional $FF.
+  // FF51-FF54 are write-only on real hardware (matching NR13/NR23/NR33/
+  // NR31/NR41 above - they never expose their stored value back to the
+  // CPU), true on both DMG (which doesn't have these registers at all) and
+  // CGB hardware alike - no m_isCgbHardware check needed, unlike VBK/SVBK/
+  // BCPS/OPRI/BCPD/OCPD below. FF55 falls through to the same unconditional
+  // $FF when no HDMA transfer is active (never started, DMG, or GDMA -
+  // synchronous, so software can never observe it in progress here either
+  // way); the in-progress case (real HDMA, bit 7 clear + remaining length
+  // in blocks in bits 0-6) is handled separately below.
   if (address >= regs::CGB_DMA_1 && address <= regs::CGB_DMA_5) {
+    if (address == regs::CGB_DMA_5 && m_cgbDmaState.isHDMA &&
+        m_cgbDmaState.bytesRemaining > 0) {
+      // The CPU is stalled for the whole duration of a block transfer (see
+      // Cpu::isCgbHdmaActive()), so no instruction - including this read -
+      // can execute while isHDMABlockInTransfer is true; and bytesRemaining
+      // is only ever touched alongside an active block copy (see
+      // runNextTCycle()), so between blocks it's always a whole multiple of
+      // 0x10. Both conditions being false here would mean one of those
+      // invariants broke elsewhere, not a real hardware state to encode.
+      hardAssert(!m_cgbDmaState.isHDMABlockInTransfer,
+                 "FF55 read while a HDMA block transfer is in progress");
+      hardAssert(m_cgbDmaState.bytesRemaining >= 0x10,
+                 "HDMA bytesRemaining isn't a whole block between transfers");
+      return static_cast<std::uint8_t>((m_cgbDmaState.bytesRemaining / 0x10U) -
+                                       1U);
+    }
     constexpr std::uint8_t writeOnlyOrUnimplementedReadsAsAllOnes = 0xFF;
     return writeOnlyOrUnimplementedReadsAsAllOnes;
   }
@@ -682,13 +715,18 @@ Mmu::runNextTCycle()
     }
   }
 
-  // HDMA isn't implemented yet - it needs to copy one 16-byte block per
-  // H-Blank without stalling the CPU in between, not continuously like
-  // GDMA. Excluding it here (rather than just via Cpu's isCgbGdmaActive()
-  // check) keeps a pending HDMA's bytesRemaining/addresses untouched until
-  // that block-per-H-Blank logic exists, instead of silently draining it
-  // at GDMA's rate in the background.
-  if (m_cgbDmaState.bytesRemaining > 0 && !m_cgbDmaState.isHDMA) {
+  // GDMA copies continuously while any bytes remain; HDMA only copies
+  // while isHDMABlockInTransfer (one 16-byte block per H-Blank - see
+  // notifyHBlankStart()). Gating the WHOLE per-byte step below on this -
+  // not just the writeByte() call - is what keeps a pending HDMA's
+  // addresses/bytesRemaining frozen while the CPU runs normally between
+  // blocks: advancing them unconditionally here would silently drain the
+  // whole transfer's byte count during ordinary CPU execution, long before
+  // the H-Blanks it actually needs have happened.
+  const bool dmaActive =
+    m_cgbDmaState.bytesRemaining > 0 &&
+    (!m_cgbDmaState.isHDMA || m_cgbDmaState.isHDMABlockInTransfer);
+  if (dmaActive) {
     constexpr std::uint8_t tCyclesPerByte = 2;
     ++m_cgbDmaState.tCyclesSinceLastByte;
     if (m_cgbDmaState.tCyclesSinceLastByte >= tCyclesPerByte) {
@@ -697,6 +735,12 @@ Mmu::runNextTCycle()
       const auto sourceAddress = m_cgbDmaState.sourceAddress();
       const auto destAddress = m_cgbDmaState.destAddress();
       writeByte(destAddress, readByte(sourceAddress));
+
+      // Checked pre-decrement: bytesRemaining == 1 (mod 16) here means the
+      // byte just written was the last of the current block.
+      if (m_cgbDmaState.isHDMA && m_cgbDmaState.bytesRemaining % 16 == 1) {
+        m_cgbDmaState.isHDMABlockInTransfer = false;
+      }
 
       // 16-bit source/dest addresses, but sourceLow/destLow are only the
       // low byte - carry into the high byte on wraparound, same as any
@@ -871,6 +915,7 @@ Mmu::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_cgbDmaState.destHigh);
   writer.writeU16(m_cgbDmaState.bytesRemaining);
   writer.writeBool(m_cgbDmaState.isHDMA);
+  writer.writeBool(m_cgbDmaState.isHDMABlockInTransfer);
 
   writer.writeBool(m_dmaState.has_value());
   if (m_dmaState) {
@@ -916,6 +961,7 @@ Mmu::deserialize(SaveStateReader& reader)
   m_cgbDmaState.destHigh = reader.readU8();
   m_cgbDmaState.bytesRemaining = reader.readU16();
   m_cgbDmaState.isHDMA = reader.readBool();
+  m_cgbDmaState.isHDMABlockInTransfer = reader.readBool();
 
   if (reader.readBool()) {
     DmaState dmaState;
