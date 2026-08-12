@@ -13,17 +13,35 @@ target_sources(
           BASE_DIRS
           ${CMAKE_CURRENT_SOURCE_DIR}
           FILES
-          ${CMAKE_CURRENT_SOURCE_DIR}/png.cppm)
+          ${CMAKE_CURRENT_SOURCE_DIR}/png.cppm
+          ${CMAKE_CURRENT_SOURCE_DIR}/test_helpers.cppm)
 
 if(MSVC)
   # See src/CMakeLists.txt's own copy of this workaround - VS IntelliSense's
   # design-time build reconstruction drops the /interface flag MSBuild's real
   # build infers from FILE_SET CXX_MODULES, misdiagnosing this file's `export`
   # as C3378.
-  set_source_files_properties(png.cppm PROPERTIES COMPILE_OPTIONS /interface)
+  set_source_files_properties(png.cppm test_helpers.cppm
+                              PROPERTIES COMPILE_OPTIONS /interface)
 endif()
 
-target_sources(gbemu-tests PRIVATE gameboy_test.cpp png.cpp)
+# One file per component (mirroring the :cpu/:apu/:ppu/:mmu module partition
+# split libgbemu itself already uses), plus gameboy_test.cpp for the top-level
+# GameBoy API surface that doesn't belong to any one component -
+# gameboy_test.cpp held every TEST_CASE here until it passed ~980 lines.
+# test_helpers.cpp/.cppm holds the readFile()/stabilizeAndGetFrame()/etc.
+# helpers every one of these files imports instead of each keeping its own copy.
+target_sources(
+  gbemu-tests
+  PRIVATE gameboy_test.cpp
+          cpu_test.cpp
+          apu_test.cpp
+          ppu_test.cpp
+          mapper_test.cpp
+          mmu_test.cpp
+          serialization_test.cpp
+          test_helpers.cpp
+          png.cpp)
 
 target_link_libraries(gbemu-tests PRIVATE libgbemu Catch2::Catch2WithMain)
 
@@ -74,9 +92,18 @@ setup_std_lib(gbemu-tests)
 
 if(ENABLE_MSVC_ANALYSIS)
   # Test cases construct gbemu::GameBoy (which owns the ~58KB Mmu memory map) on
-  # the stack, tripping C6262. That's fine for test binaries.
-  set_source_files_properties(gameboy_test.cpp PROPERTIES COMPILE_OPTIONS
-                                                          "/wd6262")
+  # the stack, tripping C6262. That's fine for test binaries - applies to every
+  # split file that does this except test_helpers.cpp (takes GameBoy& by
+  # reference, never constructs one) and png.cpp (doesn't touch GameBoy at all).
+  set_source_files_properties(
+    gameboy_test.cpp
+    cpu_test.cpp
+    apu_test.cpp
+    ppu_test.cpp
+    mapper_test.cpp
+    mmu_test.cpp
+    serialization_test.cpp
+    PROPERTIES COMPILE_OPTIONS "/wd6262")
 endif()
 
 include(Catch)
