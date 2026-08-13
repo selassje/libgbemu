@@ -30,6 +30,33 @@ TEST_CASE("mbc2 bits_ramg", "[GameBoy]")
                      "bits_ramg_reference_dmg.png"));
 }
 
+// mooneye-test-suite's MBC2 ROM-bank register test: only the low 4 bits of
+// a write below 0x4000 with address bit 8 *set* (the complementary address
+// range to bits_ramg above - see Mbc2Mapper::writeRom()'s own address-bit-8
+// dispatch) select the ROM bank, with the usual MBC-wide bank-0-reads-as-1
+// quirk. Directly exercises the fix to Mbc2Mapper::writeRom() checking
+// `value & 0x0100` (impossible - value is a uint8_t) instead of
+// `address & 0x0100`, which had silently dead-coded ROM bank switching
+// entirely. Same self-captured-reference approach as bits_ramg above -
+// reaches a static "Test OK" screen by frame 600.
+TEST_CASE("mbc2 bits_romb", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc2/bits_romb.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) /
+                     "bits_romb_reference_dmg.png"));
+}
+
 TEST_CASE("mbc3-tester (dmg)", "[GameBoy]")
 {
   auto rom =
