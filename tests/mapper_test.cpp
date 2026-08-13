@@ -36,6 +36,22 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "bits_romb_reference_dmg.png",
   600)
 
+// mooneye-test-suite's MBC2 "unused range" test (per its own source's
+// comment: "Tests that writes to $4000-$7FFF have no effect") - unlike
+// bits_ramg/bits_romb above, which probe the two *meaningful* sub-ranges
+// of $0000-$3FFF split by address bit 8, this probes the address range
+// above that entirely, which Mbc2Mapper::writeRom() already no-ops via
+// its own `if (address < 0x4000)` guard. Same self-captured-reference
+// approach as bits_ramg/bits_romb above - reaches a static "Test OK"
+// screen by frame 600.
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 bits_unused",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/bits_unused.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) /
+    "bits_unused_reference_dmg.png",
+  600)
+
 // Unlike dmg-acid2/cgb-acid2's reference.rgb, this isn't a raw capture of
 // this project's own frame buffer - it's decoded directly from
 // mbc3-tester-dmg.png, the expected-passing screenshot the
