@@ -1,34 +1,10 @@
+#include "test_macros.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 import gbemu;
 import png;
 import test_helpers;
-
-// Shared by every TEST_CASE below whose entire body is "load romPath, run
-// until framesToStabilize, compare the final frame against
-// referencePngPath" - mbc1/mbc2/mbc5's mooneye-test-suite tests all reduce
-// to exactly this, byte-for-byte identical apart from those three values.
-// Tests with any extra setup (rtc3test's menu navigation, mbc3-tester's
-// raw .rgb reference instead of a PNG) don't fit this shape and stay
-// hand-written below.
-// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
-#define GB_ROM_MATCHES_REFERENCE_PNG_TEST(                                     \
-  testName, romPath, referencePngPath, framesToStabilize)                      \
-  TEST_CASE(testName, "[GameBoy]")                                             \
-  {                                                                            \
-    auto rom = readFile(romPath);                                              \
-    gbemu::GameBoy gb{};                                                       \
-    REQUIRE(gb.loadRom(rom).has_value());                                      \
-                                                                               \
-    const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);            \
-                                                                               \
-    REQUIRE(pixelsMatchPng(                                                    \
-      std::span(frame.pixels.data_handle(), frame.pixels.size()),              \
-      gbemu::SCREEN_WIDTH,                                                     \
-      gbemu::SCREEN_HEIGHT,                                                    \
-      referencePngPath));                                                      \
-  }
 
 // mooneye-test-suite's MBC2 RAM-gate register test: only the low nibble of
 // a write below 0x4000 (with address bit 8 clear - see Mbc2Mapper's own

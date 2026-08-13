@@ -1,37 +1,10 @@
+#include "test_macros.hpp"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 import std;
 import gbemu;
 import test_helpers;
-
-// Expands to a full TEST_CASE - one line per ROM instead of the ~15-line
-// load/run/assert boilerplate repeated for each one. relPath is joined onto
-// GB_TEST_ROMS_DIR, same as every one of these tests already did by hand.
-// NOLINTBEGIN(cppcoreguidelines-macro-usage) - a constexpr function can't
-// generate a named TEST_CASE; Catch2's own registration mechanism is a
-// macro, so there's no non-macro way to do this. Duplicated (rather than
-// shared via a header) in whichever of this split's files actually need
-// it - just this one and apu_test.cpp - since a macro can't be exported
-// from test_helpers' module the way the functions it expands to are.
-#define GB_SERIAL_ROM_TEST(name, relPath, ms)                                  \
-  TEST_CASE(name, "[GameBoy]")                                                 \
-  {                                                                            \
-    gbemu::GameBoy gb{};                                                       \
-    expectSerialPass(gb,                                                       \
-                     std::filesystem::path(GB_TEST_ROMS_DIR) / (relPath),      \
-                     std::chrono::milliseconds(ms));                           \
-  }
-
-#define GB_MEMORY_ROM_TEST(name, relPath, ms)                                  \
-  TEST_CASE(name, "[GameBoy]")                                                 \
-  {                                                                            \
-    gbemu::GameBoy gb{};                                                       \
-    expectMemoryPass(gb,                                                       \
-                     std::filesystem::path(GB_TEST_ROMS_DIR) / (relPath),      \
-                     std::chrono::milliseconds(ms));                           \
-  }
-// NOLINTEND(cppcoreguidelines-macro-usage)
 
 // clang-format off
 GB_SERIAL_ROM_TEST("06-ld r,r", "cpu_instrs/individual/06-ld r,r.gb", 1000)

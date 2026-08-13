@@ -1,6 +1,11 @@
-file(GLOB ALL_CXX_SOURCE_FILES ${CMAKE_SOURCE_DIR}/modules/*.cppm
-     ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/src/mappers/*.cpp
-     ${CMAKE_SOURCE_DIR}/tests/*.cpp)
+file(
+  GLOB
+  ALL_CXX_SOURCE_FILES
+  ${CMAKE_SOURCE_DIR}/modules/*.cppm
+  ${CMAKE_SOURCE_DIR}/src/*.cpp
+  ${CMAKE_SOURCE_DIR}/src/mappers/*.cpp
+  ${CMAKE_SOURCE_DIR}/tests/*.cpp
+  ${CMAKE_SOURCE_DIR}/tests/*.hpp)
 
 if("${ALL_CXX_SOURCE_FILES}" STREQUAL "")
   message(SEND_ERROR "No files to format")

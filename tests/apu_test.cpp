@@ -1,21 +1,9 @@
+#include "test_macros.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 import std;
 import gbemu;
 import test_helpers;
-
-// See cpu_test.cpp's own comment on why this macro is duplicated here
-// rather than shared - it's the only other file that needs it.
-// NOLINTBEGIN(cppcoreguidelines-macro-usage)
-#define GB_MEMORY_ROM_TEST(name, relPath, ms)                                  \
-  TEST_CASE(name, "[GameBoy]")                                                 \
-  {                                                                            \
-    gbemu::GameBoy gb{};                                                       \
-    expectMemoryPass(gb,                                                       \
-                     std::filesystem::path(GB_TEST_ROMS_DIR) / (relPath),      \
-                     std::chrono::milliseconds(ms));                           \
-  }
-// NOLINTEND(cppcoreguidelines-macro-usage)
 
 // clang-format off
 GB_MEMORY_ROM_TEST("dmg_sound 01-registers", "dmg_sound/rom_singles/01-registers.gb", 20000)
