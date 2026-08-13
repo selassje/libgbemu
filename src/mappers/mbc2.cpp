@@ -53,7 +53,11 @@ Mbc2Mapper::readRam(std::uint16_t address) const
 
   const auto effectiveAddress = effectiveRamAddress(address);
 
-  return Mapper::readRam(effectiveAddress);
+  // MBC2's on-chip RAM is 4 bits wide - only the low nibble is real
+  // storage; the upper nibble has no physical connection to read from, so
+  // real hardware always reads it back as set (mooneye-test-suite's mbc2
+  // ram.gb, round 6, verifies this exactly).
+  return Mapper::readRam(effectiveAddress) | 0xF0U;
 }
 
 void
@@ -64,7 +68,8 @@ Mbc2Mapper::writeRam(std::uint16_t address, std::uint8_t value)
     return;
   }
   const auto effectiveAddress = effectiveRamAddress(address);
-  Mapper::writeRam(effectiveAddress, value);
+  // Only the low nibble has physical storage - see readRam()'s own comment.
+  Mapper::writeRam(effectiveAddress, value & 0x0FU);
 }
 
 void

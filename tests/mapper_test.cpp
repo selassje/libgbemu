@@ -52,6 +52,23 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
     "bits_unused_reference_dmg.png",
   600)
 
+// mooneye-test-suite's MBC2 RAM test: RAM starts disabled (reads as
+// all-0xFF - see readRam()'s own m_ramEnabled check), writes while
+// disabled have no effect, the physical RAM is only 512 bytes so
+// $A000-$BFFF (8KB of address space) mirrors it every 0x200 bytes (see
+// effectiveRamAddress()), $4000 has no RAM-bank-register effect (there's
+// only one, fixed RAM bank), and - the round this ROM used to fail on
+// before this test existed - the upper nibble of every byte always reads
+// back as 1s regardless of what was written, since the physical chip's
+// RAM is genuinely only 4 bits wide (see readRam()/writeRam()'s own
+// comments). Same self-captured-reference approach as the other mbc2
+// tests above - reaches a static "Test OK" screen by frame 600.
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 ram",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) / "emulator-only/mbc2/ram.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "ram_reference_dmg.png",
+  600)
+
 // Unlike dmg-acid2/cgb-acid2's reference.rgb, this isn't a raw capture of
 // this project's own frame buffer - it's decoded directly from
 // mbc3-tester-dmg.png, the expected-passing screenshot the
