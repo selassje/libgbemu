@@ -114,15 +114,17 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   const auto cgbFlag = rom[CGB_FLAG_ADDRESS];
   if (m_model == Mode::Dmg &&
       (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK) {
-    return std::unexpected(
+    mapperResult = std::unexpected(
       "cartridge requires CGB hardware (header byte 0x0143), cannot force "
       "Mode::Dmg for it");
+    return mapperResult;
   }
 
   // m_romBytes is assigned only now that rom is known-loadable - reset()'s
   // own initializeFromRom() call reads it, not a parameter.
   m_romBytes.assign(rom.begin(), rom.end());
-  return reset();
+  mapperResult = reset();
+  return mapperResult;
 }
 
 [[nodiscard]] std::expected<void, std::string>
