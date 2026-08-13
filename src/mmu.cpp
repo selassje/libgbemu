@@ -896,6 +896,10 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
     case 0x03:
       m_mapper.emplace<Mbc1Mapper>(rom);
       break;
+    case 0x05:
+    case 0x06:
+      m_mapper.emplace<Mbc2Mapper>(rom);
+      break;
     case 0x0F:
     case 0x10:
     case 0x11:

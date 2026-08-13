@@ -239,6 +239,28 @@ private:
   bool m_ramEnabled{ false };
 };
 
+class Mbc2Mapper // NOLINT(misc-use-internal-linkage)
+  : private Mapper
+{
+public:
+  using Mapper::runNextTCycle;
+
+  explicit Mbc2Mapper(std::span<const std::uint8_t> rom);
+
+  [[nodiscard]] std::uint8_t readRom(std::uint16_t address) const;
+  void writeRom(std::uint16_t address, std::uint8_t value);
+
+  [[nodiscard]] std::uint8_t readRam(std::uint16_t address) const;
+  void writeRam(std::uint16_t address, std::uint8_t value);
+
+  void serialize(SaveStateWriter& writer) const;
+  void deserialize(SaveStateReader& reader);
+
+private:
+  std::uint8_t m_romBank{ 1 };
+  bool m_ramEnabled{ false };
+};
+
 class Mbc3Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
@@ -328,6 +350,9 @@ template<typename... Ts>
   requires(MapperLike<Ts> && ...)
 using MapperVariantOf = std::variant<Ts...>;
 
-using MapperVariant =
-  MapperVariantOf<RomOnlyMapper, Mbc1Mapper, Mbc3Mapper, Mbc5Mapper>;
+using MapperVariant = MapperVariantOf<RomOnlyMapper,
+                                      Mbc1Mapper,
+                                      Mbc2Mapper,
+                                      Mbc3Mapper,
+                                      Mbc5Mapper>;
 }

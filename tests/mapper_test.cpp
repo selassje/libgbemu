@@ -5,6 +5,31 @@ import gbemu;
 import png;
 import test_helpers;
 
+// mooneye-test-suite's MBC2 RAM-gate register test: only the low nibble of
+// a write below 0x4000 (with address bit 8 clear - see Mbc2Mapper's own
+// wiring) should matter for enabling cartridge RAM, and only the exact
+// value 0x0A should enable it - any other low-nibble value, regardless of
+// the unused upper nibble, must disable it. Same self-captured-reference
+// approach as the mbc1/mbc5 tests above (see MBC1_TEST_EXPECTED_DIR's own
+// comment) - reaches a static "Test OK" screen by frame 600.
+TEST_CASE("mbc2 bits_ramg", "[GameBoy]")
+{
+  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+                      "emulator-only/mbc2/bits_ramg.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  constexpr int framesToStabilize = 600;
+  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
+
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) /
+                     "bits_ramg_reference_dmg.png"));
+}
+
 TEST_CASE("mbc3-tester (dmg)", "[GameBoy]")
 {
   auto rom =
