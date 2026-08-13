@@ -36,71 +36,49 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "bits_romb_reference_dmg.png",
   600)
 
-TEST_CASE("mbc3-tester (dmg)", "[GameBoy]")
-{
-  auto rom =
-    readFile(std::filesystem::path(MBC3_TESTER_DIR) / "mbc3-tester.gb");
-  // Unlike dmg-acid2/cgb-acid2's reference.rgb, this isn't a raw capture of
-  // this project's own frame buffer - it's decoded directly from
-  // mbc3-tester-dmg.png, the expected-passing screenshot the
-  // game-boy-test-roms release itself ships alongside this ROM, giving an
-  // independently-sourced ground truth rather than a self-referential one.
-  auto reference = readFile(std::filesystem::path(MBC3_TESTER_EXPECTED_DIR) /
-                            "reference_dmg.rgb");
-  gbemu::GameBoy gb{};
+// Unlike dmg-acid2/cgb-acid2's reference.rgb, this isn't a raw capture of
+// this project's own frame buffer - it's decoded directly from
+// mbc3-tester-dmg.png, the expected-passing screenshot the
+// game-boy-test-roms release itself ships alongside this ROM, giving an
+// independently-sourced ground truth rather than a self-referential one.
+//
+// This ROM never reaches a single final static frame - after drawing its
+// pass/fail grid (testing ROM bank-switch values 0x01-0xFF, exercising
+// MBC30's full 8-bit bank register, not just standard MBC3's 7-bit one)
+// and "TEST COMPLETE", it busy-waits a few seconds and executes `rst 0`,
+// jumping back to the reset vector and re-running the whole test forever
+// (see mbctest.asm's `end:` label upstream). Empirically, frames 121-223
+// (measured from GameBoy::loadRom()) are byte-identical within the first
+// post-boot cycle - the grid finishes drawing well before frame 121 and
+// the next reboot's redraw doesn't start until frame 224 - so 180 sits in
+// the middle of that stable window with comfortable margin either way.
+GB_ROM_MATCHES_REFERENCE_RGB_TEST(
+  "mbc3-tester (dmg)",
+  gbemu::Mode::Auto,
+  std::filesystem::path(MBC3_TESTER_DIR) / "mbc3-tester.gb",
+  std::filesystem::path(MBC3_TESTER_EXPECTED_DIR) / "reference_dmg.rgb",
+  180)
 
-  auto result = gb.loadRom(rom);
-  REQUIRE(result.has_value());
-
-  // This ROM never reaches a single final static frame - after drawing its
-  // pass/fail grid (testing ROM bank-switch values 0x01-0xFF, exercising
-  // MBC30's full 8-bit bank register, not just standard MBC3's 7-bit one)
-  // and "TEST COMPLETE", it busy-waits a few seconds and executes `rst 0`,
-  // jumping back to the reset vector and re-running the whole test forever
-  // (see mbctest.asm's `end:` label upstream). Empirically, frames 121-223
-  // (measured from GameBoy::loadRom()) are byte-identical within the first
-  // post-boot cycle - the grid finishes drawing well before frame 121 and
-  // the next reboot's redraw doesn't start until frame 224 - so 180 sits in
-  // the middle of that stable window with comfortable margin either way.
-  constexpr int framesToStabilize = 180;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
-}
-
-TEST_CASE("mbc3-tester (cgb)", "[GameBoy]")
-{
-  auto rom =
-    readFile(std::filesystem::path(MBC3_TESTER_DIR) / "mbc3-tester.gb");
-  // Unlike reference_dmg.rgb above, this one is a raw capture of this
-  // project's own frame buffer (same as dmg-acid2/cgb-acid2's own
-  // reference.rgb), not decoded from mbc3-tester-cgb.png - this emulator's
-  // CGB auto-coloring of this DMG-only ROM has a known, narrow discrepancy
-  // against that official screenshot (one palette color's blue channel off
-  // by a small fixed amount, ~5.5% of pixels, visually indistinguishable -
-  // see project history), not yet root-caused. Once fixed, this should be
-  // replaced with an independently-sourced reference the same way the dmg
-  // variant already is.
-  auto reference = readFile(std::filesystem::path(MBC3_TESTER_EXPECTED_DIR) /
-                            "reference_cgb.rgb");
-  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
-
-  auto result = gb.loadRom(rom);
-  REQUIRE(result.has_value());
-
-  // CGB mode paces this ROM's own vblank-wait-driven test loop slower than
-  // DMG does - empirically it isn't done drawing the grid until sometime
-  // after frame 180 (still mid-test there), while frame 240 lands after
-  // "TEST COMPLETE" but comfortably before the next reboot cycle's redraw.
-  constexpr int framesToStabilize = 240;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
-}
+// Unlike reference_dmg.rgb above, this one is a raw capture of this
+// project's own frame buffer (same as dmg-acid2/cgb-acid2's own
+// reference.rgb), not decoded from mbc3-tester-cgb.png - this emulator's
+// CGB auto-coloring of this DMG-only ROM has a known, narrow discrepancy
+// against that official screenshot (one palette color's blue channel off
+// by a small fixed amount, ~5.5% of pixels, visually indistinguishable -
+// see project history), not yet root-caused. Once fixed, this should be
+// replaced with an independently-sourced reference the same way the dmg
+// variant already is.
+//
+// CGB mode paces this ROM's own vblank-wait-driven test loop slower than
+// DMG does - empirically it isn't done drawing the grid until sometime
+// after frame 180 (still mid-test there), while frame 240 lands after
+// "TEST COMPLETE" but comfortably before the next reboot cycle's redraw.
+GB_ROM_MATCHES_REFERENCE_RGB_TEST(
+  "mbc3-tester (cgb)",
+  gbemu::Mode::Cgb,
+  std::filesystem::path(MBC3_TESTER_DIR) / "mbc3-tester.gb",
+  std::filesystem::path(MBC3_TESTER_EXPECTED_DIR) / "reference_cgb.rgb",
+  240)
 
 // Regression test for a real crash: Mbc1Mapper::readRam()/writeRam() used
 // to compute the RAM-bank-relative address as

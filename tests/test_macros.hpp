@@ -3,10 +3,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 // Test-generating macros shared across the test-file split (cpu_test.cpp/
-// apu_test.cpp/mapper_test.cpp) - each expands to a full TEST_CASE from a
-// handful of values instead of repeating the same load/run/assert
-// boilerplate per ROM. A plain header, not a module: a macro can't be
-// exported from a module the way test_helpers' actual functions
+// apu_test.cpp/mapper_test.cpp/ppu_test.cpp) - each expands to a full
+// TEST_CASE from a handful of values instead of repeating the same
+// load/run/assert boilerplate per ROM. A plain header, not a module: a macro
+// can't be exported from a module the way test_helpers' actual functions
 // (expectSerialPass()/expectMemoryPass()/stabilizeAndGetFrame()/
 // pixelsMatchPng(), all used inside the expansions below) can - `export`
 // only applies to real language declarations, and importing a module never
@@ -44,8 +44,8 @@
 // Loads romPath, runs framesToStabilize frames, then compares the final
 // frame against referencePngPath - the shape every mbc1/mbc2/mbc5
 // mooneye-test-suite TEST_CASE in mapper_test.cpp reduces to. Tests with
-// any extra setup (rtc3test's menu navigation, mbc3-tester's raw .rgb
-// reference instead of a PNG) don't fit this shape and stay hand-written.
+// any extra setup (rtc3test's menu navigation) don't fit this shape and
+// stay hand-written.
 #define GB_ROM_MATCHES_REFERENCE_PNG_TEST(                                     \
   testName, romPath, referencePngPath, framesToStabilize)                      \
   TEST_CASE(testName, "[GameBoy]")                                             \
@@ -61,5 +61,33 @@
       gbemu::SCREEN_WIDTH,                                                     \
       gbemu::SCREEN_HEIGHT,                                                    \
       referencePngPath));                                                      \
+  }
+
+// Same shape as GB_ROM_MATCHES_REFERENCE_PNG_TEST above, but against a raw
+// (width*height*3, 8-bit RGB, row-major, no padding) referenceRgbPath
+// instead of a PNG - dmg-acid2/cgb-acid2/mbc3-tester's own reference.rgb/
+// reference_dmg.rgb/reference_cgb.rgb files, predating writePixelsAsPng()'s
+// PNG approach the mbc1/mbc2/mbc5 tests use. Also takes mode explicitly
+// (those three tests each need a specific one - Mode::Auto included,
+// rather than defaulting to it implicitly the way GB_ROM_MATCHES_REFERENCE_
+// PNG_TEST's mapper tests all do) since forcing Dmg/Cgb explicitly, rather
+// than leaving it to what the cartridge header auto-resolves to, is
+// exactly what these particular tests are meant to verify.
+#define GB_ROM_MATCHES_REFERENCE_RGB_TEST(                                     \
+  testName, mode, romPath, referenceRgbPath, framesToStabilize)                \
+  TEST_CASE(testName, "[GameBoy]")                                             \
+  {                                                                            \
+    auto rom = readFile(romPath);                                              \
+    auto reference = readFile(referenceRgbPath);                               \
+    gbemu::GameBoy gb{ mode };                                                 \
+                                                                               \
+    auto result = gb.loadRom(rom);                                             \
+    REQUIRE(result.has_value());                                               \
+                                                                               \
+    const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);            \
+                                                                               \
+    REQUIRE(reference.size() == frame.pixels.size());                          \
+    REQUIRE(std::equal(                                                        \
+      reference.begin(), reference.end(), frame.pixels.data_handle()));        \
   }
 // NOLINTEND(cppcoreguidelines-macro-usage)

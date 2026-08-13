@@ -1,3 +1,4 @@
+#include "test_macros.hpp"
 #include <catch2/catch_test_macros.hpp>
 
 import std;
@@ -5,52 +6,30 @@ import gbemu;
 import png;
 import test_helpers;
 
-TEST_CASE("dmg-acid2", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
-  auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
-  gbemu::GameBoy gb{};
+// The ROM's own source schedules a debugger breakpoint 10 frames after
+// Main: starts, at which point its animation has settled and it's meant
+// to be compared against the reference image - see dmg-acid2.asm's frame
+// counter. That count doesn't include the boot ROM sequence (Nintendo
+// logo scroll + chime) that runs first, though - empirically, the first
+// byte-exact match against the reference happens at frame 24 measured
+// from GameBoy::loadRom() (booting as CGB hardware - see
+// GameBoy::initializeFromRom() - runs a shorter logo animation than
+// DMG's own boot ROM would), and every frame from there through at least
+// 200 matches too (the ROM's own animation is fully periodic once Main:
+// is running), so 120 gives a comfortable stable margin.
+GB_ROM_MATCHES_REFERENCE_RGB_TEST(
+  "dmg-acid2",
+  gbemu::Mode::Auto,
+  std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb",
+  std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb",
+  120)
 
-  auto result = gb.loadRom(rom);
-  REQUIRE(result.has_value());
-
-  // The ROM's own source schedules a debugger breakpoint 10 frames after
-  // Main: starts, at which point its animation has settled and it's meant
-  // to be compared against the reference image - see dmg-acid2.asm's frame
-  // counter. That count doesn't include the boot ROM sequence (Nintendo
-  // logo scroll + chime) that runs first, though - empirically, the first
-  // byte-exact match against the reference happens at frame 24 measured
-  // from GameBoy::loadRom() (booting as CGB hardware - see
-  // GameBoy::initializeFromRom() - runs a shorter logo animation than
-  // DMG's own boot ROM would), and every frame from there through at least
-  // 200 matches too (the ROM's own animation is fully periodic once Main:
-  // is running), so 120 gives a comfortable stable margin.
-  constexpr int framesToStabilize = 120;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
-}
-
-TEST_CASE("cgb-acid2", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
-  auto reference =
-    readFile(std::filesystem::path(CGB_ACID2_EXPECTED_DIR) / "reference.rgb");
-  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
-
-  auto result = gb.loadRom(rom);
-  REQUIRE(result.has_value());
-
-  constexpr int framesToStabilize = 120;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
-}
+GB_ROM_MATCHES_REFERENCE_RGB_TEST(
+  "cgb-acid2",
+  gbemu::Mode::Cgb,
+  std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc",
+  std::filesystem::path(CGB_ACID2_EXPECTED_DIR) / "reference.rgb",
+  120)
 
 // turtle-tests' own shipped reference screenshots - an independently-sourced
 // ground truth (same reasoning as mbc3-tester/rtc3test in mapper_test.cpp)
