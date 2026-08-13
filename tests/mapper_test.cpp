@@ -5,6 +5,31 @@ import gbemu;
 import png;
 import test_helpers;
 
+// Shared by every TEST_CASE below whose entire body is "load romPath, run
+// until framesToStabilize, compare the final frame against
+// referencePngPath" - mbc1/mbc2/mbc5's mooneye-test-suite tests all reduce
+// to exactly this, byte-for-byte identical apart from those three values.
+// Tests with any extra setup (rtc3test's menu navigation, mbc3-tester's
+// raw .rgb reference instead of a PNG) don't fit this shape and stay
+// hand-written below.
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
+#define GB_ROM_MATCHES_REFERENCE_PNG_TEST(                                     \
+  testName, romPath, referencePngPath, framesToStabilize)                      \
+  TEST_CASE(testName, "[GameBoy]")                                             \
+  {                                                                            \
+    auto rom = readFile(romPath);                                              \
+    gbemu::GameBoy gb{};                                                       \
+    REQUIRE(gb.loadRom(rom).has_value());                                      \
+                                                                               \
+    const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);            \
+                                                                               \
+    REQUIRE(pixelsMatchPng(                                                    \
+      std::span(frame.pixels.data_handle(), frame.pixels.size()),              \
+      gbemu::SCREEN_WIDTH,                                                     \
+      gbemu::SCREEN_HEIGHT,                                                    \
+      referencePngPath));                                                      \
+  }
+
 // mooneye-test-suite's MBC2 RAM-gate register test: only the low nibble of
 // a write below 0x4000 (with address bit 8 clear - see Mbc2Mapper's own
 // wiring) should matter for enabling cartridge RAM, and only the exact
@@ -12,23 +37,12 @@ import test_helpers;
 // the unused upper nibble, must disable it. Same self-captured-reference
 // approach as the mbc1/mbc5 tests above (see MBC1_TEST_EXPECTED_DIR's own
 // comment) - reaches a static "Test OK" screen by frame 600.
-TEST_CASE("mbc2 bits_ramg", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc2/bits_ramg.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) /
-                     "bits_ramg_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 bits_ramg",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/bits_ramg.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "bits_ramg_reference_dmg.png",
+  600)
 
 // mooneye-test-suite's MBC2 ROM-bank register test: only the low 4 bits of
 // a write below 0x4000 with address bit 8 *set* (the complementary address
@@ -39,23 +53,12 @@ TEST_CASE("mbc2 bits_ramg", "[GameBoy]")
 // `address & 0x0100`, which had silently dead-coded ROM bank switching
 // entirely. Same self-captured-reference approach as bits_ramg above -
 // reaches a static "Test OK" screen by frame 600.
-TEST_CASE("mbc2 bits_romb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc2/bits_romb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) /
-                     "bits_romb_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 bits_romb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/bits_romb.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "bits_romb_reference_dmg.png",
+  600)
 
 TEST_CASE("mbc3-tester (dmg)", "[GameBoy]")
 {
@@ -172,41 +175,19 @@ TEST_CASE("mbc1_ram_banks doesn't crash", "[GameBoy]")
 // MBC1_TEST_EXPECTED_DIR above), same reasoning as dmg-acid2/cgb-acid2's
 // own reference.rgb - mooneye-test-suite doesn't ship its own screenshots
 // the way game-boy-test-roms does for rtc3test/mbc3-tester.
-TEST_CASE("mbc1 ram_64kb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc1/ram_64kb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc1 ram_64kb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc1/ram_64kb.gb",
+  std::filesystem::path(MBC1_TEST_EXPECTED_DIR) / "ram_64kb_reference_dmg.png",
+  600)
 
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC1_TEST_EXPECTED_DIR) /
-                     "ram_64kb_reference_dmg.png"));
-}
-
-TEST_CASE("mbc1 ram_256kb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc1/ram_256kb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC1_TEST_EXPECTED_DIR) /
-                     "ram_256kb_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc1 ram_256kb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc1/ram_256kb.gb",
+  std::filesystem::path(MBC1_TEST_EXPECTED_DIR) / "ram_256kb_reference_dmg.png",
+  600)
 
 // mooneye-test-suite's MBC5 ROM-bank-switching tests. Its rom_*Mb.gb names
 // are in kilobits/megabits (cartridge-chip-capacity convention), not
@@ -214,68 +195,35 @@ TEST_CASE("mbc1 ram_256kb", "[GameBoy]")
 // self-captured-reference approach as the mbc1 tests above (see
 // MBC1_TEST_EXPECTED_DIR's own comment), reaching the same static "Test OK"
 // screen by frame 600.
-TEST_CASE("mbc5 rom_512kb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc5/rom_512kb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
-                     "rom_512kb_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc5 rom_512kb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc5/rom_512kb.gb",
+  std::filesystem::path(MBC5_TEST_EXPECTED_DIR) / "rom_512kb_reference_dmg.png",
+  600)
 
 // rom_64Mb.gb (actually 8MB/512 banks - see naming-convention comment
 // above) specifically needs bank numbers past 255, exercising the 9-bit
 // bank-select register's high bit (Mbc5Mapper::m_romBankHigh) that
 // rom_512kb.gb's 4 banks never touch.
-TEST_CASE("mbc5 rom_64Mb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc5/rom_64Mb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
-                     "rom_64Mb_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc5 rom_64Mb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc5/rom_64Mb.gb",
+  std::filesystem::path(MBC5_TEST_EXPECTED_DIR) / "rom_64Mb_reference_dmg.png",
+  600)
 
 // rom_32Mb.gb (4MB/256 banks) is the complementary edge case to rom_64Mb
 // above: bank 255 (0xFF) is the largest value reachable through the 8-bit
 // low register alone, with the high bit (m_romBankHigh) staying 0 the
 // entire time - as opposed to rom_64Mb's banks 256-511, which need that
 // high bit set.
-TEST_CASE("mbc5 rom_32Mb", "[GameBoy]")
-{
-  auto rom = readFile(std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
-                      "emulator-only/mbc5/rom_32Mb.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  constexpr int framesToStabilize = 600;
-  const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
-
-  REQUIRE(
-    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(MBC5_TEST_EXPECTED_DIR) /
-                     "rom_32Mb_reference_dmg.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc5 rom_32Mb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc5/rom_32Mb.gb",
+  std::filesystem::path(MBC5_TEST_EXPECTED_DIR) / "rom_32Mb_reference_dmg.png",
+  600)
 
 // rtc3test.gb boots to a menu picking among its three subtests (Basic
 // tests/Range tests/Sub-second writes; see rtc3test-*.png in this
