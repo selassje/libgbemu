@@ -1,5 +1,6 @@
 builds/
 CMakeUserPresets.json
+.vs/
 .vscode/settings.json
 .sonarlint/connectedMode.json
 tests/game-boy-test-roms/
