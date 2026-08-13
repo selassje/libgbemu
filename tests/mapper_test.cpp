@@ -69,6 +69,35 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "ram_reference_dmg.png",
   600)
 
+// mooneye-test-suite's MBC2 ROM-bank-switching tests, same rom_*.gb
+// kilobit/megabit naming convention as the mbc5 tests above (rom_512kb.gb
+// is 4 banks/64KB, the actual max a real MBC2 chip supports is rom_2Mb.gb's
+// 16 banks/256KB - its 4-bit bank register can't address more). Each write
+// to the bank-select register also sets the upper 4 (unused) bits of the
+// written value, specifically to catch a mapper that doesn't mask them out
+// before using the result. Same self-captured-reference approach as the
+// other mbc2 tests above - reaches a static "Test OK" screen by frame 600.
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 rom_512kb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/rom_512kb.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "rom_512kb_reference_dmg.png",
+  600)
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 rom_1Mb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/rom_1Mb.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "rom_1Mb_reference_dmg.png",
+  600)
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "mbc2 rom_2Mb",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "emulator-only/mbc2/rom_2Mb.gb",
+  std::filesystem::path(MBC2_TEST_EXPECTED_DIR) / "rom_2Mb_reference_dmg.png",
+  600)
+
 // Unlike dmg-acid2/cgb-acid2's reference.rgb, this isn't a raw capture of
 // this project's own frame buffer - it's decoded directly from
 // mbc3-tester-dmg.png, the expected-passing screenshot the
