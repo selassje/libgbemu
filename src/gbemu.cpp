@@ -84,8 +84,43 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   // GameBoy - not just a freshly-constructed one - gets the same fully
   // reset Apu/Mmu/Ppu/Cpu a power cycle would give it, instead of
   // inheriting stale VRAM/WRAM/PPU/APU state left over from whatever was
-  // running before. m_romBytes is assigned first since reset()'s own
-  // initializeFromRom() call reads it, not a parameter.
+  // running before.
+  //
+  // reset() can't be undone once it runs, so rom needs to be validated
+  // *before* committing to it - a rejected ROM (too small, an
+  // unsupported cartridge type, or CGB-required while forced to Dmg)
+  // must leave whatever's currently running untouched, the same as it
+  // did before this delegated to reset(). Without this check, a failed
+  // load on an already-running GameBoy (e.g. the frontend's "Open ROM"
+  // menu action) would wipe the session out first and fail second,
+  // leaving m_mapper holding no ROM data at all - which the very next
+  // runNextFrame() crashes on, trying to fetch an instruction from an
+  // empty ROM.
+  //
+  // m_mmu.loadRom() is safe to call speculatively like this on the
+  // current, not-yet-reset Mmu: on failure it returns without ever
+  // touching m_mapper (see its own comment), so a rejected cartridge
+  // type leaves the currently-loaded game's mapper exactly as it was.
+  // If this succeeds, m_mapper now holds the new ROM's mapper on the
+  // *old* Mmu - about to be discarded by reset() below regardless, so
+  // redoing this same work moments later there is harmless.
+  auto mapperResult = m_mmu.loadRom(rom);
+  if (!mapperResult) {
+    return mapperResult;
+  }
+  // Bounds already verified by m_mmu.loadRom() above succeeding (it
+  // rejects anything under MIN_ROM_SIZE, well past CGB_FLAG_ADDRESS).
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+  const auto cgbFlag = rom[CGB_FLAG_ADDRESS];
+  if (m_model == Mode::Dmg &&
+      (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK) {
+    return std::unexpected(
+      "cartridge requires CGB hardware (header byte 0x0143), cannot force "
+      "Mode::Dmg for it");
+  }
+
+  // m_romBytes is assigned only now that rom is known-loadable - reset()'s
+  // own initializeFromRom() call reads it, not a parameter.
   m_romBytes.assign(rom.begin(), rom.end());
   return reset();
 }

@@ -95,3 +95,42 @@ TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",
 
   REQUIRE_FALSE(result.has_value());
 }
+
+TEST_CASE("GameBoy::loadRom() rejecting a ROM leaves an already-running "
+          "session untouched",
+          "[GameBoy]")
+{
+  // Regression test for a real crash: loadRom() used to always call
+  // reset() first (see its own comment), which destroys and
+  // reconstructs Apu/Mmu/Ppu/Cpu unconditionally - if the *new* ROM
+  // then failed to load (too small, unsupported cartridge type), that
+  // destruction had already happened irreversibly, leaving m_mapper
+  // holding no ROM data at all. The very next runNextFrame() call then
+  // crashed (std::out_of_range from Mapper::romByte(), fetching an
+  // instruction from an empty ROM) - exactly what the frontend's "Open
+  // ROM" menu action hit in practice, reusing an already-running
+  // GameBoy instance rather than constructing a fresh one.
+  auto goodRom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
+                          "cpu_instrs/individual/06-ld r,r.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(goodRom).has_value());
+
+  constexpr int framesBeforeBadLoad = 10;
+  for (int i = 0; i < framesBeforeBadLoad; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+
+  // A well-formed header otherwise, but with a cartridge type (0x147)
+  // Mmu::loadRom() doesn't recognize.
+  std::vector<std::uint8_t> badRom(gbemu::MIN_ROM_SIZE, 0);
+  constexpr std::size_t cartridgeTypeAddress = 0x147;
+  badRom.at(cartridgeTypeAddress) = 0xFF;
+  REQUIRE_FALSE(gb.loadRom(badRom).has_value());
+
+  // The crash reproduction: this must not throw - the rejected load
+  // above should have left the original game running untouched.
+  constexpr int framesAfterBadLoad = 10;
+  for (int i = 0; i < framesAfterBadLoad; ++i) {
+    REQUIRE(gb.runNextFrame().has_value());
+  }
+}
