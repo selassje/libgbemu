@@ -1,3 +1,23 @@
+# Probed once at include time (not per-target) since check_ipo_supported()
+# actually invokes the compiler/linker to verify - cheap once, wasteful repeated
+# for every setup_lto() call below.
+include(CheckIPOSupported)
+check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT LTO_UNSUPPORTED_REASON)
+
+# Only Release - the per-config INTERPROCEDURAL_OPTIMIZATION_RELEASE property,
+# not the blunt CMAKE_BUILD_TYPE STREQUAL "Release" check every other
+# Debug-vs-Release branch in this file uses, since that variable means nothing
+# for a multi-config generator (release_vs_msvc/dev_vs_msvc pick their config at
+# build time via --config, not at configure time).
+function(setup_lto TARGET)
+  if(LTO_SUPPORTED)
+    set_target_properties(${TARGET}
+                          PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  else()
+    message(STATUS "LTO not enabled for ${TARGET}: ${LTO_UNSUPPORTED_REASON}")
+  endif()
+endfunction()
+
 function(setup_compiler_warnings TARGET)
   if(MSVC)
     target_compile_options(

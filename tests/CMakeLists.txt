@@ -89,6 +89,7 @@ setup_msvc_analysis(gbemu-tests)
 setup_coverage_report_flags(gbemu-tests)
 setup_sanitizers(gbemu-tests)
 setup_std_lib(gbemu-tests)
+setup_lto(gbemu-tests)
 
 if(ENABLE_MSVC_ANALYSIS)
   # Test cases construct gbemu::GameBoy (which owns the ~58KB Mmu memory map) on
