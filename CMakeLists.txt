@@ -16,6 +16,7 @@ option(ENABLE_CLANG_TIDY "Enable Clang Tidy" OFF)
 option(ENABLE_MSVC_ANALYSIS "Enable MSVC Analysis" OFF)
 option(ENABLE_COVERAGE_REPORT "Enable Test Coverage Report" OFF)
 option(ENABLE_SANITIZERS "Enable Sanitizers" OFF)
+option(ENABLE_FUZZING "Enable LLVM libFuzzer fuzz targets (Clang only)" OFF)
 
 include(cmake/compiler_and_linker_flags.cmake)
 include(cmake/setup_static_analysis.cmake)
@@ -37,6 +38,13 @@ add_subdirectory(src)
 if(ENABLE_TESTS)
   set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1)
   enable_testing()
+endif()
+
+# tests/ also holds fuzzing.cpp/the gbemu-fuzz target (see
+# tests/CMakeLists.txt), gated on ENABLE_FUZZING independently of ENABLE_TESTS
+# in there - so this needs to add_subdirectory() it whenever either is on, not
+# just ENABLE_TESTS.
+if(ENABLE_TESTS OR ENABLE_FUZZING)
   add_subdirectory(tests)
 endif()
 

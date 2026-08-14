@@ -232,6 +232,17 @@
       }
     },
     {
+      "name": "release_ninja_clang_fuzzing_linux",
+      "displayName": "release (Ninja, clang, libc++, libFuzzer+ASan+UBSan, Linux)",
+      "inherits": "release_ninja_clang_linux",
+      "toolchainFile": "${sourceDir}/builds/release_ninja_clang_fuzzing_linux/generators/conan_toolchain.cmake",
+      "binaryDir": "${sourceDir}/builds/release_ninja_clang_fuzzing_linux/build",
+      "cacheVariables": {
+        "ENABLE_FUZZING": "ON",
+        "ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
       "name": "release_ninja_msvc",
       "displayName": "release (Ninja, MSVC) - run from a Developer PowerShell/Command Prompt",
       "inherits": "dev_windows",
@@ -359,6 +370,10 @@
     {
       "name": "release_ninja_clang_linux",
       "configurePreset": "release_ninja_clang_linux"
+    },
+    {
+      "name": "release_ninja_clang_fuzzing_linux",
+      "configurePreset": "release_ninja_clang_fuzzing_linux"
     },
     {
       "name": "release_ninja_msvc",

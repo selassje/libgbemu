@@ -91,6 +91,22 @@ function(setup_sanitizers TARGET)
   endif()
 endfunction()
 
+# libFuzzer itself (-fsanitize=fuzzer: the coverage-guided fuzzing engine, plus
+# the main()/driver it links in - see tests/fuzzing.cpp's own comment on why
+# that file defines no main() of its own) is Clang-only in this project's
+# toolchains - ENABLE_FUZZING is guarded accordingly in tests/CMakeLists.txt,
+# the only caller of this function. Deliberately doesn't also add ASan/UBSan
+# here - call setup_sanitizers() on the same target too (tests/CMakeLists.txt
+# does) to get those under the same ENABLE_SANITIZERS flag every other target
+# already opts into, rather than a second hardcoded copy of the exact same flags
+# living here as well. -g unconditionally (not just under a Debug config):
+# ASan/UBSan crash reports and libFuzzer's own crash reproducers are far less
+# useful without symbols, even in an otherwise-optimized fuzzing build.
+function(setup_fuzzer TARGET)
+  target_compile_options(${TARGET} PRIVATE -fsanitize=fuzzer -g)
+  target_link_options(${TARGET} PRIVATE -fsanitize=fuzzer)
+endfunction()
+
 function(setup_std_lib TARGET)
   if(ENABLE_LIBCXX AND ${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
     target_compile_options(${TARGET} PRIVATE -stdlib=libc++)
