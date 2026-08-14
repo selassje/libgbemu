@@ -204,6 +204,26 @@ jobs:
           clang++ --version
           clang-format --version
 
+      # release_ninja_clang_fuzzing_linux builds against libstdc++, not
+      # libc++ (see its own comment in CMakePresets.json) - clang's
+      # `import std;` support for libstdc++ needs libstdc++.modules.json,
+      # which only ships with a recent-enough libstdc++ dev package;
+      # ubuntu-latest's own default one doesn't have it (confirmed
+      # directly: "CMake Error ... Failed to load C++ standard library
+      # modules metadata from libstdc++.modules.json: File not found").
+      # Same GCC install this repo's own build_and_test_linux job already
+      # does - clang auto-detects the newest installed GCC's libstdc++,
+      # no explicit --gcc-toolchain= needed. The other two presets in this
+      # job build against libc++ and don't need this, but installing it
+      # unconditionally is harmless for them.
+      - name: Install GCC
+        run: |
+          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+          sudo apt-get update
+          sudo apt-get install -y gcc-$GCC_VER g++-$GCC_VER
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-$GCC_VER 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-$GCC_VER 100
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
