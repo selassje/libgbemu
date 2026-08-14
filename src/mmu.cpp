@@ -861,6 +861,19 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
     return std::unexpected(
       "ROM size is too small. Must be at least 0x150 bytes.");
   }
+  // Every mapper's own bank-count math (romSize() / ROM_BANK_SIZE) assumes
+  // the buffer is a whole number of 16KB banks - real cartridges always
+  // are, but a fuzzer-crafted one doesn't have to be, and previously
+  // wasn't rejected until it made the CPU read straight past the end of
+  // the buffer (std::out_of_range, uncaught) - see ROM_BANK_SIZE's own
+  // comment.
+  if (rom.size() % ROM_BANK_SIZE != 0) {
+    return std::unexpected(std::format(
+      "ROM size (0x{:X} bytes) must be a multiple of the 16KB bank size "
+      "(0x{:X} bytes).",
+      rom.size(),
+      ROM_BANK_SIZE));
+  }
   constexpr std::size_t cartridgeTypeAddress = 0x147;
   // Bounds already verified by the size check above (cartridgeTypeAddress
   // is well within MIN_ROM_SIZE).

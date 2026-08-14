@@ -169,6 +169,14 @@ if(ENABLE_FUZZING)
   setup_compiler_warnings(gbemu-fuzz)
   setup_clang_tidy(gbemu-fuzz)
   setup_std_lib(gbemu-fuzz)
+  # libgbemu itself gets setup_lto()'d (see src/CMakeLists.txt), which under
+  # Clang means its static library's .o members are LLVM bitcode, not plain
+  # object code - linking against it from a target that *isn't* itself
+  # LTO-enabled skips clang's LTO-aware link path entirely, and the plain
+  # system linker can't read bitcode ("file format not recognized", hit
+  # directly before adding this). Matching gbemu-tests' own
+  # setup_lto(gbemu-tests) call above fixes it.
+  setup_lto(gbemu-fuzz)
   setup_fuzzer(gbemu-fuzz)
   # Not gated behind its own ENABLE_SANITIZERS check here - already gated inside
   # setup_sanitizers() itself, same as every other target that calls it.

@@ -23,9 +23,30 @@ TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
   REQUIRE_FALSE(result.has_value());
 }
 
+TEST_CASE("GameBoy::create rejects a ROM size that isn't a multiple of the "
+          "16KB bank size",
+          "[GameBoy]")
+{
+  // Regression test for a real crash found by fuzzing (see
+  // tests/fuzzing.cpp and ROM_BANK_SIZE's own comment): a size that passes
+  // the plain MIN_ROM_SIZE floor but isn't a whole number of banks used to
+  // be accepted, then let the CPU read straight past the end of the ROM
+  // buffer (std::out_of_range, uncaught) the first time it fetched an
+  // instruction beyond the buffer's actual length.
+  std::vector<std::uint8_t> rom(gbemu::ROM_BANK_SIZE + 1, 0);
+  gbemu::GameBoy gb{};
+
+  auto result = gb.loadRom(rom);
+
+  REQUIRE_FALSE(result.has_value());
+}
+
 TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
 {
-  std::vector<std::uint8_t> rom(gbemu::MIN_ROM_SIZE, 0);
+  // One full bank - the smallest size that's both >= MIN_ROM_SIZE and a
+  // whole multiple of ROM_BANK_SIZE (see its own comment on why the latter
+  // matters).
+  std::vector<std::uint8_t> rom(gbemu::ROM_BANK_SIZE, 0);
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
@@ -159,8 +180,10 @@ TEST_CASE("GameBoy::loadRom() rejecting a ROM leaves an already-running "
   }
 
   // A well-formed header otherwise, but with a cartridge type (0x147)
-  // Mmu::loadRom() doesn't recognize.
-  std::vector<std::uint8_t> badRom(gbemu::MIN_ROM_SIZE, 0);
+  // Mmu::loadRom() doesn't recognize. Bank-aligned (ROM_BANK_SIZE, not
+  // MIN_ROM_SIZE) so this is rejected for its cartridge type as intended,
+  // not short-circuited by the separate bank-alignment check first.
+  std::vector<std::uint8_t> badRom(gbemu::ROM_BANK_SIZE, 0);
   constexpr std::size_t cartridgeTypeAddress = 0x147;
   badRom.at(cartridgeTypeAddress) = 0xFF;
   REQUIRE_FALSE(gb.loadRom(badRom).has_value());

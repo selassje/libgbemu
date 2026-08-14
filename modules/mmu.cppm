@@ -9,6 +9,19 @@ import :serialization;
 namespace gbemu {
 
 export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
+// Real Game Boy ROMs are always sized in exact multiples of this - the
+// fixed 16KB bank-0 size (matches Mapper::KB16, which stays private to
+// that class rather than being redefined in terms of this one - not worth
+// a cross-partition dependency just to share a single literal). loadRom()
+// enforces this (see its own comment): every mapper's bank-count math
+// (romSize() / KB16) assumes it, and a size that isn't a whole multiple
+// leaves the last partial bank readable up to KB16/2*KB16 by address but
+// not actually backed by that many bytes - found via fuzzing (see
+// tests/fuzzing.cpp): a 382-byte "ROM_ONLY" cartridge (only rejected by
+// the old MIN_ROM_SIZE-alone check for being under 0x150, which 382
+// already exceeds) let the CPU read straight past the end of the ROM
+// buffer, throwing std::out_of_range uncaught.
+export inline constexpr std::size_t ROM_BANK_SIZE = 0x4000;
 
 // Values match JOYP's bit-position convention: Right/Left/Up/Down occupy
 // bits 0-3 of the directional-key group, A/B/Select/Start occupy bits 0-3
