@@ -233,13 +233,16 @@
     },
     {
       "name": "release_ninja_clang_fuzzing_linux",
-      "displayName": "release (Ninja, clang, libc++, libFuzzer+ASan+UBSan, Linux)",
+      "displayName": "release (Ninja, clang, libFuzzer+ASan+UBSan, Linux)",
       "inherits": "release_ninja_clang_linux",
       "toolchainFile": "${sourceDir}/builds/release_ninja_clang_fuzzing_linux/generators/conan_toolchain.cmake",
       "binaryDir": "${sourceDir}/builds/release_ninja_clang_fuzzing_linux/build",
       "cacheVariables": {
+        "ENABLE_TESTS": "ON",
         "ENABLE_FUZZING": "ON",
-        "ENABLE_SANITIZERS": "ON"
+        "ENABLE_SANITIZERS": "ON",
+        "ENABLE_LIBCXX": "OFF",
+        "CMAKE_CXX_FLAGS": ""
       }
     },
     {
@@ -485,6 +488,16 @@
       "name": "release_ninja_clang_linux",
       "inherits": "default",
       "configurePreset": "release_ninja_clang_linux"
+    },
+    {
+      "name": "release_ninja_clang_fuzzing_linux",
+      "inherits": "default",
+      "configurePreset": "release_ninja_clang_fuzzing_linux",
+      "environment": {
+        "ASAN_OPTIONS": "check_initialization_order=1",
+        "ASAN_SYMBOLIZER_PATH": "/usr/bin/llvm-symbolizer",
+        "UBSAN_OPTIONS": "print_stacktrace=1:external_symbolizer_path=/usr/bin/llvm-symbolizer"
+      }
     },
     {
       "name": "release_ninja_msvc",

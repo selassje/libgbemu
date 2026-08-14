@@ -163,7 +163,7 @@ jobs:
       matrix:
         preset:
           - dev_ninja_clang_linux
-          - release_ninja_clang_linux
+          - release_ninja_clang_fuzzing_linux
           - dev_ninja_clang_sanitizers_linux
     runs-on: ubuntu-latest
     steps:
@@ -225,6 +225,30 @@ jobs:
 
       - name: Run Tests
         run: ctest --preset ${{ matrix.preset }} --parallel $(nproc)
+
+      # Bounded regression run, not an open-ended fuzzing campaign - just
+      # enough to catch a reintroduced shallow crash (libFuzzer runs
+      # indefinitely with no limit at all). No seed corpus is committed, so
+      # this always starts exploring from scratch rather than building on
+      # coverage from a previous run. -jobs/-workers run one fuzzing process
+      # per core in parallel (each with its own -max_total_time budget, so
+      # more cores means more total exploration in the same wall-clock time,
+      # not a longer run) - libFuzzer merges every worker's findings back
+      # into the shared corpus/crash reporting itself.
+      - name: Run Fuzz Regression
+        if: matrix.preset == 'release_ninja_clang_fuzzing_linux'
+        run: |
+          mkdir -p fuzz-artifacts
+          builds/${{ matrix.preset }}/build/tests/gbemu-fuzz \
+            -max_total_time=60 -jobs=$(nproc) -workers=$(nproc) \
+            -artifact_prefix=fuzz-artifacts/
+
+      - name: Upload Fuzz Crash Artifacts
+        if: failure() && matrix.preset == 'release_ninja_clang_fuzzing_linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-artifacts
+          path: fuzz-artifacts/
 
       # Formatting doesn't vary by build type, so only check it once.
       - name: Check Formatting
