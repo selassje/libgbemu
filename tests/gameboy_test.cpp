@@ -46,8 +46,7 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
   constexpr int framesToStabilize = 120;
   stabilizeAndGetFrame(gb, framesToStabilize);
 
-  auto resetResult = gb.reset();
-  REQUIRE(resetResult.has_value());
+  gb.reset();
 
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
@@ -94,6 +93,45 @@ TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",
   auto result = gb.loadRom(rom);
 
   REQUIRE_FALSE(result.has_value());
+}
+
+TEST_CASE("GameBoy::setMode() rejects a CGB-required cartridge forced to "
+          "Dmg without mutating state",
+          "[GameBoy]")
+{
+  // Regression test for setMode() used to commit m_model before
+  // validating it against the loaded cartridge - a rejected mode change
+  // left m_model on the incompatible value, which then made a *plain*
+  // reset() (e.g. the frontend's Reset menu item) fail too, since
+  // reset()/initializeFromRom() reject the exact same combination. Now
+  // that GameBoy::reset() is unconditional (see its own comment),
+  // setMode() must validate before ever touching m_model, so a rejected
+  // call leaves the GameBoy exactly as it was.
+  auto cgbRom =
+    readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
+  gbemu::GameBoy gb{ gbemu::Mode::Auto };
+  REQUIRE(gb.loadRom(cgbRom).has_value());
+
+  auto setModeResult = gb.setMode(gbemu::Mode::Dmg);
+
+  REQUIRE_FALSE(setModeResult.has_value());
+  REQUIRE(gb.getMode() == gbemu::Mode::Auto);
+
+  // The real regression: this must not crash/assert - reset() re-derives
+  // from the same (still Mode::Auto, still compatible) state as before.
+  gb.reset();
+  REQUIRE(gb.getMode() == gbemu::Mode::Auto);
+}
+
+TEST_CASE("GameBoy::setMode() rejects changing mode before any ROM is loaded",
+          "[GameBoy]")
+{
+  gbemu::GameBoy gb{ gbemu::Mode::Auto };
+
+  auto setModeResult = gb.setMode(gbemu::Mode::Dmg);
+
+  REQUIRE_FALSE(setModeResult.has_value());
+  REQUIRE(gb.getMode() == gbemu::Mode::Auto);
 }
 
 TEST_CASE("GameBoy::loadRom() rejecting a ROM leaves an already-running "

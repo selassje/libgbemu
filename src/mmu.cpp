@@ -74,27 +74,6 @@ constexpr std::uint16_t APU_REGISTERS_START = 0xFF10;
 
 constexpr std::uint16_t WAVE_RAM_SIZE = 16;
 
-// A release-mode-active assertion for internal invariants that genuinely
-// should be unreachable (as opposed to std::expected, this codebase's usual
-// error-reporting path for conditions a caller can legitimately hit, like a
-// malformed ROM or save state) - plain <cassert>/assert() compiles out under
-// NDEBUG (every Release preset here defines it), which would silently turn
-// a real logic bug into undefined behavior instead of a diagnosable crash.
-// Deliberately not a thrown exception either: nothing up the call stack
-// from readByte()/writeByte() (called on every single memory access) has a
-// try/catch the way GameBoy::loadState() does for SaveStateReader's own
-// throws, so an uncaught exception here would just crash with no
-// diagnostic. std::abort() is what a debugger/crash dump can actually
-// point at the real failure site.
-void
-hardAssert(bool condition, std::string_view message)
-{
-  if (!condition) {
-    std::cerr << "gbemu: internal error: " << message << '\n';
-    std::abort();
-  }
-}
-
 }
 
 std::uint8_t

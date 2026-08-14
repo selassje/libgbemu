@@ -20,6 +20,7 @@ target_sources(
          ${MODULES}/boot_rom.cppm
          ${MODULES}/regs.cppm
          ${MODULES}/hardware_mode.cppm
+         ${MODULES}/hard_assert.cppm
          ${MODULES}/serialization.cppm)
 
 if(MSVC)
@@ -38,6 +39,7 @@ if(MSVC)
     ${MODULES}/boot_rom.cppm
     ${MODULES}/regs.cppm
     ${MODULES}/hardware_mode.cppm
+    ${MODULES}/hard_assert.cppm
     ${MODULES}/serialization.cppm
     PROPERTIES COMPILE_OPTIONS /interface)
 endif()
@@ -56,6 +58,7 @@ target_sources(
           ${CMAKE_CURRENT_LIST_DIR}/mappers/mbc5.cpp
           ${CMAKE_CURRENT_LIST_DIR}/ppu.cpp
           ${CMAKE_CURRENT_LIST_DIR}/boot_rom.cpp
+          ${CMAKE_CURRENT_LIST_DIR}/hard_assert.cpp
           ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp)
 
 # cl.exe already gets a working `std` module from CMake's own CXX_MODULE_STD=ON

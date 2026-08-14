@@ -3,6 +3,7 @@ export module gbemu:ppu;
 import :mmu;
 import :hardware_mode;
 import :serialization;
+import :hard_assert;
 
 namespace gbemu {
 
@@ -82,24 +83,18 @@ private:
   public:
     void push(T pixel)
     {
-      // MSVC STL's std::out_of_range base-class chain isn't visible to
-      // clang-tidy through `import std;`'s module boundary; not
-      // reproducible on libc++ (dev_ninja_clang_tidy_linux builds this
-      // file clean).
-      if (m_size >= m_buffer.size()) {
-        // NOLINTNEXTLINE(hicpp-exception-baseclass)
-        throw std::out_of_range("Fifo::push: already at capacity");
-      }
+      // An internal state-machine invariant (the pixel fetcher never
+      // pushes more than the FIFO can hold), not something an untrusted
+      // ROM/save state can trigger - see hardAssert()'s own comment on why
+      // that makes it the right tool here instead of std::expected.
+      hardAssert(m_size < m_buffer.size(), "Fifo::push: already at capacity");
       m_buffer.at((m_head + m_size) % m_buffer.size()) = std::move(pixel);
       ++m_size;
     }
 
     T pop()
     {
-      if (m_size == 0) {
-        // NOLINTNEXTLINE(hicpp-exception-baseclass) - see push()'s comment.
-        throw std::out_of_range("Fifo::pop: empty");
-      }
+      hardAssert(m_size != 0, "Fifo::pop: empty");
       auto pixel = std::move(m_buffer.at(m_head));
       m_head = (m_head + 1) % m_buffer.size();
       --m_size;
@@ -161,10 +156,7 @@ private:
   private:
     [[nodiscard]] T& at(std::size_t index)
     {
-      if (index >= m_size) {
-        // NOLINTNEXTLINE(hicpp-exception-baseclass) - see push()'s comment.
-        throw std::out_of_range("Fifo::at: index >= logical size");
-      }
+      hardAssert(index < m_size, "Fifo::at: index >= logical size");
       return m_buffer.at((m_head + index) % m_buffer.size());
     }
 

@@ -24,6 +24,30 @@ constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
 // this version number protects against silently misreading.
 constexpr std::uint32_t SAVE_STATE_VERSION = 3;
 
+// Shared by initializeFromRom() (the authoritative check on whether the
+// currently-requested Mode and currently-loaded ROM are compatible) and
+// loadRom()/setMode()'s own up-front validation - each needs to reject an
+// incompatible change *before* committing their own piece of state (rom
+// for loadRom(), model for setMode()), so a rejected change never leaves
+// GameBoy holding a model+ROM pair initializeFromRom() would otherwise
+// reject - see GameBoy::reset()'s own comment on why that matters. `rom`
+// must already be at least MIN_ROM_SIZE bytes - every call site only ever
+// passes a buffer m_mmu.loadRom() has already accepted, well past
+// CGB_FLAG_ADDRESS either way.
+[[nodiscard]] std::expected<void, std::string>
+checkModeCompatible(gbemu::Mode model, std::span<const std::uint8_t> rom)
+{
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+  const auto cgbFlag = rom[CGB_FLAG_ADDRESS];
+  const bool cgbRequired = (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK;
+  if (model == gbemu::Mode::Dmg && cgbRequired) {
+    return std::unexpected(
+      "cartridge requires CGB hardware (header byte 0x0143), cannot force "
+      "Mode::Dmg for it");
+  }
+  return {};
+}
+
 }
 
 namespace gbemu {
@@ -36,16 +60,12 @@ GameBoy::initializeFromRom()
     return result;
   }
 
+  if (auto compat = checkModeCompatible(m_model, m_romBytes); !compat) {
+    return compat;
+  }
+
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
   const bool cartSupportsCgb = (cgbFlag & CGB_SUPPORTED_MASK) != 0;
-  const bool cgbRequired = (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK;
-
-  if (m_model == Mode::Dmg && cgbRequired) {
-    result = std::unexpected(
-      "cartridge requires CGB hardware (header byte 0x0143), cannot force "
-      "Mode::Dmg for it");
-    return result;
-  }
 
   // Mode::Auto gives each cartridge the physical console it
   // actually targets (DMG-only carts boot as DMG, CGB-aware/required
@@ -108,26 +128,20 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   if (!mapperResult) {
     return mapperResult;
   }
-  // Bounds already verified by m_mmu.loadRom() above succeeding (it
-  // rejects anything under MIN_ROM_SIZE, well past CGB_FLAG_ADDRESS).
-  // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-  const auto cgbFlag = rom[CGB_FLAG_ADDRESS];
-  if (m_model == Mode::Dmg &&
-      (cgbFlag & CGB_REQUIRED_MASK) == CGB_REQUIRED_MASK) {
-    mapperResult = std::unexpected(
-      "cartridge requires CGB hardware (header byte 0x0143), cannot force "
-      "Mode::Dmg for it");
-    return mapperResult;
+  if (auto compat = checkModeCompatible(m_model, rom); !compat) {
+    return compat;
   }
 
   // m_romBytes is assigned only now that rom is known-loadable - reset()'s
-  // own initializeFromRom() call reads it, not a parameter.
+  // own initializeFromRom() call reads it, not a parameter. reset() itself
+  // can't fail here - both checks above are exactly what it would
+  // otherwise reject (see its own comment).
   m_romBytes.assign(rom.begin(), rom.end());
-  mapperResult = reset();
-  return mapperResult;
+  reset();
+  return {};
 }
 
-[[nodiscard]] std::expected<void, std::string>
+void
 GameBoy::reset()
 {
   // Reset first - Mmu's constructor below takes a reference to it.
@@ -153,14 +167,34 @@ GameBoy::reset()
   // being the only one of the three that goes through a temporary.
   m_cpu.~Cpu();
   new (&m_cpu) Cpu(m_mmu, m_ppu, m_apu);
-  return initializeFromRom();
+  // initializeFromRom() only fails on a too-small/malformed ROM or an
+  // incompatible model+ROM pair - both already-checked preconditions by
+  // the time reset() is reachable at all (loadRom()/setMode() each
+  // validate before ever committing to a call that reaches here, see
+  // their own comments), so a failure here means an internal invariant
+  // broke, not a legitimate runtime condition a caller needs to handle.
+  hardAssert(initializeFromRom().has_value(),
+             "reset() failed after loadRom()/setMode() already validated "
+             "compatibility");
 }
 
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::setMode(Mode mode)
 {
+  // Validated *before* committing to m_model, mirroring loadRom()'s own
+  // validate-before-commit shape (see its own comment) - so a rejected
+  // mode change leaves m_model exactly as it was, keeping reset()'s own
+  // "always succeeds" guarantee true for a caller that falls back to a
+  // plain reset() afterward instead.
+  if (m_romBytes.size() < MIN_ROM_SIZE) {
+    return std::unexpected("no ROM loaded, nothing to change the mode for");
+  }
+  if (auto compat = checkModeCompatible(mode, m_romBytes); !compat) {
+    return compat;
+  }
   m_model = mode;
-  return reset();
+  reset();
+  return {};
 }
 
 std::expected<EmulationFrame, std::string>

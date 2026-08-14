@@ -18,6 +18,9 @@ export import :hardware_mode;
 // Mbc1Mapper/MapperVariant are marked `export` either (see mapper.cppm's
 // own comments); Mmu is their only consumer.
 export import :mappers;
+// Same reasoning as :hardware_mode above - hardAssert() isn't marked
+// `export` either (see its own comment).
+export import :hard_assert;
 
 export namespace gbemu {
 
@@ -91,17 +94,23 @@ public:
   // Power-cycle equivalent: re-runs the exact same boot sequence against
   // the already-loaded cartridge, without needing it re-supplied - the
   // same cartridge stays "inserted", same as a real Game Boy's power
-  // switch off/on.
-  [[nodiscard]] std::expected<void, std::string> reset();
+  // switch off/on. Unconditionally succeeds: the only two ways
+  // initializeFromRom() can reject a model+ROM pair (a too-small/malformed
+  // ROM, or an incompatible Mode::Dmg forced onto a CGB-required
+  // cartridge) are both validated *before* being committed to m_romBytes/
+  // m_model, by loadRom()/setMode() respectively - by the time reset() can
+  // be called at all, the pair it re-derives from is already known-good.
+  void reset();
 
   // Changes which physical console this instance emulates, then reset()s -
   // matches unplugging the already-inserted cartridge, plugging it into a
-  // different physical console, and powering that on. Rejected the same
-  // way reset()/loadRom() reject an incompatible Mode::Dmg for a
-  // CGB-required cartridge (see initializeFromRom()) - m_model is still
-  // updated even on that error, matching what a real swap would leave you
-  // holding (the wrong console for this cartridge), so a caller correcting
-  // the model afterward isn't fighting a half-applied change.
+  // different physical console, and powering that on. Validated *before*
+  // committing to m_model, the same way loadRom() validates before
+  // committing to m_romBytes (see its own comment) - a rejected mode
+  // change (no ROM loaded yet, or an incompatible Mode::Dmg forced onto a
+  // CGB-required cartridge) leaves m_model exactly as it was, which is
+  // what keeps reset()'s own "always succeeds" guarantee above true for a
+  // caller that falls back to a plain reset() instead.
   [[nodiscard]] std::expected<void, std::string> setMode(Mode mode);
 
   // The console model this instance currently emulates - the setting
@@ -145,11 +154,14 @@ private:
   void serializeComponents(SaveStateWriter& writer) const;
   void deserializeComponents(SaveStateReader& reader);
 
-  // Reconstructs Mmu/Ppu/Cpu from scratch (guaranteeing every field
-  // returns to its true declared default, rather than a hand-maintained
-  // per-field reset that could silently miss one) and re-runs the same
-  // load sequence loadRom()/reset() both need, operating on whatever's
-  // currently in m_romBytes.
+  // Re-runs the actual ROM/boot-ROM/hardware-mode setup reset() needs,
+  // operating on whatever's currently in m_romBytes - the authoritative
+  // check on whether m_model and m_romBytes are compatible (a too-small/
+  // malformed ROM, or an incompatible Mode::Dmg forced onto a CGB-required
+  // cartridge), which loadRom()/setMode() also each validate up front
+  // before committing their own piece of state - see reset()'s own
+  // comment on why that's what makes it safe for reset() to no longer
+  // propagate this failure at all.
   [[nodiscard]] std::expected<void, std::string> initializeFromRom();
 
   // Caller-requested console model - see Mode's own comment.
