@@ -60,8 +60,9 @@ GameBoy::initializeFromRom()
     return result;
   }
 
-  if (auto compat = checkModeCompatible(m_model, m_romBytes); !compat) {
-    return compat;
+  result = checkModeCompatible(m_model, m_romBytes);
+  if (!result) {
+    return result;
   }
 
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
@@ -128,17 +129,22 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
   if (!mapperResult) {
     return mapperResult;
   }
-  if (auto compat = checkModeCompatible(m_model, rom); !compat) {
-    return compat;
+  mapperResult = checkModeCompatible(m_model, rom);
+  if (!mapperResult) {
+    return mapperResult;
   }
 
   // m_romBytes is assigned only now that rom is known-loadable - reset()'s
   // own initializeFromRom() call reads it, not a parameter. reset() itself
   // can't fail here - both checks above are exactly what it would
-  // otherwise reject (see its own comment).
+  // otherwise reject (see its own comment). mapperResult is already known
+  // to hold success at this point - reused rather than returning a fresh
+  // {} so every return statement in this function returns the same named
+  // variable (see checkModeCompatible()'s own call above for why that
+  // matters under GCC's -Wnrvo).
   m_romBytes.assign(rom.begin(), rom.end());
   reset();
-  return {};
+  return mapperResult;
 }
 
 void
@@ -186,15 +192,25 @@ GameBoy::setMode(Mode mode)
   // mode change leaves m_model exactly as it was, keeping reset()'s own
   // "always succeeds" guarantee true for a caller that falls back to a
   // plain reset() afterward instead.
+  //
+  // Every return statement below returns this same named `result` (never
+  // a fresh std::unexpected(...)/{} directly) - GCC 13+'s -Wnrvo flags
+  // mixing a named return with unnamed temporaries across different
+  // return paths as ineligible for NRVO (see loadRom()'s own comment,
+  // and 096628f in this file's history for the original instance of this
+  // fix).
+  std::expected<void, std::string> result;
   if (m_romBytes.size() < MIN_ROM_SIZE) {
-    return std::unexpected("no ROM loaded, nothing to change the mode for");
+    result = std::unexpected("no ROM loaded, nothing to change the mode for");
+    return result;
   }
-  if (auto compat = checkModeCompatible(mode, m_romBytes); !compat) {
-    return compat;
+  result = checkModeCompatible(mode, m_romBytes);
+  if (!result) {
+    return result;
   }
   m_model = mode;
   reset();
-  return {};
+  return result;
 }
 
 std::expected<EmulationFrame, std::string>
