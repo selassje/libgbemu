@@ -163,6 +163,15 @@ also reaches library code, not just the `tests/` target, via
   (serial) tells you which, if source is available; otherwise just check
   both.
 
+## Code style
+
+Don't add comments unless something is genuinely complicated - a real
+hardware quirk, a non-obvious bit-timing/register-behavior detail, or a
+subtle invariant that isn't derivable from the code itself. Don't add
+comments explaining what the code does, restating identifier names,
+narrating implementation history/rationale, or documenting ordinary C++
+idioms - well-named code and the type system already carry that.
+
 ## Monitoring CI
 
 `gh` (GitHub CLI) is available and authenticated. Prefer it over raw `curl`

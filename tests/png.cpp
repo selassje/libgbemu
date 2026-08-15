@@ -80,23 +80,13 @@ public:
   {
     if (m_bitPos == 0) {
       if (m_bytePos >= m_data.size()) {
-        // MSVC STL's std::runtime_error base-class chain isn't visible to
-        // clang-tidy through `import std;`'s module boundary; not
-        // reproducible on libc++ (dev_ninja_clang_tidy_linux builds this
-        // file clean) - see Ppu::Fifo::push()'s identical comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: unexpected end of DEFLATE "
                                  "stream");
       }
-      // Bounds already verified by the size check above.
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
       m_current = m_data[m_bytePos++];
     }
-    // m_current/m_bitPos cast to unsigned (not uint8_t/uint16_t, which
-    // would just get re-promoted to signed int) before the bitwise ops -
-    // sub-int types always promote to signed int in an expression
-    // regardless of their own signedness, which is what
-    // hicpp-signed-bitwise actually reacts to.
     const int value = static_cast<int>(
       (static_cast<unsigned>(m_current) >> static_cast<unsigned>(m_bitPos)) &
       1U);
@@ -113,21 +103,14 @@ public:
     return value;
   }
 
-  // Discards any leftover, already-fetched-but-unread bits of the current
-  // byte (0-7 of them - NOT a whole extra byte) without consuming a new
-  // one from m_data - m_bytePos already sits at the next unread byte
-  // regardless of m_bitPos, since bit() advances it the moment a byte is
-  // fetched, not as each individual bit is consumed from it.
   void alignToByte() { m_bitPos = 0; }
 
-  // Reads one full byte directly, bypassing bit-level buffering entirely -
-  // only valid right after alignToByte() (stored blocks' LEN/NLEN/literal
-  // bytes; a mid-byte call here would silently skip whatever bits of the
-  // current byte hadn't been consumed yet).
+  // Only valid right after alignToByte() - a mid-byte call here would
+  // silently skip whatever bits of the current byte hadn't been consumed
+  // yet.
   std::uint8_t byte()
   {
     if (m_bytePos >= m_data.size()) {
-      // See bit()'s comment.
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error("readPngAsRgb: unexpected end of DEFLATE "
                                "stream");
@@ -164,11 +147,6 @@ construct(HuffmanTable& table, std::span<const std::uint8_t> lengths)
   }
   table.counts.at(0) = 0; // length 0 means "unused symbol", not a real code
 
-  // Cursor array, separate from counts (which decode() also needs, left
-  // untouched here): offsets[len] is where the next symbol of that code
-  // length gets written, and advances by one each time one is placed.
-  // std::size_t throughout (rather than int, MAX_CODE_BITS' own type) so
-  // none of the .at() calls below need an explicit signed->unsigned cast.
   std::array<int, MAX_CODE_BITS + 1> offsets{};
   for (std::size_t len = 1; len < static_cast<std::size_t>(MAX_CODE_BITS);
        ++len) {
@@ -190,9 +168,6 @@ construct(HuffmanTable& table, std::span<const std::uint8_t> lengths)
 int
 decodeSymbol(BitReader& reader, const HuffmanTable& table)
 {
-  // unsigned, not int - code/first are repeatedly shifted/OR'd below, and
-  // hicpp-signed-bitwise flags any signed operand in those ops even when
-  // (as here) the value is always non-negative by construction.
   unsigned code = 0;
   unsigned first = 0;
   unsigned index = 0;
@@ -208,7 +183,6 @@ decodeSymbol(BitReader& reader, const HuffmanTable& table)
     first <<= 1U;
     code <<= 1U;
   }
-  // See BitReader::bit()'s comment.
   // NOLINTNEXTLINE(hicpp-exception-baseclass)
   throw std::runtime_error("readPngAsRgb: invalid Huffman code");
 }
@@ -261,7 +235,6 @@ buildDynamicTables(BitReader& reader, HuffmanTable& litLen, HuffmanTable& dist)
       lengths.at(index++) = static_cast<std::uint8_t>(symbol);
     } else if (symbol == 16) {
       if (index == 0) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error(
           "readPngAsRgb: repeat code with no previous length");
@@ -282,7 +255,6 @@ buildDynamicTables(BitReader& reader, HuffmanTable& litLen, HuffmanTable& dist)
         lengths.at(index++) = 0;
       }
     } else {
-      // See BitReader::bit()'s comment.
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error("readPngAsRgb: invalid code length symbol");
     }
@@ -336,7 +308,6 @@ inflateBlock(BitReader& reader,
     } else {
       const auto lengthIndex = static_cast<std::size_t>(symbol - 257);
       if (lengthIndex >= lengthBase.size()) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: invalid length symbol");
       }
@@ -345,7 +316,6 @@ inflateBlock(BitReader& reader,
 
       const auto distSymbol = decodeSymbol(reader, dist);
       if (static_cast<std::size_t>(distSymbol) >= distBase.size()) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: invalid distance symbol");
       }
@@ -353,7 +323,6 @@ inflateBlock(BitReader& reader,
         distBase.at(static_cast<std::size_t>(distSymbol)) +
         reader.bits(distExtra.at(static_cast<std::size_t>(distSymbol)));
       if (distance > out.size()) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: back-reference distance "
                                  "past start of output");
@@ -387,15 +356,11 @@ inflate(std::span<const std::uint8_t> deflateData)
       const auto lenHi = reader.byte();
       const auto nlenLo = reader.byte();
       const auto nlenHi = reader.byte();
-      // Cast each byte to unsigned (not uint16_t, which would just get
-      // re-promoted to signed int) before the bitwise ops - see
-      // BitReader::bit()'s identical comment.
       const auto len = static_cast<std::uint16_t>(
         static_cast<unsigned>(lenLo) | (static_cast<unsigned>(lenHi) << 8U));
       const auto notLen = static_cast<std::uint16_t>(
         static_cast<unsigned>(nlenLo) | (static_cast<unsigned>(nlenHi) << 8U));
       if (static_cast<std::uint16_t>(~len) != notLen) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: corrupt stored block length");
       }
@@ -412,7 +377,6 @@ inflate(std::span<const std::uint8_t> deflateData)
       }
       inflateBlock(reader, litLen, dist, out);
     } else {
-      // See BitReader::bit()'s comment.
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error("readPngAsRgb: invalid DEFLATE block type");
     }
@@ -454,11 +418,6 @@ unfilter(std::span<const std::uint8_t> filtered,
   std::vector<std::uint8_t> previousRow(rowBytes, 0);
 
   std::size_t srcOffset = 0;
-  // Every index/pointer offset below is already bounds-derived from
-  // rowBytes/height (the exact sizes out/previousRow/the src subspan were
-  // constructed with), and std::span has no bounds-checked .at() to switch
-  // to instead - scoped rather than repeated per line since this whole
-  // loop is one dense, hot per-pixel unfiltering pass.
   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,cppcoreguidelines-pro-bounds-pointer-arithmetic)
   for (std::size_t y = 0; y < height; ++y) {
     const auto filterType = filtered[srcOffset++];
@@ -488,7 +447,6 @@ unfilter(std::span<const std::uint8_t> filtered,
           dst[x] = static_cast<std::uint8_t>(src[x] + paethPredictor(a, b, c));
           break;
         default:
-          // See BitReader::bit()'s comment.
           // NOLINTNEXTLINE(hicpp-exception-baseclass)
           throw std::runtime_error("readPngAsRgb: invalid PNG filter type");
       }
@@ -512,7 +470,6 @@ channelsForColorType(std::uint8_t colorType)
     case 6:
       return 4; // RGBA
     default:
-      // See BitReader::bit()'s comment.
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error(
         "readPngAsRgb: unsupported PNG color type (palette images aren't "
@@ -531,8 +488,6 @@ toRgb(std::span<const std::uint8_t> unfiltered,
   const auto channels = channelsForColorType(colorType);
   std::vector<std::uint8_t> rgb(width * height * 3);
   for (std::size_t i = 0; i < width * height; ++i) {
-    // unfiltered's size is exactly width*height*channels (unfilter()'s own
-    // return value) - pixel/pixel[0..channels-1] always stay in bounds.
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
     const auto* pixel = unfiltered.data() + (i * channels);
     std::uint8_t r = 0;
@@ -563,7 +518,6 @@ toRgb(std::span<const std::uint8_t> unfiltered,
 std::uint32_t
 readBigEndianU32(std::span<const std::uint8_t> bytes)
 {
-  // Every caller passes a 4-byte (sub)span (see readPngAsRgb() below).
   // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
   return (static_cast<std::uint32_t>(bytes[0]) << 24U) |
          (static_cast<std::uint32_t>(bytes[1]) << 16U) |
@@ -631,9 +585,6 @@ writePixelsAsPng(const std::filesystem::path& path,
   appendPngChunk(png, "IEND", std::span<const std::uint8_t>{});
 
   std::ofstream file(path, std::ios::binary);
-  // std::ostream::write() requires const char* - no portable
-  // reinterpret_cast-free way to write a raw std::uint8_t buffer to a
-  // binary stream.
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   file.write(reinterpret_cast<const char*>(png.data()),
              static_cast<std::streamsize>(png.size()));
@@ -644,7 +595,6 @@ readPngAsRgb(const std::filesystem::path& path)
 {
   std::ifstream file(path, std::ios::binary);
   if (!file) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: cannot open " + path.string());
   }
@@ -656,7 +606,6 @@ readPngAsRgb(const std::filesystem::path& path)
                                                              0x1A, '\n' };
   if (bytes.size() < signature.size() ||
       !std::equal(signature.begin(), signature.end(), bytes.begin())) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: not a PNG file: " + path.string());
   }
@@ -669,16 +618,12 @@ readPngAsRgb(const std::filesystem::path& path)
   std::size_t offset = signature.size();
   while (offset + 12 <= bytes.size()) {
     const auto length = readBigEndianU32(std::span(bytes).subspan(offset, 4));
-    // bytes.data()+offset+4 stays within bytes: the loop condition above
-    // (offset+12 <= bytes.size()) guarantees at least 12 bytes - the 4-byte
-    // chunk type included - remain from offset.
     // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-reinterpret-cast)
     const std::string_view type(
       reinterpret_cast<const char*>(bytes.data() + offset + 4), 4);
     // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-type-reinterpret-cast)
     const auto dataStart = offset + 8;
     if (dataStart + length + 4 > bytes.size()) {
-      // See BitReader::bit()'s comment.
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error("readPngAsRgb: truncated chunk in " +
                                path.string());
@@ -687,29 +632,24 @@ readPngAsRgb(const std::filesystem::path& path)
 
     if (type == "IHDR") {
       if (length != 13) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error("readPngAsRgb: malformed IHDR in " +
                                  path.string());
       }
       width = readBigEndianU32(data.subspan(0, 4));
       height = readBigEndianU32(data.subspan(4, 4));
-      // IHDR's length is verified == 13 just above, so indices 8/9/12 are
-      // always in bounds.
       // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
       const auto bitDepth = data[8];
       colorType = data[9];
       const auto interlaceMethod = data[12];
       // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
       if (bitDepth != 8) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error(
           "readPngAsRgb: only 8-bit-per-channel PNGs are supported: " +
           path.string());
       }
       if (interlaceMethod != 0) {
-        // See BitReader::bit()'s comment.
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error(
           "readPngAsRgb: interlaced PNGs aren't supported: " + path.string());
@@ -723,12 +663,10 @@ readPngAsRgb(const std::filesystem::path& path)
   }
 
   if (!width || !height || !colorType) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: missing IHDR in " + path.string());
   }
   if (idat.empty()) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: missing IDAT in " + path.string());
   }
@@ -737,13 +675,10 @@ readPngAsRgb(const std::filesystem::path& path)
   // skipped rather than verified, since a failing inflate() or size check
   // below already catches a corrupt/truncated stream.
   if (idat.size() < 6) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: IDAT too short in " +
                              path.string());
   }
-  // idat.size() >= 6 just verified above, so idat.data()+2 / size()-6 stay
-  // in bounds.
   // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic)
   const std::span<const std::uint8_t> deflateData(idat.data() + 2,
                                                   idat.size() - 6);
@@ -754,7 +689,6 @@ readPngAsRgb(const std::filesystem::path& path)
 
   const auto filtered = inflate(deflateData);
   if (filtered.size() != expectedFilteredSize) {
-    // See BitReader::bit()'s comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error(
       "readPngAsRgb: decompressed size doesn't match IHDR dimensions in " +

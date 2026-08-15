@@ -18,10 +18,6 @@ GB_MEMORY_ROM_TEST("dmg_sound 11-regs after power", "dmg_sound/rom_singles/11-re
 GB_MEMORY_ROM_TEST("dmg_sound 09-wave read while on", "dmg_sound/rom_singles/09-wave read while on.gb", 20000)
 GB_MEMORY_ROM_TEST("dmg_sound 10-wave trigger while on", "dmg_sound/rom_singles/10-wave trigger while on.gb", 20000)
 GB_MEMORY_ROM_TEST("dmg_sound 12-wave write while on", "dmg_sound/rom_singles/12-wave write while on.gb", 20000)
-// cgb_sound's ROMs declare CGB support/requirement in their own header
-// (0x0143 = 0xC0), so Mode::Auto - which GB_MEMORY_ROM_TEST's default-
-// constructed GameBoy already uses - resolves to CGB on its own, same as
-// dmg_sound's own ROMs resolving to DMG without needing Mode::Dmg forced.
 GB_MEMORY_ROM_TEST("cgb_sound 01-registers", "cgb_sound/rom_singles/01-registers.gb", 20000)
 GB_MEMORY_ROM_TEST("cgb_sound 02-len ctr", "cgb_sound/rom_singles/02-len ctr.gb", 20000)
 GB_MEMORY_ROM_TEST("cgb_sound 03-trigger", "cgb_sound/rom_singles/03-trigger.gb", 20000)

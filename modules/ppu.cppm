@@ -24,45 +24,26 @@ public:
     std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;
 
   // Returns the last *fully rendered* frame, not whatever's currently being
-  // drawn into mid-scanline - GameBoy::runNextFrame() runs a fixed 70224
-  // T-cycles per call, but CPU instructions are variable-length, so that
-  // loop can stop anywhere within a frame's timing, not necessarily inside
-  // VBlank - reading the actively-rendered buffer at an arbitrary stop
-  // point could return something part this frame's pixels and part the
-  // previous frame's leftovers (visible as sprites/scanline bands that
-  // look like they're from two different frames at once). Real rendering
+  // drawn into mid-scanline - GameBoy::runNextFrame() can stop anywhere
+  // within a frame's timing, not necessarily inside VBlank. Real rendering
   // always writes into m_frameBuffer; runNextTCycle() copies it into
-  // m_completedFrameBuffer (what this actually returns) the instant a
-  // frame finishes (LY reaches 144), so this is always a complete,
-  // internally-consistent snapshot regardless of when between frames the
-  // caller happens to read it - at most one frame's latency behind, the
-  // same as any double-buffered renderer.
+  // m_completedFrameBuffer the instant a frame finishes (LY reaches 144).
   [[nodiscard]] const FrameBuffer& frameBuffer() const;
 
-  // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see HardwareMode) -
-  // unlike Apu::setHardwareMode()/Mmu::setHardwareMode(), Ppu keeps the
-  // full three-way distinction (not just "is this CGB hardware at all"):
-  // rendering rules genuinely differ between CgbCompatibility and
-  // CgbNative, not just between Dmg and CGB. CgbCompatibility means a
-  // DMG-only cartridge running on CGB hardware - real hardware's own
-  // DMG-compatibility scheme applies (background/object shade computed
-  // exactly as on real DMG hardware via BGP/OBP0/OBP1, then looked up in
-  // CGB background palette 0 / object palette 0-1 instead of the fixed
-  // grayscale table). CgbNative (a genuinely CGB-aware cartridge) needs
-  // VRAM-bank-1 tile attributes, palettes 0-7, and CGB priority rules
-  // instead; Fetcher and handlePixelTransfer() implement those rules.
+  // Rendering rules genuinely differ between CgbCompatibility and
+  // CgbNative: CgbCompatibility means a DMG-only cartridge running on CGB
+  // hardware - real hardware's own DMG-compatibility scheme applies
+  // (background/object shade computed exactly as on real DMG hardware via
+  // BGP/OBP0/OBP1, then looked up in CGB background palette 0 / object
+  // palette 0-1 instead of the fixed grayscale table). CgbNative (a
+  // genuinely CGB-aware cartridge) needs VRAM-bank-1 tile attributes,
+  // palettes 0-7, and CGB priority rules instead.
   void setHardwareMode(HardwareMode mode) { m_hardwareMode = mode; }
 
-  // Save-state support (see GameBoy::saveState()/loadState()) - every data
-  // member below except m_mmu (owned separately).
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
 private:
-  // Defaults to Dmg purely so a default-constructed Ppu has a well-defined
-  // value before GameBoy calls setHardwareMode(); it is set explicitly in
-  // practice, same reasoning as Apu/Mmu's own m_isCgbHardware.
   HardwareMode m_hardwareMode{ HardwareMode::Dmg };
   enum class Mode : std::uint8_t
   {
@@ -72,21 +53,12 @@ private:
     PixelTransfer = 3,
   };
 
-  // Generic ring buffer shared by the background/window and object FIFOs.
-  // Carries no pixel-specific policy (transparency, priority, ...) of its
-  // own - merge()'s shouldReplace callback supplies that, so this stays
-  // reusable for both a plain std::uint8_t color index and the richer
-  // ObjectPixel.
   template<typename T>
   class Fifo
   {
   public:
     void push(T pixel)
     {
-      // An internal state-machine invariant (the pixel fetcher never
-      // pushes more than the FIFO can hold), not something an untrusted
-      // ROM/save state can trigger - see hardAssert()'s own comment on why
-      // that makes it the right tool here instead of std::expected.
       hardAssert(m_size < m_buffer.size(), "Fifo::push: already at capacity");
       m_buffer.at((m_head + m_size) % m_buffer.size()) = std::move(pixel);
       ++m_size;
@@ -101,12 +73,8 @@ private:
       return pixel;
     }
 
-    // Merges 8 freshly-fetched pixels into the FIFO at [offset, offset+8),
-    // one at a time, positionally - pixels[i] is only ever compared
-    // against and possibly replaces whatever is already at slot offset+i.
-    // shouldReplace(incoming, existing) decides each one; callers are
-    // responsible for having already grown the FIFO to cover that range
-    // (e.g. via push()) before calling this.
+    // Merges 8 freshly-fetched pixels into the FIFO at [offset, offset+8) -
+    // shouldReplace(incoming, existing) decides each one.
     template<typename Predicate>
     void merge(std::size_t offset,
                const std::array<T, 8>& pixels,
@@ -129,12 +97,6 @@ private:
     [[nodiscard]] bool empty() const { return m_size == 0; }
     [[nodiscard]] std::size_t size() const { return m_size; }
 
-    // All 16 buffer slots are written/read unconditionally, in fixed
-    // slot order, regardless of how many (m_size) are currently logical -
-    // simpler than only covering the logical range, and just as exact:
-    // m_head/m_size (written first) are what define which slots are
-    // logically live again on the read side, so slots outside that range
-    // round-trip as inert bytes either way.
     void serialize(SaveStateWriter& writer) const
     {
       writer.writeSize(m_head);
@@ -267,14 +229,9 @@ private:
     }
   };
 
-  // A decoded object-FIFO pixel. objectX and oamIndex exist purely for
-  // drawing-priority resolution when two opaque object pixels overlap
-  // (DMG: smaller objectX wins, tie-broken by oamIndex; CGB: oamIndex
-  // alone) - deliberately not relying on sprite fetch order matching
-  // priority order, which would be correct today but fragile against
-  // future changes to fetch scheduling. objectX stores the raw OAM byte
-  // (X+8) unmodified - priority is a relative comparison, so the +8
-  // offset never changes which pixel wins.
+  // objectX/oamIndex exist for drawing-priority resolution when two
+  // opaque object pixels overlap: DMG - smaller objectX wins, tie-broken
+  // by oamIndex; CGB - oamIndex alone.
   struct ObjectPixel
   {
     std::uint8_t colorIndex{};
@@ -312,35 +269,23 @@ private:
   Mode m_mode{ Mode::OAMSearch };
   // Real hardware: LCDC.7 off forces LY=0/STAT mode=HBlank for as long as
   // it stays off, and re-enabling always restarts a fresh frame at
-  // scanline 0/mode 2 - never resumes wherever the PPU was paused. Tracked
-  // here so runNextTCycle() can detect the edge (not just the level) and
-  // apply that reset/restart exactly once per transition.
+  // scanline 0/mode 2 - never resumes wherever the PPU was paused.
   bool m_lcdEnabled{ false };
   std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
   // WX < 7 has no valid on-screen X = WX-7 (it'd be negative) - the window
   // still triggers at screen X=0 in that case, same as WX=7, just with its
-  // own leftmost (7-WX) pixels clipped rather than shown. Set once by
-  // Fetcher::reset(Mode::Window) when the window triggers, then counted
-  // down in handlePixelTransfer() - a dedicated counter, not reusing
-  // m_scxDiscardedCount above, since that one already has its own job
-  // (disabling itself, not counting anything, once window mode starts -
-  // see reset()'s own comment) and both can't be mid-countdown at once.
+  // own leftmost (7-WX) pixels clipped rather than shown.
   std::uint8_t m_windowPixelsToDiscard{ 0 };
   bool m_YCondition{ false };
   Fifo<BackgroundPixel> m_bgWndFifo{};
   Fifo<ObjectPixel> m_objFifo{};
   FrameBuffer m_frameBuffer{};
-  // What frameBuffer() actually returns - see its own comment. Copied from
-  // m_frameBuffer the instant a frame finishes rendering (LY reaches 144).
   FrameBuffer m_completedFrameBuffer{};
   Fetcher m_fetcher{ m_mmu, *this };
   // Snapshot of m_fetcher's state, captured/restored around an object fetch
-  // pausing/resuming the background/window fetch it interrupted. Never run
-  // itself (runNextTCycle() is never called on it) - purely a storage slot,
-  // copy-assigned to/from m_fetcher by saveFetcherState()/
-  // restoreFetcherState().
+  // pausing/resuming the background/window fetch it interrupted.
   Fetcher m_savedFetcherState{ m_mmu, *this };
 
   void incrementDot();

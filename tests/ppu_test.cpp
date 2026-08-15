@@ -6,17 +6,6 @@ import gbemu;
 import png;
 import test_helpers;
 
-// The ROM's own source schedules a debugger breakpoint 10 frames after
-// Main: starts, at which point its animation has settled and it's meant
-// to be compared against the reference image - see dmg-acid2.asm's frame
-// counter. That count doesn't include the boot ROM sequence (Nintendo
-// logo scroll + chime) that runs first, though - empirically, the first
-// byte-exact match against the reference happens at frame 24 measured
-// from GameBoy::loadRom() (booting as CGB hardware - see
-// GameBoy::initializeFromRom() - runs a shorter logo animation than
-// DMG's own boot ROM would), and every frame from there through at least
-// 200 matches too (the ROM's own animation is fully periodic once Main:
-// is running), so 120 gives a comfortable stable margin.
 GB_ROM_MATCHES_REFERENCE_RGB_TEST(
   "dmg-acid2",
   gbemu::Mode::Auto,
@@ -31,10 +20,6 @@ GB_ROM_MATCHES_REFERENCE_RGB_TEST(
   std::filesystem::path(CGB_ACID2_EXPECTED_DIR) / "reference.rgb",
   120)
 
-// turtle-tests' own shipped reference screenshots - an independently-sourced
-// ground truth (same reasoning as mbc3-tester/rtc3test in mapper_test.cpp)
-// specifically for WY/WX window-trigger timing, the exact area WX < 7
-// handling (see checkForWindow()'s own comment) lives in.
 GB_ROM_MATCHES_REFERENCE_PNG_TEST("window_y_trigger",
                                   std::filesystem::path(TURTLE_TESTS_DIR) /
                                     "window_y_trigger/window_y_trigger.gb",
@@ -42,8 +27,6 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST("window_y_trigger",
                                     "window_y_trigger/window_y_trigger.png",
                                   600)
 
-// Same as window_y_trigger above, but with WX set off-screen (< 7) -
-// specifically exercises the m_windowPixelsToDiscard clipping path.
 GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   "window_y_trigger_wx_offscreen",
   std::filesystem::path(TURTLE_TESTS_DIR) /

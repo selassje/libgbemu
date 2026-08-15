@@ -40,8 +40,6 @@ TEST_CASE("halt_bug", "[GameBoy]")
     FAIL("Error : " + result.error());
   }
   REQUIRE(result.has_value());
-  // Diagnostic only for now -- just want to see what this ROM actually
-  // prints, channel unknown yet.
   REQUIRE_THAT(gbemu::serialOutput() + "|" + gbemu::memoryOutput(),
                Catch::Matchers::ContainsSubstring("Passed"));
   gbemu::serialOutput().clear();

@@ -55,8 +55,7 @@ Mbc2Mapper::readRam(std::uint16_t address) const
 
   // MBC2's on-chip RAM is 4 bits wide - only the low nibble is real
   // storage; the upper nibble has no physical connection to read from, so
-  // real hardware always reads it back as set (mooneye-test-suite's mbc2
-  // ram.gb, round 6, verifies this exactly).
+  // real hardware always reads it back as set.
   return Mapper::readRam(effectiveAddress) | 0xF0U;
 }
 

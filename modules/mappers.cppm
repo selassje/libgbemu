@@ -5,24 +5,6 @@ import :serialization;
 
 namespace gbemu {
 
-// Common storage/behavior every concrete mapper needs regardless of
-// cartridge type: the raw ROM bytes, and the external RAM Mmu maps at
-// 0xA000-0xBFFF - which, in this library, is always present and
-// ungated (see its own comment) the same way for every mapper type so
-// far, hence readRam()/writeRam() living here rather than being
-// re-implemented identically in each derived class.
-//
-// Deliberately NOT a polymorphic base - no virtual functions, no
-// Mapper*/Mapper& used anywhere. Dispatch between concrete mapper types
-// is static, via MapperVariant + std::visit below (see its own comment
-// on why); this class exists purely so RomOnlyMapper/Mbc1Mapper/future
-// mapper types don't each duplicate the same two data members and the
-// same two RAM accessors. Derived classes inherit from it privately, not
-// publicly - "implemented in terms of", not "is-a", matching the fact
-// that a Mapper is never substituted in through a base reference/pointer
-// anywhere. Each derived class re-exposes readRam()/writeRam() with a
-// `using` declaration since MapperLike (and Mmu's std::visit call sites)
-// need them public.
 class Mapper // NOLINT(misc-use-internal-linkage)
 {
 public:
@@ -38,11 +20,6 @@ protected:
   Mapper() = default;
   explicit Mapper(std::span<const std::uint8_t> rom);
 
-  // m_rom/m_ram themselves stay private (not just protected) - this
-  // project's clang-tidy config (cppcoreguidelines/misc-non-private-
-  // member-variables-in-classes) rejects protected data outright, so
-  // derived classes reach them only through the accessors below rather
-  // than directly.
   [[nodiscard]] std::size_t romSize() const { return m_rom.size(); }
   [[nodiscard]] std::uint8_t romByte(std::size_t index) const
   {
@@ -51,14 +28,8 @@ protected:
 
   // Real hardware only ever exposes as many *distinct* RAM banks as the
   // cartridge's own SRAM chip actually has, declared in its header at
-  // 0x0149 - a cartridge with, say, a single 8KB chip has no physical
-  // bank 1/2/3 for a mapper's bank-select register to reach, so selecting
-  // one of those aliases back onto the bank(s) that do exist instead (mod
-  // ramBankCount(), the same wraparound convention readRom() already
-  // applies for ROM banks) rather than reading/writing distinct storage
-  // per bank number regardless of what's actually populated. Every code
-  // in the table below is already a power of two, so mod and mask would
-  // be equivalent - mod purely for readability, not a rejected mask.
+  // 0x0149 - a cartridge with fewer physical banks aliases a bank-select
+  // write back onto the bank(s) that do exist (mod ramBankCount()).
   [[nodiscard]] std::size_t ramBankCount() const
   {
     constexpr std::uint16_t ramSizeHeaderAddress = 0x0149;
@@ -75,26 +46,16 @@ protected:
       case 0x05:
         return 8; // 64 KB
       default:
-        // 0x00 (no RAM) or an unrecognized/reserved code - stay
-        // permissive (bank 0 always resolves, matching this library's own
-        // existing behavior of backing 0xA000-0xBFFF unconditionally even
-        // when the header declares no RAM at all - see m_ram's own
-        // comment) rather than rejecting bank-select writes outright.
         return 1;
     }
   }
 
-  // For mappers with RAM banking (Mbc1Mapper/Mbc3Mapper's real-RAM path) -
-  // NOT `readRam(static_cast<uint16_t>(address + bank * RAM_BANK_SIZE))`,
-  // a real bug this replaced: that truncates the sum back down to 16 bits
-  // *before* readRam()/writeRam() subtracts EXT_RAM_START, so for banks/
-  // addresses where address + bank*RAM_BANK_SIZE overflows std::uint16_t
-  // (e.g. bank 3 at any address, reachable on real MBC1 cartridges - see
-  // this pair's own git history for the crash report that caught it), the
-  // wraparound lands outside RAM_SIZE and .at() throws. Computed here
-  // entirely in std::size_t instead, only ever subtracting EXT_RAM_START
-  // from the original address (never adding to it first), so nothing
-  // overflows before the final bounds check.
+  // Computed entirely in std::size_t, only ever subtracting EXT_RAM_START
+  // from the original address (never adding bank*RAM_BANK_SIZE to a
+  // uint16_t first) - address + bank*RAM_BANK_SIZE can overflow
+  // std::uint16_t for banks reachable on real MBC1 cartridges (e.g. bank
+  // 3), which would wrap outside RAM_SIZE if truncated before the bounds
+  // check.
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
   [[nodiscard]] std::uint8_t readRam(std::uint16_t address,
                                      std::size_t bank) const;
@@ -109,34 +70,9 @@ protected:
 
 private:
   std::vector<std::uint8_t> m_rom;
-  // Present unconditionally, matching this library's existing behavior of
-  // always backing 0xA000-0xBFFF with 8KB regardless of whether the
-  // cartridge header actually declares any RAM - preserved as-is by this
-  // refactor rather than newly gated here (see README's own "no external
-  // RAM/battery saves yet"; RAM-size/enable gating is future work, not
-  // part of this change).
   std::array<std::uint8_t, RAM_SIZE> m_ram{};
 };
 
-// A mapper owns everything the cartridge ROM area (0x0000-0x7FFF) and
-// external RAM area (0xA000-0xBFFF) resolve to - the raw ROM/RAM bytes
-// (via the Mapper base above), plus whatever bank-select/enable
-// registers a given cartridge type exposes. Mmu forwards every access in
-// those two ranges here (see Mmu::readByte()/writeByte()) via
-// std::visit(MapperVariant) instead of branching on cartridge type
-// itself.
-//
-// Static dispatch via std::variant + std::visit, not virtual dispatch -
-// MapperVariant below is a closed set of every mapper type this library
-// implements, known entirely at compile time, so there's no need to pay
-// for (or allow) runtime-open polymorphism. MapperLike is what makes
-// that safe: it gives a compile-time guarantee every alternative
-// actually implements the same shape (whether declared directly or, like
-// readRam()/writeRam(), inherited from Mapper above), something a bare
-// std::variant<Ts...> alone can't enforce - nothing would otherwise stop
-// adding a type that's missing a method until some unrelated call site
-// fails to compile. Named MapperLike, not Mapper, only because the base
-// class above already claims that name.
 template<typename T>
 concept MapperLike = requires(T& mapper,
                               const T& constMapper,
@@ -145,38 +81,22 @@ concept MapperLike = requires(T& mapper,
                               SaveStateWriter& writer,
                               SaveStateReader& reader) {
   { constMapper.readRom(address) } -> std::same_as<std::uint8_t>;
-  // Register write (bank switching, RAM-enable, etc.) - ROM itself is
-  // never writable, so this never actually stores into ROM bytes.
+  // ROM itself is never writable - this is a register write (bank
+  // switching, RAM-enable, etc.), never a store into ROM bytes.
   { mapper.writeRom(address, value) } -> std::same_as<void>;
   { constMapper.readRam(address) } -> std::same_as<std::uint8_t>;
   { mapper.writeRam(address, value) } -> std::same_as<void>;
-  // No reset() requirement here - GameBoy::reset()'s power-cycle
-  // semantics reconstruct Mmu (and so m_mapper) from scratch, and
-  // Mmu::loadRom() picks the mapper type via m_mapper.emplace<T>(rom),
-  // itself a fresh construction; every field a hand-written reset() would
-  // touch already reaches power-on defaults via construction alone (see
-  // e.g. Mbc1Mapper's own default member initializers).
-  // ROM bytes are never part of a save state (same reasoning as Mmu's
-  // own m_rom/m_bootRom before this refactor - the caller is expected to
-  // loadRom() the same cartridge before deserialize()); only RAM and
-  // register state round-trip here.
   { constMapper.serialize(writer) } -> std::same_as<void>;
   { mapper.deserialize(reader) } -> std::same_as<void>;
 
   { mapper.runNextTCycle() } -> std::same_as<void>;
 };
 
-// Cartridge type 0x00 ("ROM ONLY"): no bank switching. Also the fallback
-// for any cartridge type this library doesn't yet recognize (carried over
-// unchanged from Mmu's pre-refactor cartridgeType check, which already
-// treated every non-MBC1 type this way - not a new widening of scope
-// here).
+// Cartridge type 0x00 ("ROM ONLY"): no bank switching.
 class RomOnlyMapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
 public:
-  // Mapper's own readRam()/writeRam() are otherwise private here (private
-  // inheritance) - see Mapper's own comment on why that's the intent.
   using Mapper::readRam;
   using Mapper::runNextTCycle;
   using Mapper::writeRam;
@@ -191,27 +111,17 @@ public:
   void deserialize(SaveStateReader& reader);
 };
 
-// Cartridge types 0x01-0x03 (MBC1, MBC1+RAM, MBC1+RAM+BATTERY - the RAM/
-// battery distinction isn't yet meaningfully modeled: battery-backed saves
-// don't persist across sessions yet, see Mapper's own comment on RAM
-// always being present regardless of header declaration). ROM and RAM
-// banking both: a 5-bit low register (bank 0 reads back as 1, real
+// Cartridge types 0x01-0x03 (MBC1, MBC1+RAM, MBC1+RAM+BATTERY). ROM and
+// RAM banking both: a 5-bit low register (bank 0 reads back as 1, real
 // hardware's own well-known quirk) plus a 2-bit high register that either
 // extends the switchable ROM bank number or selects a RAM bank, depending
-// on banking mode - see writeRom()/readRam()/writeRam(). RAM reads/writes
-// are also gated by the RAM-enable register, same as Mbc3Mapper's own
-// m_ramAndTimerEnabled - disabled RAM reads back as 0xFF and ignores
-// writes, matching real hardware's open-bus behavior for a disconnected
-// SRAM chip.
+// on banking mode. RAM reads/writes are also gated by the RAM-enable
+// register - disabled RAM reads back as 0xFF and ignores writes, matching
+// real hardware's open-bus behavior for a disconnected SRAM chip.
 class Mbc1Mapper // NOLINT(misc-use-internal-linkage)
   : private Mapper
 {
 public:
-  // Mapper's own runNextTCycle() is otherwise private here (private
-  // inheritance) - see Mapper's own comment on why that's the intent.
-  // readRam()/writeRam() are overridden below instead of reused as-is
-  // (unlike RomOnlyMapper) - RAM banking needs m_bankHigh/m_bankingMode,
-  // which Mapper's own flat, unbanked implementation knows nothing about.
   using Mapper::runNextTCycle;
 
   explicit Mbc1Mapper(std::span<const std::uint8_t> rom);
@@ -226,11 +136,6 @@ public:
   void deserialize(SaveStateReader& reader);
 
 private:
-  // Recomputed from m_romBankLow/m_bankHigh/m_bankingMode on every call
-  // rather than cached - it's cheap, and avoids a fourth piece of state
-  // that could drift out of sync with the three registers it's purely
-  // derived from (m_switchableRomBank, kept as a separate stored field,
-  // was exactly that risk before this refactor).
   [[nodiscard]] std::size_t currentRomBank() const;
 
   std::uint8_t m_romBankLow{ 1 };
@@ -281,11 +186,9 @@ public:
 private:
   [[nodiscard]] std::size_t currentRomBank() const;
 
-  // { 1 }, not { } - bank 0 is always mapped at the fixed 0x0000-0x3FFF
-  // window, so real hardware never lets 0 mean anything in the
-  // switchable 0x4000-0x7FFF one either (writeRom() re-enforces this on
-  // every write too) - matches Mbc1Mapper's own m_romBankLow{ 1 }/
-  // Mbc5Mapper's own m_romBankLow{ 1 } for the same reason.
+  // Bank 0 is always mapped at the fixed 0x0000-0x3FFF window, so real
+  // hardware never lets 0 mean anything in the switchable 0x4000-0x7FFF
+  // one either.
   std::uint8_t m_romBank{ 1 };
   std::uint8_t m_ramBank{};
   bool m_ramAndTimerEnabled{ false };
@@ -327,12 +230,9 @@ public:
 private:
   [[nodiscard]] std::size_t currentRomBank() const;
 
-  // Real MBC5 hardware presents ROM bank 1 at 0x4000-0x7FFF from power-on,
-  // the same as every other mapper here (see Mbc1Mapper's own m_romBankLow
-  // above) - well-behaved ROMs rely on this and jump straight into that
-  // region before ever writing the bank-select registers themselves
-  // (confirmed against mooneye-test-suite's mbc5 rom_*.gb tests, whose very
-  // first instructions CALL into 0x4000+ with no prior bank-select write).
+  // Real MBC5 hardware presents ROM bank 1 at 0x4000-0x7FFF from power-on -
+  // well-behaved ROMs rely on this and jump straight into that region
+  // before ever writing the bank-select registers themselves.
   std::uint8_t m_romBankLow{ 1 };
   std::uint8_t m_romBankHigh{ 0 };
   bool m_rumblerEnabled{ false };
@@ -340,12 +240,6 @@ private:
   std::uint8_t m_ramBank{ 0 };
 };
 
-// Constrains std::variant itself to only ever hold types satisfying
-// MapperLike - MapperVariant below is built through this rather than a
-// bare std::variant<RomOnlyMapper, Mbc1Mapper> so a future mapper type
-// missing part of the interface fails to compile right here, at the
-// point its name is added to the list, instead of wherever std::visit
-// first happens to instantiate a call against it.
 template<typename... Ts>
   requires(MapperLike<Ts> && ...)
 using MapperVariantOf = std::variant<Ts...>;

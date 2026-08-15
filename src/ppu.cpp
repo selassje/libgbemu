@@ -22,14 +22,12 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
   { 0x00, 0x00, 0x00 },
 } };
 
-// Expands a CGB palette color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR -
-// see Mmu::bgPaletteColor()/objPaletteColor()) to 8-bit RGB. Bit-replicates
-// the top 3 bits into the low 3 (rather than a plain x8 shift) so a
-// component's full 5-bit range 0-31 maps onto the full 8-bit range
-// 0-255 (0->0, 31->255) instead of leaving it capped at 248 - the
-// standard, widely-used N-bit-to-8-bit expansion, not a
-// hardware-accurate color-correction curve (real CGB hardware's LCD has
-// its own non-linear response that this doesn't attempt to model).
+// Expands a CGB palette color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR) to
+// 8-bit RGB. Bit-replicates the top 3 bits into the low 3 so a component's
+// full 5-bit range 0-31 maps onto the full 8-bit range 0-255 (0->0,
+// 31->255) instead of leaving it capped at 248 - not a hardware-accurate
+// color-correction curve (real CGB hardware's LCD has its own non-linear
+// response that this doesn't attempt to model).
 std::array<std::uint8_t, 3>
 cgbColorToRgb(std::uint16_t color)
 {
@@ -60,14 +58,8 @@ Ppu::Fetcher::checkForObject()
     return;
   }
   // Only the first m_objectCount entries are valid for this scanline -
-  // m_objects is a fixed 10-slot array that's never cleared, only
-  // overwritten slot-by-slot as handleOAMSearch() finds objects (which
-  // resets m_objectCount, not m_objects, at the start of each scanline),
-  // so slots beyond m_objectCount hold stale data from whichever earlier
-  // scanline last wrote there. Searching the whole array picked up that
-  // stale data as if it were real sprites for the current scanline - a
-  // real bug, not just theoretical (visible as spurious sprite-tile
-  // corruption).
+  // slots beyond it hold stale data from whichever earlier scanline last
+  // wrote there.
   auto objects =
     std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
   auto it = std::ranges::find_if(objects, [&](const auto& object) {
@@ -110,13 +102,9 @@ void
 Ppu::Fetcher::runNextTCycle()
 {
   // Window must be checked first: its trigger is an exact-equality check
-  // on m_pixelsRendered (unlike the object trigger, which is deliberately
-  // >= so it survives being stalled). If an object's fetch claimed this
-  // dot first, output stalls until the fetch completes, m_pixelsRendered
-  // has already moved past the window's trigger point by the time control
-  // returns, and the window would never enter for this scanline. Checking
-  // window first lets it switch mode (and get correctly snapshotted by the
-  // object's saveFetcherState()) before an object fetch can steal the dot.
+  // on m_pixelsRendered, unlike the object trigger (deliberately >= so it
+  // survives being stalled) - checking window first lets it switch mode
+  // before an object fetch can steal the dot.
   checkForWindow();
   checkForObject();
 
@@ -239,9 +227,6 @@ Ppu::Fetcher::runNextTCycle()
 
         const auto tileMapAddress = static_cast<std::uint16_t>(
           tileMapBaseAddress + ((tileY / 8) * 32) + tileX);
-        // Bank 0 explicitly, not readByte() - see Mmu::readVram()'s
-        // comment: the PPU's own tile-map fetch must not follow whatever
-        // the CPU currently has VBK pointed at.
         constexpr std::uint8_t vramBank0 = 0;
         m_mTileIndex = m_mmu.get().readVram(vramBank0, tileMapAddress);
         constexpr std::uint8_t vramBank1 = 1;
@@ -379,16 +364,12 @@ Ppu::Fetcher::reset(Mode mode)
   if (m_mode == Mode::Window) {
     m_Y = m_ppu.get().m_activeWindowRow;
     m_ppu.get().m_activeWindowRow += 1;
-    // Satisfied already (not "reset to 0" the way a real countdown would
-    // be) - the window has no SCX-driven fine scroll of its own, so this
-    // just neutralizes the background's own SCX discard check in
-    // handlePixelTransfer() for the rest of the scanline, rather than
-    // counting anything down itself.
+    // The window has no SCX-driven fine scroll of its own, so this just
+    // neutralizes the background's own SCX discard check for the rest of
+    // the scanline.
     m_ppu.get().m_scxDiscardedCount = m_ppu.get().m_scx3LowBits;
-    // See checkForWindow(): WX < 7 triggers here at screen X=0 same as
-    // WX == 7, but still owes (7 - WX) pixels of clipping from its own
-    // left edge - handlePixelTransfer() counts this down before any
-    // window pixel actually reaches the screen.
+    // WX < 7 triggers here at screen X=0 same as WX == 7, but still owes
+    // (7 - WX) pixels of clipping from its own left edge.
     constexpr std::uint8_t wxOffset = 7;
     const auto wx = m_mmu.get().readByte(regs::WX);
     m_ppu.get().m_windowPixelsToDiscard =
@@ -525,8 +506,6 @@ Ppu::incrementDot()
         m_mmu.get().writeByte(
           regs::IF,
           static_cast<std::uint8_t>(interruptFlags | VBLANK_INTERRUPT_BIT));
-        // The frame just finished rendering - publish it as the one
-        // frameBuffer() returns (see its own comment).
         m_completedFrameBuffer = m_frameBuffer;
       }
     } else {
@@ -542,10 +521,6 @@ Ppu::incrementDot()
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
-        // Not strictly required (always set fresh by reset(Mode::Window)
-        // whenever the window actually triggers - see its own comment) -
-        // cleared here anyway so no stale value from a previous scanline
-        // could ever be read as meaningful.
         m_windowPixelsToDiscard = 0;
         m_objFifo.clear();
         m_fetcher.reset(Fetcher::Mode::Background);

@@ -31,8 +31,7 @@ namespace {
 // 60-63, hours written as 24-31) and increments past the counter's bit
 // width (hardMax), which resets to 0 *without* carrying. A field sitting on
 // an invalid value that hasn't yet hit hardMax just keeps counting up
-// normally - see rtc3test's "range tests" subtest, which exercises exactly
-// this quirk.
+// normally.
 [[nodiscard]] bool
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 tickField(std::uint8_t& field, std::uint8_t validMax, std::uint8_t hardMax)
@@ -51,7 +50,7 @@ tickField(std::uint8_t& field, std::uint8_t validMax, std::uint8_t hardMax)
 };
 
 Mbc3Mapper::Mbc3Mapper(std::span<const std::uint8_t> rom)
-  : Mapper(rom) // Initialize m_romBank to 1
+  : Mapper(rom)
 {
 }
 
@@ -112,10 +111,6 @@ Mbc3Mapper::readRam(std::uint16_t address) const
   if (m_selectedRtc.has_value()) {
     return m_rtcRegisters.at(*m_selectedRtc);
   }
-  // Wrapped by ramBankCount() the same way Mbc1Mapper's own readRam()
-  // does - see its own comment on why an under-populated cartridge
-  // aliases rather than getting distinct per-bank storage it doesn't
-  // physically have.
   return Mapper::readRam(address, m_ramBank % ramBankCount());
 }
 
@@ -131,7 +126,7 @@ Mbc3Mapper::writeRam(std::uint16_t address, std::uint8_t value)
         m_rtc.seconds = value & mbc3::REGISTER_MASKS.at(mbc3::RTC_S);
         // Real hardware resets the sub-second prescaler on any write to the
         // seconds register - writes to the other RTC registers leave it
-        // running in place. See rtc3test's "sub-second writes" subtest.
+        // running in place.
         m_rtc.tCycles = 0;
         break;
       case mbc3::RTC_M:
@@ -224,8 +219,7 @@ Mbc3Mapper::RealTimeClock::runNextTCycle()
   // The sub-second prescaler itself is gated by halt too - real hardware
   // freezes it in place while halted rather than letting it keep running
   // and only masking the S/M/H/day fields, so it resumes from the exact
-  // sub-second position it was halted at. See rtc3test's "sub-second
-  // writes" subtest, specifically the "RTC off" case.
+  // sub-second position it was halted at.
   if (halt) {
     return;
   }

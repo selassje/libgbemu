@@ -2,17 +2,6 @@ module gbemu;
 
 namespace {
 
-// Only actually casts when narrowing is real for this build's To/From
-// widths (e.g. std::uint64_t -> std::size_t on wasm32) - sizeof(To) <
-// sizeof(From) depends on the template parameters, so the untaken branch
-// is genuinely discarded (never instantiated), not merely dead code, the
-// same way a template's discarded if-constexpr branch is never checked
-// for a type that doesn't apply to it. That's what lets this compile
-// cleanly on every target: a plain static_cast written directly at the
-// call site would instead be a real, needed cast on some build targets
-// (wasm32) and a same-width no-op cast on others (flagged
-// -Wuseless-cast, GCC-only) - both can't be satisfied by one
-// unconditional cast.
 template<typename To, typename From>
 constexpr To
 narrowingCast(From value)
@@ -97,10 +86,6 @@ void
 SaveStateReader::checkAvailable(std::size_t count) const
 {
   if (count > m_data.size() - m_offset) {
-    // MSVC STL's std::out_of_range base-class chain isn't visible to
-    // clang-tidy through `import std;`'s module boundary; not
-    // reproducible on libc++ (dev_ninja_clang_tidy_linux builds this file
-    // clean) - see Ppu::Fifo::push()'s identical comment.
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::out_of_range("SaveStateReader: not enough data remaining");
   }

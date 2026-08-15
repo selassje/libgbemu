@@ -11,14 +11,10 @@ namespace gbemu {
 class Cpu // NOLINT(misc-use-internal-linkage)
 {
 public:
-  // Every member below already default-initializes to true hardware
-  // power-on/reset state (PC=0, SP=0xFFFF, all other registers/flags
-  // zero), so this constructor alone - with no separate reset() needed -
-  // reaches it; GameBoy::reset()/loadRom() get a fresh reset CPU simply by
-  // reconstructing this in place. The boot ROM (see :boot_rom) is what
-  // brings the CPU to a real *post-boot* state by actually executing, the
-  // same as on real hardware; this is not a "seed the post-boot values"
-  // shortcut.
+  // Default-initializes to true hardware power-on/reset state (PC=0,
+  // SP=0xFFFF, all other registers/flags zero) - the boot ROM then brings
+  // the CPU to a real post-boot state by actually executing, the same as
+  // on real hardware.
   Cpu(Mmu& mmu, Ppu& ppu, Apu& apu)
     : m_mmu(mmu)
     , m_ppu(ppu)
@@ -29,10 +25,6 @@ public:
   std::expected<std::size_t, std::string> runNextInstruction();
   [[nodiscard]] std::size_t baseTCycles() const { return m_baseTCycles; }
 
-  // Save-state support (see GameBoy::saveState()/loadState()) - every data
-  // member below except the Mmu/Ppu/Apu references (owned/reloaded
-  // separately) and the static instruction table (fixed, not runtime
-  // state).
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
@@ -63,8 +55,6 @@ private:
   // state advances on every one; PPU/APU advance on every cycle at normal
   // speed and every other cycle at double speed.
   std::size_t m_syncedTCycles{ 0 };
-  // Base-speed clock count used by GameBoy::runNextFrame(), so a frame keeps
-  // the same real duration even when speed changes partway through it.
   std::size_t m_baseTCycles{ 0 };
   bool m_doubleSpeedPhase{ false };
 
@@ -84,26 +74,12 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   void handleInterrupts();
-  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time (so a
-  // memory access made partway through an instruction sees hardware state
-  // as of its own T-cycle, not just whatever was left over from the
-  // *previous* instruction), then runs the timer's own DIV/TIMA catch-up
-  // math up to timerMCycles - a separate parameter (not just
-  // currentTCycles/4) specifically so a caller needing sub-M-cycle
-  // precision for the *peripheral* observation point (see ldha8(), the
-  // only current user) doesn't also drag the timer's own, genuinely
-  // M-cycle-granular catch-up point backward with it. Called at every
-  // point in an instruction handler that performs a memory access - the
-  // same checkpoints this used to only serve for the timer, before it
-  // needed T-cycle precision - plus once more at the end of
-  // runNextInstruction() with the instruction's final cycle totals, to
-  // flush any of its own trailing cycles a mid-instruction checkpoint
-  // didn't already cover.
+  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time, then
+  // runs the timer's own DIV/TIMA catch-up math up to timerMCycles - a
+  // separate parameter since ldha8()'s Wave RAM read needs sub-M-cycle
+  // precision for the peripheral observation point without affecting the
+  // timer's own M-cycle-granular catch-up.
   void advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles);
-  // Convenience overload for every call site *except* ldha8()'s Wave RAM
-  // read: currentTCycles is always an exact M-cycle multiple for these, so
-  // currentTCycles/4 is genuinely the same M-cycle the timer should catch
-  // up to.
   void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;
 

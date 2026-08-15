@@ -14,9 +14,7 @@ RomOnlyMapper::readRom(std::uint16_t address) const
   if (address < KB16) {
     return romByte(address);
   }
-  // No register ever changes which bank this reads (writeRom() is a
-  // no-op) - always bank 1, the same fixed value Mmu's pre-refactor
-  // m_switchableRomBank permanently held for a non-MBC1 cartridge.
+  // No register ever changes which bank this reads - always bank 1.
   const auto bank = std::size_t{ 1 } % bankCount;
   return romByte((bank * KB16) + (address - KB16));
 }

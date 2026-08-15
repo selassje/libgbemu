@@ -97,15 +97,11 @@ Apu::runNextTCycle(std::uint16_t divCounter, bool doubleSpeed)
   }
   m_sampleAccumulator -= CLOCK_RATE_HZ;
 
-  // Kept as separate statements (not applyHpf(mix())) so the pre-filter
-  // mixed output stays inspectable on its own.
   const auto mixed = mix();
   const auto [left, right] = applyHpf(mixed);
-  // mix() itself is normalized to [-1, 1] (see its own comment), but
-  // applyHpf()'s capacitor filter can still transiently overshoot that
-  // range for a sample or two right after a sudden polarity flip (its
-  // capacitor hasn't caught up yet) - this clamp is the safety net for
-  // that, keeping buffer()'s own documented [-1, 1] contract true.
+  // applyHpf()'s capacitor filter can transiently overshoot [-1, 1] for a
+  // sample or two right after a sudden polarity flip - clamp as a safety
+  // net.
   m_buffer.at(m_sampleCount++) = std::clamp(left, -1.0F, 1.0F);
   m_buffer.at(m_sampleCount++) = std::clamp(right, -1.0F, 1.0F);
 }
@@ -233,8 +229,6 @@ Apu::applyHpf(std::pair<float, float> input)
   return { outLeft, outRight };
 }
 
-// address/value is this file's (and Mmu::writeByte()'s) established
-// register-write shape.
 void
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Apu::writeRegister(std::uint16_t address, std::uint8_t value)
@@ -272,12 +266,6 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
 
       const auto unsignedValue = static_cast<unsigned>(value);
       PulseChannel& pulse = (address == regs::NR11) ? m_pulse1 : m_pulse2;
-      // While the APU is powered off, Mmu::writeByte() already merges
-      // this write's length bits into the EXISTING stored duty bits
-      // before forwarding here (only the length-timer load circuit
-      // bypasses the power gate on real hardware, not the duty bits
-      // sharing this register) - so parsing duty out of value normally
-      // is always correct, powered or not.
       pulse.configuration.duty =
         static_cast<std::uint8_t>((unsignedValue >> dutyShift) & dutyMask);
       pulse.configuration.lengthTimer =
@@ -356,15 +344,12 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         pulse.playback.enabled = isDacEnabled(pulse.configuration.envelope);
         if (pulse.playback.remainingLengthTicks == 0) {
           // Jams to the hardcoded maximum, NOT recomputed from the
-          // length-timer register's current value - a real hardware
-          // quirk, confirmed by dmg_sound/02-len ctr.gb's "Trigger should
-          // treat 0 length as maximum" check.
+          // length-timer register's current value - a real hardware quirk.
           static constexpr std::uint16_t maxLengthTicks = 64;
           pulse.playback.remainingLengthTicks = maxLengthTicks;
-          // The same extra-clock quirk also applies to this fresh
-          // reload, when length is (now) enabled and the phase condition
-          // still holds - see dmg_sound/03-trigger.gb's "Triggering that
-          // clocks length of 1 should clock twice" check.
+          // The same extra-clock quirk also applies to this fresh reload,
+          // when length is (now) enabled and the phase condition still
+          // holds.
           if (nowLengthEnabled && frameSequencerWontClockLengthNext()) {
             pulse.clockLength();
           }
@@ -452,8 +437,7 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         // T-cycle before its next wave fetch corrupts the wave table itself,
         // not just where playback resumes from. The upcoming 4-byte group
         // gets copied into the first group (byte 0 only if the upcoming byte
-        // is already in the first group); CGB doesn't have this bug. See
-        // dmg_sound/10-wave trigger while on.gb.
+        // is already in the first group); CGB doesn't have this bug.
         if (!m_isCgbHardware && m_wave.playback.enabled &&
             m_wave.playback.periodCounter == 0) {
           static constexpr std::size_t groupSize = 4;
@@ -487,17 +471,9 @@ Apu::writeRegister(std::uint16_t address, std::uint8_t value)
         m_wave.playback.waveRamIndex = 0;
         m_wave.playback.hasFetchedWaveRam = false;
         // Trigger also reloads the frequency timer from the (just-updated)
-        // period - same base formula as WaveChannel::runNextTCycle()'s own
-        // reload. Without this, periodCounter would carry over unchanged
-        // from however the channel was counting down before this trigger,
-        // which is wrong: dmg_sound/09-wave read while on.gb specifically
-        // depends on each iteration's freshly-triggered period determining
-        // when the channel's first post-trigger Wave RAM fetch happens.
-        // triggerStartupDelay is a real DMG quirk on top of that reload:
-        // the channel's first post-trigger fetch happens 4 T-cycles later
-        // than the reload formula alone would predict - confirmed
-        // empirically against dmg_sound/09-wave read while on.gb's exact
-        // expected byte sequence (its own checksum, not just pass/fail).
+        // period. triggerStartupDelay is a real DMG quirk on top of that
+        // reload: the channel's first post-trigger fetch happens 4 T-cycles
+        // later than the reload formula alone would predict.
         static constexpr std::uint16_t periodBase = 2048;
         static constexpr std::uint16_t periodMultiplier = 2;
         static constexpr std::uint16_t triggerStartupDelay = 5;
@@ -689,8 +665,7 @@ Apu::writeWaveRam(std::uint16_t address, std::uint8_t value)
   // While enabled, the requested address is ignored and the write uses
   // CH3's current Wave RAM byte. On DMG the CPU's write strobe is accepted
   // in the post-fetch phase represented by periodCounter == 2 in this
-  // countdown convention. CGB has no such restriction. See
-  // dmg_sound/12-wave write while on.gb.
+  // countdown convention. CGB has no such restriction.
   static constexpr std::uint16_t dmgWriteAccessCounter = 2;
   if (!m_isCgbHardware &&
       (m_wave.playback.periodCounter != dmgWriteAccessCounter ||
@@ -1024,12 +999,6 @@ Apu::NoiseChannel::deserialize(SaveStateReader& reader)
 void
 Apu::serialize(SaveStateWriter& writer) const
 {
-  // Per-element via writeFloat(), not a raw std::as_bytes() dump - unlike
-  // the fixed-size uint8_t arrays elsewhere (VRAM, Wave RAM, ...) that are
-  // already just bytes, a float's own in-memory byte order still depends
-  // on host endianness, so dumping it raw would reintroduce exactly the
-  // host-endianness dependence the rest of this format deliberately
-  // avoids (see serialization.cppm's own comment).
   for (const auto sample : m_buffer) {
     writer.writeFloat(sample);
   }

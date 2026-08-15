@@ -10,30 +10,9 @@ constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
 constexpr std::uint8_t CGB_SUPPORTED_MASK = 0x80;
 constexpr std::uint8_t CGB_REQUIRED_MASK = 0xC0;
 
-// Written first, unconditionally, by every saveState() call - lets
-// loadState() reject a file that isn't a gbemu save state at all (wrong
-// ROM's save, a corrupted download, an unrelated file) with a clear error
-// right away, rather than either misreading it as valid or failing with a
-// confusing error from deep inside some component's own deserialize().
 constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
-// Bumped whenever the save-state layout changes (a component gains/loses/
-// reorders a serialized field) - loadState() requires an exact match, no
-// migration or partial-load attempt for an older/newer version. See
-// serialization.cppm's own comment on C++26 reflection eventually
-// replacing the hand-maintained per-field serialize()/deserialize() calls
-// this version number protects against silently misreading.
 constexpr std::uint32_t SAVE_STATE_VERSION = 3;
 
-// Shared by initializeFromRom() (the authoritative check on whether the
-// currently-requested Mode and currently-loaded ROM are compatible) and
-// loadRom()/setMode()'s own up-front validation - each needs to reject an
-// incompatible change *before* committing their own piece of state (rom
-// for loadRom(), model for setMode()), so a rejected change never leaves
-// GameBoy holding a model+ROM pair initializeFromRom() would otherwise
-// reject - see GameBoy::reset()'s own comment on why that matters. `rom`
-// must already be at least MIN_ROM_SIZE bytes - every call site only ever
-// passes a buffer m_mmu.loadRom() has already accepted, well past
-// CGB_FLAG_ADDRESS either way.
 [[nodiscard]] std::expected<void, std::string>
 checkModeCompatible(gbemu::Mode model, std::span<const std::uint8_t> rom)
 {
@@ -68,14 +47,6 @@ GameBoy::initializeFromRom()
   const auto cgbFlag = m_mmu.readByte(CGB_FLAG_ADDRESS);
   const bool cartSupportsCgb = (cgbFlag & CGB_SUPPORTED_MASK) != 0;
 
-  // Mode::Auto gives each cartridge the physical console it
-  // actually targets (DMG-only carts boot as DMG, CGB-aware/required
-  // carts boot as CGB); Mode::Dmg/Cgb force a specific physical
-  // console regardless of what the cartridge declares, for deliberately
-  // running a cartridge - even a DMG-only one on Cgb, or a CGB-aware one
-  // on Dmg - on hardware other than what it targets, matching a real
-  // console's own fixed boot ROM (a real DMG or CGB console runs the same
-  // boot ROM no matter what's inserted).
   const bool bootAsCgb =
     m_model == Mode::Cgb || (m_model == Mode::Auto && cartSupportsCgb);
   if (!bootAsCgb) {
@@ -86,10 +57,6 @@ GameBoy::initializeFromRom()
     m_hardwareMode = HardwareMode::CgbCompatibility;
   }
   m_mmu.enableBootRom(bootAsCgb ? cgbBootRom() : dmgBootRom());
-  // Some hardware quirks/rendering rules genuinely differ between the two
-  // physical consoles, and between compatibility and native mode on CGB -
-  // see each subsystem's own setHardwareMode() comment for what it does
-  // with this.
   m_apu.setHardwareMode(m_hardwareMode);
   m_mmu.setHardwareMode(m_hardwareMode);
   m_ppu.setHardwareMode(m_hardwareMode);
@@ -100,31 +67,6 @@ GameBoy::initializeFromRom()
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::loadRom(std::span<const std::uint8_t> rom)
 {
-  // Delegates to reset() (rather than calling initializeFromRom()
-  // directly, as this used to) so a ROM loaded onto an already-running
-  // GameBoy - not just a freshly-constructed one - gets the same fully
-  // reset Apu/Mmu/Ppu/Cpu a power cycle would give it, instead of
-  // inheriting stale VRAM/WRAM/PPU/APU state left over from whatever was
-  // running before.
-  //
-  // reset() can't be undone once it runs, so rom needs to be validated
-  // *before* committing to it - a rejected ROM (too small, an
-  // unsupported cartridge type, or CGB-required while forced to Dmg)
-  // must leave whatever's currently running untouched, the same as it
-  // did before this delegated to reset(). Without this check, a failed
-  // load on an already-running GameBoy (e.g. the frontend's "Open ROM"
-  // menu action) would wipe the session out first and fail second,
-  // leaving m_mapper holding no ROM data at all - which the very next
-  // runNextFrame() crashes on, trying to fetch an instruction from an
-  // empty ROM.
-  //
-  // m_mmu.loadRom() is safe to call speculatively like this on the
-  // current, not-yet-reset Mmu: on failure it returns without ever
-  // touching m_mapper (see its own comment), so a rejected cartridge
-  // type leaves the currently-loaded game's mapper exactly as it was.
-  // If this succeeds, m_mapper now holds the new ROM's mapper on the
-  // *old* Mmu - about to be discarded by reset() below regardless, so
-  // redoing this same work moments later there is harmless.
   auto mapperResult = m_mmu.loadRom(rom);
   if (!mapperResult) {
     return mapperResult;
@@ -134,14 +76,6 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
     return mapperResult;
   }
 
-  // m_romBytes is assigned only now that rom is known-loadable - reset()'s
-  // own initializeFromRom() call reads it, not a parameter. reset() itself
-  // can't fail here - both checks above are exactly what it would
-  // otherwise reject (see its own comment). mapperResult is already known
-  // to hold success at this point - reused rather than returning a fresh
-  // {} so every return statement in this function returns the same named
-  // variable (see checkModeCompatible()'s own call above for why that
-  // matters under GCC's -Wnrvo).
   m_romBytes.assign(rom.begin(), rom.end());
   reset();
   return mapperResult;
@@ -150,35 +84,13 @@ GameBoy::loadRom(std::span<const std::uint8_t> rom)
 void
 GameBoy::reset()
 {
-  // Reset first - Mmu's constructor below takes a reference to it.
   m_apu = Apu{};
-  // Not m_mmu = Mmu{} - that constructs a ~58KB temporary Mmu on the stack
-  // before assigning it in, which trips MSVC /analyze's C6262 (excessive
-  // stack usage) treated as an error under /WX. Destroying and
-  // reconstructing in-place avoids the temporary entirely.
   m_mmu.~Mmu();
   new (&m_mmu) Mmu(m_apu);
-  // Not m_ppu = Ppu(m_mmu) - Ppu's Fetcher members capture *this in their
-  // default member initializers, so constructing a temporary Ppu and
-  // assigning it in would leave those bound to the temporary's (about to
-  // be destroyed) address, not m_ppu's. Destroying and reconstructing
-  // in-place ensures *this inside the constructor is the real, persistent
-  // m_ppu.
   m_ppu.~Ppu();
   new (&m_ppu) Ppu(m_mmu);
-  // Not m_cpu = Cpu(m_mmu, m_ppu, m_apu) - Cpu's own copy/move assignment
-  // isn't actually deleted (it holds reference_wrappers, not raw
-  // references, so unlike Mmu/Ppu above it would compile), but
-  // reconstructing in place keeps this consistent with them rather than
-  // being the only one of the three that goes through a temporary.
   m_cpu.~Cpu();
   new (&m_cpu) Cpu(m_mmu, m_ppu, m_apu);
-  // initializeFromRom() only fails on a too-small/malformed ROM or an
-  // incompatible model+ROM pair - both already-checked preconditions by
-  // the time reset() is reachable at all (loadRom()/setMode() each
-  // validate before ever committing to a call that reaches here, see
-  // their own comments), so a failure here means an internal invariant
-  // broke, not a legitimate runtime condition a caller needs to handle.
   hardAssert(initializeFromRom().has_value(),
              "reset() failed after loadRom()/setMode() already validated "
              "compatibility");
@@ -187,18 +99,6 @@ GameBoy::reset()
 [[nodiscard]] std::expected<void, std::string>
 GameBoy::setMode(Mode mode)
 {
-  // Validated *before* committing to m_model, mirroring loadRom()'s own
-  // validate-before-commit shape (see its own comment) - so a rejected
-  // mode change leaves m_model exactly as it was, keeping reset()'s own
-  // "always succeeds" guarantee true for a caller that falls back to a
-  // plain reset() afterward instead.
-  //
-  // Every return statement below returns this same named `result` (never
-  // a fresh std::unexpected(...)/{} directly) - GCC 13+'s -Wnrvo flags
-  // mixing a named return with unnamed temporaries across different
-  // return paths as ineligible for NRVO (see loadRom()'s own comment,
-  // and 096628f in this file's history for the original instance of this
-  // fix).
   std::expected<void, std::string> result;
   if (m_romBytes.size() < MIN_ROM_SIZE) {
     result = std::unexpected("no ROM loaded, nothing to change the mode for");
@@ -216,24 +116,11 @@ GameBoy::setMode(Mode mode)
 std::expected<EmulationFrame, std::string>
 gbemu::GameBoy::runNextFrame()
 {
-  // Fixed 70224-cycle audio cadence, same as always - frameBuffer() below
-  // is now always safe to read regardless of exactly where in that window
-  // this loop happens to stop (see its own comment for why), so this loop
-  // no longer needs to reason about LCD/VBlank state at all.
+  // A real Game Boy frame is a fixed 70224 T-cycles.
   constexpr std::size_t tCyclesPerFrame = 70224;
   m_apu.startFrame();
   const auto targetBaseTCycles = m_cpu.baseTCycles() + tCyclesPerFrame;
   while (m_cpu.baseTCycles() < targetBaseTCycles) {
-    // Cpu::runNextInstruction() ticks Ppu/Mmu/Apu itself now (see
-    // Cpu::advanceHardware()), at the specific memory-access points within
-    // an instruction that already called it for timer-accuracy reasons,
-    // rather than this loop catching everything up in one batch afterward
-    // - needed so a mid-instruction Wave RAM read (see
-    // Apu::readWaveRam()) observes the channel's state as of its own
-    // T-cycle, not whatever was left over from the previous instruction.
-    // Not every memory access gets this treatment (e.g. opcode/operand
-    // fetches don't), only the ones advanceHardware() was already being
-    // called around.
     const auto result = m_cpu.runNextInstruction();
     if (!result) {
       return std::unexpected(result.error());
@@ -312,19 +199,6 @@ GameBoy::loadState(std::span<const std::uint8_t> data)
       std::to_string(version) + ")");
   }
 
-  // Magic and version are already verified above, so only a truncated or
-  // otherwise corrupt body can throw here - unlike that check (which never
-  // touches any component), deserializeComponents() mutates Cpu/Mmu/Ppu/Apu
-  // directly and in place, so a mid-body failure would otherwise leave the
-  // session partially overwritten with only some components updated,
-  // despite loadState() reporting failure via a std::expected a caller
-  // could reasonably treat as recoverable (i.e. safe to keep using this
-  // GameBoy). Snapshotting the pre-load state first and restoring it on
-  // failure keeps that std::expected contract honest: an error return means
-  // nothing changed. writer/backupReader never touch the magic/version
-  // header, only ever produced/consumed by this process's own
-  // serializeComponents()/deserializeComponents() moments apart, so the
-  // restore itself isn't expected to ever fail the same way.
   SaveStateWriter backupWriter;
   serializeComponents(backupWriter);
 

@@ -22,10 +22,6 @@ template<typename Self>
 auto&
 Mmu::getByteRef(this Self& self, std::uint16_t address)
 {
-  // ROM (0x0000-0x7FFF) and external RAM (0xA000-0xBFFF) are handled
-  // directly by readByte()/writeByte() instead, via the mapper - see
-  // their own comments. Both callers already guarantee address is
-  // outside those two ranges before reaching here.
   if (address < 0xA000) {
     return self.m_vram.at(address - (2 * KB16) +
                           (self.m_switchableVRamBank * KB8));
@@ -88,22 +84,16 @@ Mmu::readByte(std::uint16_t address) const
       return m_bootRom.at(address);
     }
   }
-  // ROM - delegated to the mapper (see mapper.cppm's own comments on why
-  // this needs the whole 0x0000-0x7FFF range, not just 0x4000-0x7FFF).
   if (address < 0x8000) {
     return std::visit(
       [address](const auto& mapper) { return mapper.readRom(address); },
       m_mapper);
   }
-  // External RAM - also delegated to the mapper.
   if (address >= 0xA000 && address < 0xC000) {
     return std::visit(
       [address](const auto& mapper) { return mapper.readRam(address); },
       m_mapper);
   }
-  // getByteRef()'s explicit-object-parameter overload deduces Self as
-  // const Mmu here (readByte() is const), so this returns a
-  // const std::uint8_t& - no const_cast needed to reuse it read-only.
   const auto value = getByteRef(address);
   if (address == regs::IF) {
     return static_cast<std::uint8_t>(
@@ -294,25 +284,14 @@ Mmu::readByte(std::uint16_t address) const
       address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
     return m_apu.get().readWaveRam(address);
   }
-  // FF51-FF54 are write-only on real hardware (matching NR13/NR23/NR33/
-  // NR31/NR41 above - they never expose their stored value back to the
-  // CPU), true on both DMG (which doesn't have these registers at all) and
-  // CGB hardware alike - no m_isCgbHardware check needed, unlike VBK/SVBK/
-  // BCPS/OPRI/BCPD/OCPD below. FF55 falls through to the same unconditional
-  // $FF when no HDMA transfer is active (never started, DMG, or GDMA -
-  // synchronous, so software can never observe it in progress here either
-  // way); the in-progress case (real HDMA, bit 7 clear + remaining length
-  // in blocks in bits 0-6) is handled separately below.
+  // FF51-FF54 are write-only on real hardware, true on both DMG (which
+  // doesn't have these registers at all) and CGB hardware alike. FF55
+  // falls through to the same unconditional $FF when no HDMA transfer is
+  // active; the in-progress case (real HDMA, bit 7 clear + remaining
+  // length in blocks in bits 0-6) is handled separately below.
   if (address >= regs::CGB_DMA_1 && address <= regs::CGB_DMA_5) {
     if (address == regs::CGB_DMA_5 && m_cgbDmaState.isHDMA &&
         m_cgbDmaState.bytesRemaining > 0) {
-      // The CPU is stalled for the whole duration of a block transfer (see
-      // Cpu::isCgbHdmaActive()), so no instruction - including this read -
-      // can execute while isHDMABlockInTransfer is true; and bytesRemaining
-      // is only ever touched alongside an active block copy (see
-      // runNextTCycle()), so between blocks it's always a whole multiple of
-      // 0x10. Both conditions being false here would mean one of those
-      // invariants broke elsewhere, not a real hardware state to encode.
       hardAssert(!m_cgbDmaState.isHDMABlockInTransfer,
                  "FF55 read while a HDMA block transfer is in progress");
       hardAssert(m_cgbDmaState.bytesRemaining >= 0x10,
@@ -398,9 +377,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 #endif
 
   // Writes in the cartridge ROM area control the mapper (bank switching,
-  // etc.) - ROM itself is never writable. cpu_instrs.gb is an MBC1
-  // cartridge and uses this register to dispatch each of its individual
-  // test banks.
+  // etc.) - ROM itself is never writable.
   if (address < 0x8000) {
     std::visit(
       [address, value](auto& mapper) { mapper.writeRom(address, value); },
@@ -408,7 +385,6 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
-  // External RAM - also delegated to the mapper.
   if (address >= 0xA000 && address < 0xC000) {
     std::visit(
       [address, value](auto& mapper) { mapper.writeRam(address, value); },
@@ -467,11 +443,9 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 
   // NR52 bit 7 gates the APU's power - bits 0-3 (channel status) and 4-6
   // (unused) are read-only, so writes to them are silently discarded,
-  // matching real hardware ("writing to those does not enable or disable
-  // the channels"). Powering off clears NR10-NR51 (0xFF10-0xFF25) here and
-  // makes them read-only until powered back on; Wave RAM is unaffected.
-  // Apu tracks the power bit and its own channel state itself now (see
-  // readByte()), so NR52 no longer needs a raw byte stored in m_io.
+  // matching real hardware. Powering off clears NR10-NR51 (0xFF10-0xFF25)
+  // here and makes them read-only until powered back on; Wave RAM is
+  // unaffected.
   if (address == regs::NR52) {
     constexpr unsigned powerBit = 0b1000'0000U;
     const bool poweringOn = (static_cast<unsigned>(value) & powerBit) != 0;
@@ -485,25 +459,17 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
-  // While the APU is powered off, NR10-NR51 are read-only (see the NR52
-  // handling above) - Wave RAM (0xFF30-0xFF3F) is deliberately excluded,
-  // it's always writable regardless of APU power state. The four length-
-  // timer registers (NR11/NR21/NR31/NR41) are a second, narrower
-  // exception, but only on DMG/MGB ("monochrome models" - Pan Docs'
-  // Audio_Registers.md, NR52's own footnote): real hardware's length-
-  // counter load circuit bypasses the power gate entirely there - see
-  // dmg_sound/11-regs after power.gb's own "While powered off, writes to
-  // NR41 are NOT ignored" check. CGB hardware doesn't have this bypass;
-  // writes to these registers while powered off are ignored the same as
-  // every other NR10-NR51 register there (confirmed by cgb_sound/11-regs
-  // after power.gb's own "Powering off should clear NR41" check, which
-  // fails if this bypass applies unconditionally). For NR11/NR21
-  // specifically (DMG/MGB only), only their length bits (0-5) bypass it;
-  // the duty bits (6-7) sharing that same register are ordinary
-  // NR10-NR51 bits, still read-only while off (confirmed by
-  // dmg_sound/01-registers.gb's own "when off, should ignore writes to
-  // registers" check) - so merge the new length bits into the existing
-  // stored duty bits rather than letting the whole byte through.
+  // While the APU is powered off, NR10-NR51 are read-only - Wave RAM
+  // (0xFF30-0xFF3F) is deliberately excluded, it's always writable
+  // regardless of APU power state. The four length-timer registers
+  // (NR11/NR21/NR31/NR41) are a second, narrower exception, but only on
+  // DMG/MGB: real hardware's length-counter load circuit bypasses the
+  // power gate entirely there. CGB hardware doesn't have this bypass. For
+  // NR11/NR21 specifically (DMG/MGB only), only their length bits (0-5)
+  // bypass it; the duty bits (6-7) sharing that same register are
+  // ordinary NR10-NR51 bits, still read-only while off - so merge the new
+  // length bits into the existing stored duty bits rather than letting
+  // the whole byte through.
   const bool isLengthTimerRegister =
     !m_isCgbHardware && (address == regs::NR11 || address == regs::NR21 ||
                          address == regs::NR31 || address == regs::NR41);
@@ -521,36 +487,26 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     }
   }
 
-  // Forward channel-register writes (NR10-NR44), NR50 (master volume) and
-  // NR51 (panning) to Apu - it needs both for its own mixing - only
-  // reached once we know the write wasn't just dropped by the read-only
-  // guard above.
   if (address >= APU_REGISTERS_START && address < regs::NR52) {
     m_apu.get().writeRegister(address, value);
   }
 
-  // Wave RAM mirrors into Apu on every write, unconditionally - unlike
-  // NR10-NR51 above it's never read-only regardless of APU power state
-  // (see the read-only guard above), so there's no gating to check first.
+  // Wave RAM mirrors into Apu on every write, unconditionally - it's
+  // never read-only regardless of APU power state.
   if (address >= regs::WAVE_RAM_START &&
       address < regs::WAVE_RAM_START + WAVE_RAM_SIZE) {
     m_apu.get().writeWaveRam(address, value);
   }
 
   // Starts a new transfer, restarting any one already in progress - matches
-  // real hardware. The register itself still stores the written byte
-  // normally (falls through to getByteRef below), so reading 0xFF46 back
-  // returns the last source page written.
+  // real hardware.
   if (address == regs::OAM_DMA) {
     m_dmaState = DmaState{ .sourceBase = static_cast<std::uint16_t>(
                              static_cast<unsigned>(value) << 8U) };
   }
 
-  // CGB-only: selects which VRAM bank 0x8000-0x9FFF maps to - see
-  // setCgbMode() and getByteRef(). Ignored on DMG (no such bank to
-  // select); the register itself still stores the written byte either way
-  // (falls through to getByteRef below), it just never affects addressing
-  // or reads back as anything but $FF there.
+  // CGB-only: selects which VRAM bank 0x8000-0x9FFF maps to. Ignored on
+  // DMG (no such bank to select).
   if (address == regs::VBK && m_isCgbHardware) {
     constexpr unsigned vramBankBit = 0b0000'0001U;
     m_switchableVRamBank = static_cast<unsigned>(value) & vramBankBit;
@@ -558,8 +514,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
 
   // CGB-only: selects which WRAM bank 0xD000-0xDFFF maps to - bank 0
   // behaves as bank 1 (there's no way to map WRAM bank 0 into the
-  // switchable window, only the fixed 0xC000-0xCFFF one). Ignored on DMG,
-  // same reasoning as VBK above.
+  // switchable window, only the fixed 0xC000-0xCFFF one). Ignored on DMG.
   if (address == regs::SVBK && m_isCgbHardware) {
     constexpr unsigned wramBankBits = 0b0000'0111U;
     auto bank = static_cast<unsigned>(value) & wramBankBits;
@@ -570,12 +525,8 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 
   // CGB-only: writes the byte of BG palette RAM BCPS currently indexes,
-  // then auto-increments that index (wrapping) if BCPS bit 7 is set - see
-  // bgPaletteColor(). No backing byte for BCPD itself (like NR52, its
-  // whole CPU-visible behavior is this side effect), so this returns
-  // early rather than falling through to the generic getByteRef() store
-  // below. On DMG, falls through and is simply not readable back as
-  // anything but $FF (see readByte()) - the register doesn't exist there.
+  // then auto-increments that index (wrapping) if BCPS bit 7 is set. On
+  // DMG the register doesn't exist and always reads back $FF.
   if (address == regs::BCPD && m_isCgbHardware) {
     constexpr unsigned indexMask = 0b0011'1111U;
     constexpr unsigned autoIncBit = 0b1000'0000U;
@@ -606,9 +557,7 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   }
 
   // Only an internally-clocked transfer (bit 0 set) has a local timer to
-  // complete it - see m_serialTCyclesRemaining's comment. The register
-  // itself still stores the written byte normally (falls through to
-  // getByteRef below) either way.
+  // complete it.
   constexpr unsigned transferStartBit = 0b1000'0000U;
   constexpr unsigned internalClockBit = 0b0000'0001U;
   if (address == regs::SC &&
@@ -621,9 +570,8 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   if (m_isCgbHardware) {
     switch (address) {
       // HDMA1/HDMA3 are the *high* byte of source/dest respectively, and
-      // HDMA2/HDMA4 the *low* byte (confirmed against gdma_addr_mask.asm's
-      // own register writes: HIGH(SrcBuf) -> rHDMA1, LOW(SrcBuf) -> rHDMA2)
-      // - only the low-byte registers get the 0x10-byte-alignment mask.
+      // HDMA2/HDMA4 the *low* byte - only the low-byte registers get the
+      // 0x10-byte-alignment mask.
       case regs::CGB_DMA_1:
         m_cgbDmaState.sourceHigh = value;
         break;
@@ -652,16 +600,11 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
         // Real hardware doesn't special-case "LCD off" for HDMA - it just
         // checks whether STAT's mode is already 0 (H-Blank) at the moment
         // of this write. Disabling the LCD forces STAT to permanently read
-        // mode 0 (see Ppu::runNextTCycle()'s own comment on this), so it's
-        // indistinguishable from genuinely being mid-H-Blank: one block
-        // starts immediately instead of waiting for the next H-Blank
-        // *entry* - same-suite/dma/gdma_addr_mask.asm relies on exactly
-        // this (LCD off, one block transferred, the rest of its nominally
-        // longer request left untouched since no further H-Blank entry
-        // ever comes with the LCD staying off) - and hdma_mode0.gb almost
-        // certainly covers the LCD-on, genuinely-mid-H-Blank case the same
-        // way. notifyHBlankStart() handles every subsequent block the
-        // normal way; this only special-cases the very first one.
+        // mode 0, so it's indistinguishable from genuinely being
+        // mid-H-Blank: one block starts immediately instead of waiting for
+        // the next H-Blank entry. notifyHBlankStart() handles every
+        // subsequent block the normal way; this only special-cases the
+        // very first one.
         m_cgbDmaState.isHDMABlockInTransfer =
           m_cgbDmaState.isHDMA && (static_cast<unsigned>(readByte(regs::STAT)) &
                                    statModeMask) == hblankStatMode;
@@ -713,13 +656,7 @@ Mmu::runNextTCycle()
   }
 
   // GDMA copies continuously while any bytes remain; HDMA only copies
-  // while isHDMABlockInTransfer (one 16-byte block per H-Blank - see
-  // notifyHBlankStart()). Gating the WHOLE per-byte step below on this -
-  // not just the writeByte() call - is what keeps a pending HDMA's
-  // addresses/bytesRemaining frozen while the CPU runs normally between
-  // blocks: advancing them unconditionally here would silently drain the
-  // whole transfer's byte count during ordinary CPU execution, long before
-  // the H-Blanks it actually needs have happened.
+  // while isHDMABlockInTransfer (one 16-byte block per H-Blank).
   const bool dmaActive =
     m_cgbDmaState.bytesRemaining > 0 &&
     (!m_cgbDmaState.isHDMA || m_cgbDmaState.isHDMABlockInTransfer);
@@ -739,12 +676,6 @@ Mmu::runNextTCycle()
         m_cgbDmaState.isHDMABlockInTransfer = false;
       }
 
-      // 16-bit source/dest addresses, but sourceLow/destLow are only the
-      // low byte - carry into the high byte on wraparound, same as any
-      // normal 16-bit increment. Without this, a transfer crossing a
-      // 256-byte boundary (common - max length is 0x800 bytes) would wrap
-      // back to the start of the same page instead of advancing into the
-      // next one.
       if (++m_cgbDmaState.sourceLow == 0) {
         ++m_cgbDmaState.sourceHigh;
       }
@@ -863,10 +794,7 @@ Mmu::loadRom(std::span<const std::uint8_t> rom)
   }
   // Every mapper's own bank-count math (romSize() / ROM_BANK_SIZE) assumes
   // the buffer is a whole number of 16KB banks - real cartridges always
-  // are, but a fuzzer-crafted one doesn't have to be, and previously
-  // wasn't rejected until it made the CPU read straight past the end of
-  // the buffer (std::out_of_range, uncaught) - see ROM_BANK_SIZE's own
-  // comment.
+  // are.
   if (rom.size() % ROM_BANK_SIZE != 0) {
     return std::unexpected(std::format(
       "ROM size (0x{:X} bytes) must be a multiple of the 16KB bank size "

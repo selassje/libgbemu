@@ -6,9 +6,6 @@ import :serialization;
 
 namespace gbemu {
 
-// Games/most emulators target 44100 or 48000 Hz; 44100 chosen as the more
-// universally-supported default. Exported so a frontend can configure its
-// audio device's frequency to match without duplicating the constant.
 export std::size_t constexpr SAMPLE_RATE = 44100;
 
 class Apu // NOLINT(misc-use-internal-linkage)
@@ -16,51 +13,22 @@ class Apu // NOLINT(misc-use-internal-linkage)
 public:
   Apu() = default;
 
-  // Clears the previous frame's samples; call once before running a new
-  // frame's worth of T-cycles. Deliberately doesn't touch the sample-timing
-  // accumulator (see runNextTCycle()) - that needs to stay continuous
-  // across frame boundaries to avoid long-term drift.
   void startFrame();
 
-  // divCounter is Mmu's real 16-bit DIV counter (see Mmu::divCounter()) for
-  // this same T-cycle - not read back via a stored Mmu& (that would make
-  // Mmu and Apu circularly reference each other, since Mmu already holds
-  // an Apu& for channel-register write forwarding); GameBoy::runNextFrame()
-  // just passes it through each cycle instead.
   void runNextTCycle(std::uint16_t divCounter, bool doubleSpeed);
 
-  // Interleaved stereo samples (L, R, L, R, ...) accumulated so far this
-  // frame - size() / 2 sample-frames. Normalized float in [-1, 1] (the DAC's
-  // own natural output range) rather than a fixed-point type: avoids an
-  // artificial extra quantization step between the HPF (a feedback filter,
-  // and so precision-sensitive) and this buffer, and SDL3's SDL_AUDIO_F32
-  // is just as native a stream format as S16.
   [[nodiscard]] std::span<const float> buffer() const
   {
     return { m_buffer.data(), m_sampleCount };
   }
 
-  // Called by Mmu::writeByte() for every write to a channel register
-  // (NR10-NR44) that actually took effect (i.e. not dropped by the
-  // APU-powered-off read-only guard) - parses the byte into whichever
-  // channel struct's fields it belongs to. Also handles NR51 (panning)
-  // and NR52 (power); Mmu keeps its own raw copy of every register for
-  // CPU reads regardless (see readRegister() for the one exception).
   void writeRegister(std::uint16_t address, std::uint8_t value);
 
-  // Called by Mmu::readByte() for NR52 - the only register whose
-  // CPU-visible value genuinely depends on live Apu state (each channel's
-  // real active status) rather than being a fixed positional bitmask Mmu
-  // can compute on its own.
+  // The only register whose CPU-visible value genuinely depends on live
+  // Apu state (each channel's real active status) rather than being a
+  // fixed positional bitmask.
   [[nodiscard]] std::uint8_t readRegister(std::uint16_t address) const;
 
-  // Called by Mmu::writeByte() for every write to Wave RAM
-  // (0xFF30-0xFF3F, see regs::WAVE_RAM_START) - mirrors the byte into
-  // WaveChannel's own copy (see WaveChannel::Configuration::waveRam) for
-  // CH3 playback. Mmu keeps its own copy too, for CPU reads - Wave RAM
-  // isn't forwarded the other direction (Apu doesn't hold a Mmu&, see
-  // runNextTCycle()'s comment on divCounter for why), so each side's copy
-  // only ever reflects what's actually been written, never diverging.
   void writeWaveRam(std::uint16_t address, std::uint8_t value);
 
   // Called by Mmu::readByte() for every read of Wave RAM
@@ -75,33 +43,20 @@ public:
   // only - irrelevant to CGB's unconditional access).
   [[nodiscard]] std::uint8_t readWaveRam(std::uint16_t address) const;
 
-  // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see HardwareMode).
   // Some APU power-on behavior genuinely differs between DMG and CGB
   // hardware even in CGB compatibility mode - see the NR52 write
-  // handler's use of this for the length-counter-on-power-on quirk. Both
-  // CGB variants count as CGB hardware here (unlike Ppu's rendering path,
-  // this quirk doesn't distinguish compatibility from native mode).
+  // handler's use of this for the length-counter-on-power-on quirk.
   void setHardwareMode(HardwareMode mode)
   {
     m_isCgbHardware = mode != HardwareMode::Dmg;
   }
 
-  // Save-state support (see GameBoy::saveState()/loadState()) - every data
-  // member below, including this frame's in-progress m_buffer/
-  // m_sampleCount (harmless to carry - startFrame() clears them again
-  // before the next frame runs regardless).
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
 private:
-  // At SAMPLE_RATE=44100, one frame's worth of interleaved stereo samples
-  // is ~1476-1478 floats (see runNextTCycle()'s accumulator) - comfortable
-  // headroom over that without heap-allocating like a std::vector would.
   static constexpr std::size_t BUFFER_CAPACITY = 2048;
   std::array<float, BUFFER_CAPACITY> m_buffer{};
-  // How many of m_buffer's slots hold real samples so far this frame - see
-  // buffer() and startFrame().
   std::size_t m_sampleCount{ 0 };
   // Bresenham-style fractional accumulator driving sample timing - the
   // Game Boy's clock doesn't divide evenly into any standard sample rate,
@@ -109,30 +64,20 @@ private:
   // a sample whenever accumulated cycles cross the clock rate, carrying the
   // remainder forward.
   std::uint32_t m_sampleAccumulator{ 0 };
-  // NR52 bit 7. Named distinctly from the channels' own "enabled" (a
-  // channel being actively on) - this is the APU as a whole.
   bool m_powered{ false };
-  // Set once via setCgbMode() - which physical console's power-on APU
-  // quirks apply (see the NR52 write handler). Defaults to false (DMG)
-  // purely so a default-constructed Apu has a well-defined value before
-  // GameBoy calls setCgbMode(); it's always set explicitly in practice.
   bool m_isCgbHardware{ false };
 
   // NR50 bits 6-4/2-0 - raw 0-7 register values; effective volume is
-  // value+1 (1-8), applied in mix(). VIN (bits 7/3, external cartridge
-  // audio pass-through) is deliberately not modeled - vanishingly rare in
-  // real games and not implemented by essentially any mainstream emulator.
+  // value+1 (1-8). VIN (bits 7/3, external cartridge audio pass-through)
+  // is deliberately not modeled.
   std::uint8_t m_leftVolume{ 0 };
   std::uint8_t m_rightVolume{ 0 };
 
   // NR51 bits 3-0/7-4 - which of CH1-CH4 (bit N = CH(N+1)) are routed to
-  // the right/left mixer, respectively. Checked directly as a bitmask
-  // against each channel's index in mix().
+  // the right/left mixer, respectively.
   std::uint8_t m_rightPanning{ 0 };
   std::uint8_t m_leftPanning{ 0 };
 
-  // applyHpf()'s persistent one-pole filter state, independent per stereo
-  // channel (left/right output) - not per Game Boy sound channel.
   float m_leftCapacitor{ 0.0F };
   float m_rightCapacitor{ 0.0F };
 
@@ -148,13 +93,9 @@ private:
 
   // NRx2's volume-envelope layout (initial volume/direction/pace) is
   // identical across CH1, CH2, and CH4 - CH3's wave channel has no
-  // envelope at all, just a coarser output-level shift instead (see
-  // WaveChannel).
+  // envelope at all, just a coarser output-level shift instead.
   struct EnvelopeConfig
   {
-    // Note: readable, but not updated by the envelope itself as it runs -
-    // see PulseChannel::PlaybackState::volume/NoiseChannel::PlaybackState::
-    // volume for the live, currently-playing value.
     std::uint8_t initialVolume{ 0 };
     bool increase{ false };
     // Bits 2-0 - ticks at 64 Hz, volume changes every pace-many ticks; 0
@@ -176,11 +117,8 @@ private:
     }
   };
 
-  // Shared by both pulse channels - CH1 (below) adds a period sweep on top
-  // of this, it isn't itself "a kind of" CH2.
   struct PulseChannel
   {
-    // What a register write directly set - never mutated by anything else.
     struct Configuration
     {
       std::uint8_t duty{ 0 };
@@ -350,13 +288,6 @@ private:
     // the channel if the result overflows the 11-bit period range (2047).
     [[nodiscard]] std::uint16_t calculateSweepFrequency();
 
-    // Deliberately not named serialize()/deserialize() (which would shadow
-    // - not override, nothing here is virtual - PulseChannel's own methods
-    // of the same name, flagged by
-    // bugprone-derived-method-shadowing-base-method): covers only
-    // PulseChannel1's own extra fields, not configuration/playback -
-    // Apu::serialize()/deserialize() call both this and the inherited
-    // PulseChannel::serialize()/deserialize() explicitly.
     void serializeSweepState(SaveStateWriter& writer) const;
     void deserializeSweepState(SaveStateReader& reader);
   };

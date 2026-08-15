@@ -9,18 +9,9 @@ import :serialization;
 namespace gbemu {
 
 export inline constexpr std::size_t MIN_ROM_SIZE = 0x150;
-// Real Game Boy ROMs are always sized in exact multiples of this - the
-// fixed 16KB bank-0 size (matches Mapper::KB16, which stays private to
-// that class rather than being redefined in terms of this one - not worth
-// a cross-partition dependency just to share a single literal). loadRom()
-// enforces this (see its own comment): every mapper's bank-count math
-// (romSize() / KB16) assumes it, and a size that isn't a whole multiple
-// leaves the last partial bank readable up to KB16/2*KB16 by address but
-// not actually backed by that many bytes - found via fuzzing (see
-// tests/fuzzing.cpp): a 382-byte "ROM_ONLY" cartridge (only rejected by
-// the old MIN_ROM_SIZE-alone check for being under 0x150, which 382
-// already exceeds) let the CPU read straight past the end of the ROM
-// buffer, throwing std::out_of_range uncaught.
+// Real Game Boy ROMs are always sized in exact multiples of the fixed 16KB
+// bank-0 size - every mapper's bank-count math (romSize() / KB16) assumes
+// it, so loadRom() enforces it.
 export inline constexpr std::size_t ROM_BANK_SIZE = 0x4000;
 
 // Values match JOYP's bit-position convention: Right/Left/Up/Down occupy
@@ -39,18 +30,8 @@ export enum class Button : std::uint8_t {
 };
 
 #ifdef ENABLE_TESTS
-// Function-local statics, not plain exported globals: sidesteps a
-// reproducible clang codegen crash (in this toolchain's experimental
-// snapshot) in the llvm.global_ctors list machinery that non-trivially-
-// initialized module-exported globals need - a local static instead uses
-// the unrelated (C++11 thread-safe) guarded-initialization codegen path.
 export std::string&
 serialOutput();
-// Some test ROMs (e.g. blargg's interrupt_time.gb) report their result via a
-// zero-terminated string written to cartridge RAM at $A004 instead of over
-// the serial port. Captured positionally (indexed by address, not
-// append-on-write) so the interleaved null-terminator writes each character
-// print performs land in the right place.
 export std::string&
 memoryOutput();
 #endif
@@ -62,30 +43,12 @@ public:
   static constexpr std::size_t KB8 = 0x2000;
   static constexpr std::size_t KB4 = 0x1000;
 
-  // Forwards channel-register writes (NR10-NR44) to apu - see
-  // writeByte(). apu must outlive this Mmu.
   explicit Mmu(Apu& apu)
     : m_apu(apu)
   {
   }
-  // Explicit, not left implicit: GCC's (experimental, per the CMake
-  // configure-time warning on `import std;`) C++23 modules support
-  // otherwise re-derives this destructor as deleted when GameBoy's own
-  // implicit destructor needs it from modules/gbemu.cppm - but only there,
-  // not when compiling this partition's own mmu.cppm/mmu.cpp, where it's
-  // genuinely well-formed (MapperVariant's own destructor is trivial).
-  // Defaulting it explicitly, right here, sidesteps whatever's going
-  // wrong with that cross-TU re-derivation instead of chasing it further.
   ~Mmu() = default;
 
-  // Rule of five, once the destructor above is user-declared (clang-tidy's
-  // cppcoreguidelines/hicpp-special-member-functions) - deleted, not
-  // defaulted: Ppu/Cpu each hold a Mmu& into whichever Mmu instance they
-  // were constructed with (see GameBoy's own member layout comment), so a
-  // copy or move would leave those references pointing at a stale/moved-
-  // from object instead of the real, current Mmu. GameBoy::reset()
-  // already gets the equivalent of a fresh Mmu via placement-new
-  // destroy+reconstruct, never copy/move, for the same reason.
   Mmu(const Mmu&) = delete;
   Mmu& operator=(const Mmu&) = delete;
   Mmu(Mmu&&) = delete;
@@ -101,26 +64,18 @@ public:
 
   void enableBootRom(std::span<const std::uint8_t> bootRom);
 
-  // PPU-only: bypass the CPU-facing write mask on STAT's read-only bits
-  // (0-2). Not reachable through writeByte(), same reasoning as
-  // enableBootRom() being a dedicated method rather than a writeByte()
-  // special case.
   void updateStatMode(std::uint8_t mode);
   void updateStatCoincidence(bool coincidence);
 
-  // Frontend-facing: records real button state, combined with whichever
-  // group(s) JOYP currently selects at read time (see readByte()).
   void setButtonState(Button button, bool pressed);
 
   // Advances CPU-clocked MMU state (DIV, DMA and serial) by one CPU T-cycle.
   void runNextTCycle();
 
-  // The real 16-bit free-running divider counter DIV (0xFF04) is just the
-  // upper 8 bits of - incremented every T-cycle, reset (in full, not just
-  // the CPU-visible byte) by a write to DIV, see writeByte(). Exposed for
-  // Apu's frame sequencer (and eventually Cpu's timer handling) to watch
-  // specific bits of directly, bypassing readByte()'s 8-bit CPU-facing
-  // view - those subsystems tap bits below DIV's own visible range.
+  // DIV (0xFF04) is the upper 8 bits of a real 16-bit free-running divider
+  // counter, incremented every T-cycle and reset in full by a write to
+  // DIV. Exposed so Apu's frame sequencer can watch specific bits below
+  // DIV's own visible range.
   [[nodiscard]] std::uint16_t divCounter() const { return m_divCounter; }
 
   [[nodiscard]] bool doubleSpeed() const { return m_doubleSpeed; }
@@ -128,16 +83,10 @@ public:
   // hardware. Returns false when no switch was prepared or on DMG.
   bool switchSpeed();
 
-  // Called once by GameBoy::initializeFromRom() after resolving which
-  // physical console this session actually boots as (see HardwareMode) -
-  // mirrors Apu::setHardwareMode(). Gates VBK/SVBK (VRAM/WRAM bank
-  // select) and BCPS/BCPD/OCPS/OCPD (palette RAM): real DMG hardware
-  // doesn't have any of these registers at all (reads $FF, writes are
-  // no-ops), so writeByte()/readByte() only let them actually take
-  // effect when this isn't Dmg. Both CGB variants count as CGB hardware
-  // here - these registers exist regardless of whether the cartridge
-  // itself is compatibility- or native-mode, see HardwareMode's own
-  // comment.
+  // Real DMG hardware doesn't have VBK/SVBK (VRAM/WRAM bank select) or
+  // BCPS/BCPD/OCPS/OCPD (palette RAM) at all - reads $FF, writes are
+  // no-ops - so writeByte()/readByte() only let them take effect when
+  // this isn't Dmg.
   void setHardwareMode(HardwareMode mode)
   {
     m_isCgbHardware = mode != HardwareMode::Dmg;
@@ -145,43 +94,21 @@ public:
 
   // The CGB color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR in the low 15
   // bits) BCPS/BCPD (background) or OCPS/OCPD (object) have stored for the
-  // given palette (0-7) and color-within-palette (0-3) - Ppu converts this
-  // to 8-bit RGB while rendering in CGB mode; DMG-mode rendering never
-  // calls these, using its own fixed grayscale table instead. palette RAM
-  // itself lives here (not Ppu) so Ppu doesn't need a second, circular
-  // reference back to Mmu on top of the one it already holds - same
-  // reasoning as BGP/OBP0/OBP1 already being plain Mmu-owned bytes Ppu
-  // just reads through readByte().
+  // given palette (0-7) and color-within-palette (0-3).
   [[nodiscard]] std::uint16_t bgPaletteColor(std::uint8_t palette,
                                              std::uint8_t colorIndex) const;
   [[nodiscard]] std::uint16_t objPaletteColor(std::uint8_t palette,
                                               std::uint8_t colorIndex) const;
 
   // Reads VRAM (0x8000-0x9FFF) from an explicitly-chosen bank, ignoring
-  // whatever the CPU currently has VBK pointed at - Ppu's own tile
-  // map/tile-data fetches must use this, not readByte(): VBK selects
-  // which bank *CPU* accesses land on, but the PPU's fetch logic needs a
-  // specific bank per purpose (bank 0 for tile map indices/pixel data;
-  // bank 1 only for the CGB tile-attribute byte at the same tile-map
-  // address, or for pixel data when that attribute's bank bit says so).
-  // Using readByte() here would make the PPU's fetches silently
-  // follow whatever the CPU last left VBK as, corrupting tile data for
-  // any CGB game that leaves VBK=1 selected after setting up attributes.
-  // bank is masked to 0-1 (VRAM only ever has 2 banks) - out-of-range
-  // input can't reach here since it's only ever a literal 0 or a value
-  // masked from an attribute byte's own single bank bit.
+  // whatever the CPU currently has VBK pointed at - the PPU's fetch logic
+  // needs a specific bank per purpose (bank 0 for tile map indices/pixel
+  // data; bank 1 only for the CGB tile-attribute byte at the same
+  // tile-map address, or for pixel data when that attribute's bank bit
+  // says so) regardless of what the CPU last left VBK as.
   [[nodiscard]] std::uint8_t readVram(std::uint8_t bank,
                                       std::uint16_t address) const;
 
-  // Save-state support (see GameBoy::saveState()/loadState()) - every data
-  // member below except m_apu (owned separately) and m_bootRom: both are
-  // reloaded from their own external source (the built-in boot ROM data,
-  // the cartridge file) by GameBoy::loadRom() rather than carried in the
-  // save file itself, the same way a save file doesn't embed the ROM it
-  // goes with - m_mapper's own ROM bytes are excluded from its
-  // serialize()/deserialize() for the same reason (see mapper.cppm).
-  // Callers are expected to loadRom() the same cartridge before calling
-  // deserialize() on a save made against it.
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
@@ -207,9 +134,6 @@ public:
 
 private:
   std::reference_wrapper<Apu> m_apu;
-  // Defaults to false (DMG) purely so a default-constructed Mmu has a
-  // well-defined value before GameBoy calls setCgbMode() - always set
-  // explicitly in practice, same reasoning as Apu::m_isCgbHardware.
   bool m_isCgbHardware{ false };
   bool m_doubleSpeed{ false };
   bool m_speedSwitchPrepared{ false };
@@ -241,12 +165,9 @@ private:
         (static_cast<unsigned>(sourceHigh) << 8U) | sourceLow);
     }
 
-    // destHigh/destLow only ever store a 13-bit offset within VRAM (destHigh
-    // is masked to 0x1F on write - see writeByte()'s CGB_DMA_4 handling),
-    // relative to VRAM's own 0x8000 base - real hardware forces the
-    // destination's top 3 address bits to 0b100 regardless of what's
-    // written, so that base has to be added back in here rather than
-    // treating destHigh:destLow as a standalone 16-bit address.
+    // destHigh/destLow store a 13-bit offset within VRAM - real hardware
+    // forces the destination's top 3 address bits to 0b100 regardless of
+    // what's written, so VRAM's 0x8000 base is added back in here.
     [[nodiscard]] std::uint16_t destAddress() const
     {
       constexpr std::uint16_t vramBase = 0x8000;
@@ -261,22 +182,14 @@ private:
   // real hardware shifts 8 bits at ~8192 Hz (512 T-cycles/bit), so 4096
   // T-cycles for the whole byte. An externally-clocked transfer (bit 0
   // clear) has no local timer driving it and is deliberately left to just
-  // sit there forever with nothing to advance it - that's genuinely
-  // correct behavior with no partner connected, not a bug.
+  // sit there forever - genuinely correct behavior with no partner
+  // connected, not a bug.
   std::optional<std::uint16_t> m_serialTCyclesRemaining;
 
-  // See divCounter(). Wraps naturally on overflow (plain unsigned
-  // arithmetic) - exactly the free-running behavior real hardware has.
   std::uint16_t m_divCounter{ 0 };
 
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };
-  // Handles every 0x0000-0x7FFF (ROM) and 0xA000-0xBFFF (external RAM)
-  // access - see readByte()/writeByte(). Which concrete alternative this
-  // holds is chosen by loadRom() from the cartridge header; default-
-  // constructed as RomOnlyMapper (empty ROM) purely so a default-
-  // constructed Mmu has a well-defined value before loadRom() is ever
-  // called, same reasoning as m_isCgbHardware above.
   MapperVariant m_mapper;
   std::array<std::uint8_t, KB16> m_vram{};
   std::array<std::uint8_t, KB4 * 8> m_wram{};
@@ -285,37 +198,20 @@ private:
   std::array<std::uint8_t, 0x7F> m_hram{};
   std::size_t m_switchableVRamBank{ 0 };
   std::size_t m_switchableWRamBank{ 1 };
-  // 8 palettes x 4 colors x 2 bytes/color (15-bit RGB555, little-endian) -
-  // see bgPaletteColor()/objPaletteColor(). Indexed via BCPS/OCPS's low 6
-  // bits (see writeByte()), themselves stored as plain bytes in m_io like
-  // any other simple register - no separate index field needed here.
+  // 8 palettes x 4 colors x 2 bytes/color (15-bit RGB555, little-endian).
   std::array<std::uint8_t, 64> m_bgPaletteRam{};
   std::array<std::uint8_t, 64> m_objPaletteRam{};
   std::uint8_t m_interruptEnableRegister{ 0 };
   std::uint8_t m_unusable{ 0 };
   // 1 = pressed, one bit per Button - directional keys in bits 0-3, button
-  // keys in bits 4-7 (matching Button's own enumerator order/values).
+  // keys in bits 4-7.
   std::uint8_t m_buttonState{ 0 };
-  // Mirrors NR52 bit 7 (APU power). Starts true since m_io - and so NR52 -
-  // starts zeroed, matching real hardware's power-on-reset state before the
-  // boot ROM writes NR52=0x80 to turn the APU on. While true, writes to
-  // NR10-NR51 (0xFF10-0xFF25) are dropped - see writeByte(). Wave RAM
-  // (0xFF30-0xFF3F) and NR52 itself are unaffected either way.
+  // Mirrors NR52 bit 7 (APU power). Starts true, matching real hardware's
+  // power-on-reset state before the boot ROM writes NR52=0x80. While true,
+  // writes to NR10-NR51 (0xFF10-0xFF25) are dropped - Wave RAM
+  // (0xFF30-0xFF3F) and NR52 itself are unaffected.
   bool m_apuRegistersReadOnly{ true };
 
-  // Single definition serving both the const (read-only, from readByte())
-  // and non-const (read/write, from writeByte()/friends) cases via an
-  // explicit object parameter - Self deduces to Mmu or const Mmu depending
-  // on the constness of whatever calls it, so the return type follows
-  // automatically (std::uint8_t& or const std::uint8_t&) without needing a
-  // const_cast to reuse this logic from readByte(). Defined in mmu.cpp;
-  // relies on implicit instantiation (both Self=Mmu and Self=const Mmu are
-  // only ever needed from calls within that same file) rather than explicit
-  // instantiation - MSVC (confirmed on 19.51/VS 2026) miscompiles explicit
-  // instantiation of an explicit-object-parameter member function template,
-  // rejecting every ordinary member-call-syntax call to it afterwards as if
-  // the object argument had to be passed explicitly, even though implicit
-  // instantiation of the identical template works correctly.
   template<typename Self>
   [[nodiscard]] auto& getByteRef(this Self& self, std::uint16_t address);
 };
