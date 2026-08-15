@@ -223,6 +223,20 @@ if(ENABLE_FUZZING)
     set(FUZZ_ARTIFACTS_DIR ${CMAKE_SOURCE_DIR}/fuzz-artifacts)
     set(FUZZ_SEEDS_DIR ${CMAKE_SOURCE_DIR}/tests/fuzz-seeds)
 
+    # Without an explicit -max_len, libFuzzer derives its own cap from
+    # whatever's currently in the corpus - either the largest existing entry, or
+    # a hardcoded 4096 bytes if the corpus is empty/small (confirmed directly
+    # against both an empty and a partially-populated fuzz-corpus/). Either way
+    # that's far below what real cartridges need: the mapper bank math (e.g.
+    # src/mappers/mbc5.cpp's romSize()/ROM_BANK_SIZE) scales directly off the
+    # actual ROM buffer size with no header-derived cap, and real hardware goes
+    # up to 8MB/512 banks for MBC5 - MBC1's own bank-0x20/0x40/0x60 special case
+    # alone needs a ROM past 512KB to even reach. 8388608 (0x800000) = MBC5's
+    # real 8MB ceiling, so the fuzzer can reach every bank-count edge case any
+    # supported mapper actually has, regardless of what the corpus happens to
+    # contain on a given run.
+    set(FUZZ_MAX_LEN 8388608)
+
     # -jobs/-workers run one fuzzing process per core in parallel, all pointed
     # at the same fuzz-corpus/ directory - what actually lets them learn from
     # each other's finds (via -reload, on by default, periodically re-reading
@@ -236,7 +250,7 @@ if(ENABLE_FUZZING)
       NAME "fuzz regression"
       COMMAND
         bash -c
-        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -max_total_time=60 -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
+        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -max_total_time=60 -max_len=${FUZZ_MAX_LEN} -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
     )
     set_tests_properties("fuzz regression" PROPERTIES PROCESSORS ${NPROC})
 
@@ -253,7 +267,7 @@ if(ENABLE_FUZZING)
       NAME "fuzz (unbounded)"
       COMMAND
         bash -c
-        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
+        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -max_len=${FUZZ_MAX_LEN} -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
     )
     set_tests_properties("fuzz (unbounded)" PROPERTIES PROCESSORS ${NPROC}
                                                        LABELS "manual")
