@@ -18,6 +18,22 @@ function(setup_lto TARGET)
   endif()
 endfunction()
 
+function(setup_features TARGET)
+  if(CMAKE_CXX_REFLECTION)
+    # CMake compiles PUBLIC module file sets a second time through a generated
+    # @synth target. Attach the feature directly to project-owned module
+    # sources so both compilations receive it without rebuilding import std
+    # with reflection enabled as well.
+    foreach(FEATURE_SOURCE IN LISTS ARGN)
+      set_property(SOURCE "${FEATURE_SOURCE}" APPEND PROPERTY COMPILE_OPTIONS
+                                                         -freflection)
+      set_property(SOURCE "${FEATURE_SOURCE}" APPEND PROPERTY
+                         COMPILE_DEFINITIONS CMAKE_CXX_REFLECTION=1)
+    endforeach()
+
+  endif()
+endfunction()
+
 function(setup_compiler_warnings TARGET)
   if(MSVC)
     target_compile_options(
@@ -64,7 +80,7 @@ function(setup_compiler_warnings TARGET)
                 -Wno-unused-private-field)
     endif()
 
-    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU" AND NOT ${ENABLE_CLANG_TIDY})
+    if(${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
       target_compile_options(
         ${TARGET} PRIVATE -Wduplicated-cond -Wduplicated-branches -Wlogical-op
                           -Wuseless-cast -Wnrvo)

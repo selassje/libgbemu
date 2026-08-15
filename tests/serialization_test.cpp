@@ -56,6 +56,8 @@ TEST_CASE("GameBoy::saveState()/loadState() resume exactly where they left "
           "off",
           "[GameBoy][Serialization]")
 {
+  gbemu::serialOutput().clear();
+
   // A real, actively-running ROM (not a static test image like dmg-acid2,
   // which converges to an unchanging frame and so wouldn't actually
   // exercise whether mid-execution Cpu/Ppu/Apu state round-tripped) -
@@ -103,6 +105,8 @@ TEST_CASE("GameBoy::saveState()/loadState() resume exactly where they left "
   REQUIRE(std::equal(referencePixels.begin(),
                      referencePixels.end(),
                      resumedFrame->pixels.data_handle()));
+
+  gbemu::serialOutput().clear();
 }
 
 TEST_CASE("GameBoy::loadState() rejects a bad magic or version mismatch",
@@ -131,6 +135,8 @@ TEST_CASE("GameBoy::loadState() leaves state untouched when the body is "
           "truncated",
           "[GameBoy][Serialization]")
 {
+  gbemu::serialOutput().clear();
+
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) /
                       "cpu_instrs/individual/06-ld r,r.gb");
 
@@ -178,4 +184,6 @@ TEST_CASE("GameBoy::loadState() leaves state untouched when the body is "
   REQUIRE(std::equal(referencePixels.begin(),
                      referencePixels.end(),
                      gbFrame->pixels.data_handle()));
+
+  gbemu::serialOutput().clear();
 }

@@ -5,10 +5,19 @@ include(cmake/bootstrap_conan.cmake)
 project(libgbemu LANGUAGES CXX)
 
 # The Conan toolchain (included by project()) forces CMAKE_CXX_STANDARD to 14
-# for Catch2's own build requirements; set ours afterwards so it wins. NOTE:
-# C++26 is the target per project decisions, but CMake 4.2 does not yet map
-# dialect 26 to an MSVC flag, so this is pinned to 23 until that lands.
-set(CMAKE_CXX_STANDARD 23)
+# for Catch2's own build requirements; set ours afterwards so it wins. Use
+# C++26 only when the compiler's reflection mode is available; all other
+# toolchains retain the project's established C++23 baseline.
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-std=c++26 -freflection"
+                        CMAKE_CXX_REFLECTION_SUPPORTED)
+set(CMAKE_CXX_REFLECTION ${CMAKE_CXX_REFLECTION_SUPPORTED}
+    CACHE INTERNAL "Compiler supports C++26 reflection" FORCE)
+if(CMAKE_CXX_REFLECTION)
+  set(CMAKE_CXX_STANDARD 26)
+else()
+  set(CMAKE_CXX_STANDARD 23)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED YES)
 
 option(ENABLE_TESTS "Enable Tests" OFF)

@@ -1,5 +1,9 @@
 module gbemu;
 
+#if defined(CMAKE_CXX_REFLECTION)
+#include "serialization.hpp"
+#endif
+
 namespace {
 
 constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
@@ -260,19 +264,33 @@ GameBoy::setButtonState(Button button, bool pressed)
 void
 GameBoy::serializeComponents(SaveStateWriter& writer) const
 {
+#if defined(CMAKE_CXX_REFLECTION)
+  serialize(writer, m_cpu);
+  serialize(writer, m_mmu);
+  serialize(writer, m_ppu);
+  serialize(writer, m_apu);
+#else
   m_cpu.serialize(writer);
   m_mmu.serialize(writer);
   m_ppu.serialize(writer);
   m_apu.serialize(writer);
+#endif
 }
 
 void
 GameBoy::deserializeComponents(SaveStateReader& reader)
 {
+#if defined(CMAKE_CXX_REFLECTION)
+  deserialize(reader, m_cpu);
+  deserialize(reader, m_mmu);
+  deserialize(reader, m_ppu);
+  deserialize(reader, m_apu);
+#else
   m_cpu.deserialize(reader);
   m_mmu.deserialize(reader);
   m_ppu.deserialize(reader);
   m_apu.deserialize(reader);
+#endif
 }
 
 std::vector<std::uint8_t>

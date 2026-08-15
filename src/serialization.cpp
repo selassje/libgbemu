@@ -1,5 +1,7 @@
 module gbemu;
 
+#include "serialization.hpp"
+
 namespace {
 
 // Only actually casts when narrowing is real for this build's To/From

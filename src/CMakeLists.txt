@@ -99,6 +99,8 @@ if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows"
 endif()
 
 setup_compiler_warnings(libgbemu)
+setup_features(libgbemu ${CMAKE_CURRENT_LIST_DIR}/serialization.cpp
+                         ${CMAKE_CURRENT_LIST_DIR}/gbemu.cpp)
 setup_clang_tidy(libgbemu)
 setup_msvc_analysis(libgbemu)
 setup_coverage_report_flags(libgbemu)
