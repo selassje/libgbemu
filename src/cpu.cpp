@@ -170,7 +170,6 @@ constexpr std::array<std::uint16_t, NUM_INTERRUPTS>
   INTERRUPT_VECTORS = { 0x40, 0x48, 0x50, 0x58, 0x60 };
 };
 
-
 std::uint8_t
 Cpu::getR8(std::uint8_t code) const
 {
@@ -1395,9 +1394,8 @@ Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
   constexpr std::size_t tCyclesPerMCycle = 4;
   const auto timerTCycles = timerMCycles * tCyclesPerMCycle;
   const auto timerAheadTCycles = timerTCycles - currentTCycles;
-  m_mmu.get().runTimerTo(static_cast<std::uint16_t>(
-    m_mmu.get().divCounter() + timerAheadTCycles));
-
+  m_mmu.get().runTimerTo(
+    static_cast<std::uint16_t>(m_mmu.get().divCounter() + timerAheadTCycles));
 }
 
 void

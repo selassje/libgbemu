@@ -93,10 +93,9 @@ Mmu::incrementTimer()
 {
   auto& tima = getByteRef(regs::TIMA);
   if (tima == 0xFF) {
-    tima = getByteRef(regs::TMA);
-    auto& interruptFlags = getByteRef(regs::IF);
-    constexpr std::uint8_t timerInterruptBit = 0x04;
-    interruptFlags |= timerInterruptBit;
+    tima = 0;
+    constexpr std::uint8_t reloadDelayTCycles = 4;
+    m_timerReloadTCycles = reloadDelayTCycles;
   } else {
     ++tima;
   }
@@ -460,6 +459,21 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
     return;
   }
 
+  if (address == regs::TIMA) {
+    if (m_timerReloadedThisCycle) {
+      return;
+    }
+    m_timerReloadTCycles = 0;
+    getByteRef(address) = value;
+    return;
+  }
+
+  if (address == regs::TMA && m_timerReloadedThisCycle) {
+    getByteRef(regs::TMA) = value;
+    getByteRef(regs::TIMA) = value;
+    return;
+  }
+
   // JOYP bits 0-3 are inputs (button state), not writable by the CPU -
   // only bits 4-5 (which of the two button groups is selected) actually
   // are.
@@ -754,6 +768,15 @@ void
 Mmu::runTimerTo(std::uint16_t divCounter)
 {
   while (m_timerDivCounter != divCounter) {
+    m_timerReloadedThisCycle = false;
+    if (m_timerReloadTCycles > 0 && --m_timerReloadTCycles == 0) {
+      getByteRef(regs::TIMA) = getByteRef(regs::TMA);
+      auto& interruptFlags = getByteRef(regs::IF);
+      constexpr std::uint8_t timerInterruptBit = 0x04;
+      interruptFlags |= timerInterruptBit;
+      m_timerReloadedThisCycle = true;
+    }
+
     const bool oldTimerInput = timerInput();
     ++m_timerDivCounter;
     if (oldTimerInput && !timerInput()) {
@@ -929,6 +952,8 @@ Mmu::serialize(SaveStateWriter& writer) const
 
   writer.writeU16(m_divCounter);
   writer.writeU16(m_timerDivCounter);
+  writer.writeU8(m_timerReloadTCycles);
+  writer.writeBool(m_timerReloadedThisCycle);
   writer.writeBool(m_bootRomActive);
   writer.writeBytes(m_vram);
   std::visit([&writer](const auto& mapper) { mapper.serialize(writer); },
@@ -980,6 +1005,8 @@ Mmu::deserialize(SaveStateReader& reader)
 
   m_divCounter = reader.readU16();
   m_timerDivCounter = reader.readU16();
+  m_timerReloadTCycles = reader.readU8();
+  m_timerReloadedThisCycle = reader.readBool();
   m_bootRomActive = reader.readBool();
   reader.readBytes(m_vram);
   std::visit([&reader](auto& mapper) { mapper.deserialize(reader); }, m_mapper);

@@ -73,3 +73,11 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
     "div_write_reference_dmg.png",
   600)
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "acceptance/timer/tima_reload",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "acceptance/timer/tima_reload.gb",
+  std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
+    "tima_reload_reference_dmg.png",
+  600)

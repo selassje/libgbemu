@@ -189,6 +189,8 @@ private:
 
   std::uint16_t m_divCounter{ 0 };
   std::uint16_t m_timerDivCounter{ 0 };
+  std::uint8_t m_timerReloadTCycles{ 0 };
+  bool m_timerReloadedThisCycle{ false };
 
   [[nodiscard]] bool timerInput() const;
   void incrementTimer();
