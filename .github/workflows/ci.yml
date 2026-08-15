@@ -243,15 +243,16 @@ jobs:
       - name: Build
         run: cmake --build --preset ${{ matrix.preset }}
 
-      - name: Run Tests
-        run: ctest --preset ${{ matrix.preset }} --parallel $(nproc)
-
       # A shared corpus directory across runs, so the fuzzer builds on
       # coverage found by previous CI runs instead of restarting from
-      # scratch every time. restore-keys falls back to the newest cache
+      # scratch every time (must come before Run Tests - that's what
+      # actually invokes the "fuzz regression" ctest test, see
+      # tests/CMakeLists.txt). restore-keys falls back to the newest cache
       # available from any previous run (exact key never hits, since
       # github.sha is always new) - saved back below regardless of whether
-      # this run found anything new, so it keeps accumulating.
+      # this run found anything new, so it keeps accumulating. A no-op for
+      # the other two presets in this job - fuzz-corpus/ is only ever
+      # populated when ENABLE_FUZZING is on.
       - name: Restore Fuzz Corpus Cache
         if: matrix.preset == 'release_ninja_clang_fuzzing_linux'
         uses: actions/cache@v4
@@ -260,35 +261,12 @@ jobs:
           key: fuzz-corpus-${{ github.sha }}
           restore-keys: fuzz-corpus-
 
-      # Bounded regression run, not an open-ended fuzzing campaign - just
-      # enough to catch a reintroduced shallow crash (libFuzzer runs
-      # indefinitely with no limit at all). -jobs/-workers run one fuzzing
-      # process per core in parallel, each with its own -max_total_time
-      # budget - passing fuzz-corpus/ as the (shared, cached above) corpus
-      # directory is what actually lets them learn from each other's finds
-      # (via -reload, on by default, periodically re-reading it) rather
-      # than being fully isolated processes that happen to run at the same
-      # time - confirmed directly: without a shared corpus dir, 16 parallel
-      # workers each starting from nothing all got stuck at the exact same
-      # trivial coverage level for the whole run, none benefiting from any
-      # other's progress.
-      # tests/fuzz-seeds/ is a 2nd, read-only corpus dir (libFuzzer: "if
-      # more than one corpus dir is provided, the 1st is used for output,
-      # the rest are read-only") - committed to git, so it's always
-      # present even on a cold cache, unlike fuzz-corpus/ itself. Without
-      # it, a random buffer's length is astronomically unlikely to ever
-      # land on an exact multiple of ROM_BANK_SIZE on its own (confirmed
-      # directly: ~35 million executions across 16 parallel workers, zero
-      # of them got past loadRom()'s size/alignment rejection into real
-      # GameBoy execution) - one valid-shaped seed to mutate from is what
-      # actually lets coverage-guided exploration make progress at all.
-      - name: Run Fuzz Regression
-        if: matrix.preset == 'release_ninja_clang_fuzzing_linux'
-        run: |
-          mkdir -p fuzz-artifacts fuzz-corpus
-          builds/${{ matrix.preset }}/build/tests/gbemu-fuzz \
-            -max_total_time=60 -jobs=$(nproc) -workers=$(nproc) \
-            -artifact_prefix=fuzz-artifacts/ fuzz-corpus/ tests/fuzz-seeds/
+      # -LE manual excludes the "fuzz (unbounded)" test (see
+      # tests/CMakeLists.txt) - the bounded "fuzz regression" one still
+      # runs as part of this like any other test, no separate step needed
+      # for it anymore.
+      - name: Run Tests
+        run: ctest --preset ${{ matrix.preset }} --parallel $(nproc) -LE manual
 
       - name: Upload Fuzz Crash Artifacts
         if: failure() && matrix.preset == 'release_ninja_clang_fuzzing_linux'

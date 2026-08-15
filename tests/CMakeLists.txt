@@ -185,4 +185,77 @@ if(ENABLE_FUZZING)
   # just crashes - see setup_fuzzer()'s own comment on why that combination
   # lives here instead of being hardcoded into setup_fuzzer() itself.
   setup_sanitizers(gbemu-fuzz)
+
+  # Registered as real ctest tests (only when ENABLE_TESTS is also on -
+  # add_test() is a no-op otherwise, since enable_testing() itself is only
+  # called in that case, see the top-level CMakeLists.txt) rather than a
+  # separate CI-only shell step, so `ctest --preset
+  # release_ninja_clang_fuzzing_linux` picks fuzzing up the same way it already
+  # does gbemu-tests.
+  if(ENABLE_TESTS)
+    include(ProcessorCount)
+    ProcessorCount(NPROC)
+    if(NPROC EQUAL 0)
+      set(NPROC 1)
+    endif()
+
+    # fuzz-corpus/ (writable) and fuzz-artifacts/ (crash reproducers) live at
+    # the repo root, not under the build dir - matching where
+    # .github/workflows/ci.yml's own actions/cache and upload-artifact steps
+    # already expect them, so this doesn't need a matching change there.
+    # tests/fuzz-seeds/ is the 2nd, read-only corpus dir (libFuzzer: "if more
+    # than one corpus dir is provided, the 1st is used for output, the rest are
+    # read-only") - committed to git, so it's always present even on a cold
+    # cache, unlike fuzz-corpus/ itself. Without at least one valid-shaped seed,
+    # a random buffer's length is astronomically unlikely to ever land on an
+    # exact multiple of ROM_BANK_SIZE on its own (confirmed directly: ~35
+    # million executions across 16 parallel workers, zero of them got past
+    # loadRom()'s size/ alignment rejection into real GameBoy execution).
+    #
+    # The mkdir happens inside the test COMMAND itself (bash -c), not just once
+    # at configure time - confirmed directly that relying on configure-time
+    # creation alone is fragile: anything that clears fuzz-corpus/ without also
+    # re-running cmake (a cache miss included - actions/cache doesn't create the
+    # restore path on a miss, it just leaves whatever's already there) leaves
+    # ctest unable to find it. bash -c is safe to rely on unconditionally here -
+    # this whole block is already Linux-only (see the WIN32 FATAL_ERROR above).
+    set(FUZZ_CORPUS_DIR ${CMAKE_SOURCE_DIR}/fuzz-corpus)
+    set(FUZZ_ARTIFACTS_DIR ${CMAKE_SOURCE_DIR}/fuzz-artifacts)
+    set(FUZZ_SEEDS_DIR ${CMAKE_SOURCE_DIR}/tests/fuzz-seeds)
+
+    # -jobs/-workers run one fuzzing process per core in parallel, all pointed
+    # at the same fuzz-corpus/ directory - what actually lets them learn from
+    # each other's finds (via -reload, on by default, periodically re-reading
+    # it) rather than being fully isolated processes that happen to run at the
+    # same time (confirmed directly: without a shared corpus dir, 16 parallel
+    # workers each starting from nothing all got stuck at the exact same trivial
+    # coverage level for the whole run). PROCESSORS tells ctest's own scheduler
+    # this test wants every core, so it doesn't also try to start other tests
+    # alongside it and oversubscribe the machine.
+    add_test(
+      NAME "fuzz regression"
+      COMMAND
+        bash -c
+        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -max_total_time=60 -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
+    )
+    set_tests_properties("fuzz regression" PROPERTIES PROCESSORS ${NPROC})
+
+    # Same as above but with no -max_total_time cap - a real, open-ended fuzzing
+    # session instead of a shallow regression check, for manual/ local use.
+    # Labeled "manual" and excluded from CI's own ctest invocation (-LE manual,
+    # see ci.yml) - letting this run unbounded on every push would make every CI
+    # run take as long as ctest's own default per-test timeout (1500s) instead
+    # of the ~60s the regression check above costs. Still bounded by that same
+    # default CTest timeout rather than truly infinite either way - run
+    # explicitly via `ctest -R "fuzz \(unbounded\)"` for a real, longer fuzzing
+    # session.
+    add_test(
+      NAME "fuzz (unbounded)"
+      COMMAND
+        bash -c
+        "mkdir -p '${FUZZ_CORPUS_DIR}' '${FUZZ_ARTIFACTS_DIR}' && exec $<TARGET_FILE:gbemu-fuzz> -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${FUZZ_ARTIFACTS_DIR}/' '${FUZZ_CORPUS_DIR}/' '${FUZZ_SEEDS_DIR}/'"
+    )
+    set_tests_properties("fuzz (unbounded)" PROPERTIES PROCESSORS ${NPROC}
+                                                       LABELS "manual")
+  endif()
 endif()
