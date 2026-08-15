@@ -71,6 +71,7 @@ public:
 
   // Advances CPU-clocked MMU state (DIV, DMA and serial) by one CPU T-cycle.
   void runNextTCycle();
+  void runTimerTo(std::uint16_t divCounter);
 
   // DIV (0xFF04) is the upper 8 bits of a real 16-bit free-running divider
   // counter, incremented every T-cycle and reset in full by a write to
@@ -187,6 +188,10 @@ private:
   std::optional<std::uint16_t> m_serialTCyclesRemaining;
 
   std::uint16_t m_divCounter{ 0 };
+  std::uint16_t m_timerDivCounter{ 0 };
+
+  [[nodiscard]] bool timerInput() const;
+  void incrementTimer();
 
   std::vector<std::uint8_t> m_bootRom;
   bool m_bootRomActive{ false };

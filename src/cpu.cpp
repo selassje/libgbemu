@@ -165,16 +165,11 @@ constexpr std::uint16_t IO_REGISTERS_BASE = 0xFF00;
 constexpr std::uint16_t FLAGS_UNUSED_BITS_MASK = 0xFFF0;
 constexpr std::uint16_t NUM_INTERRUPTS = 5;
 constexpr std::uint8_t INTERRUPT_MASK = 0x1F;
-constexpr std::uint16_t NUM_TIMER_FREQS = 4;
 
 constexpr std::array<std::uint16_t, NUM_INTERRUPTS>
   INTERRUPT_VECTORS = { 0x40, 0x48, 0x50, 0x58, 0x60 };
 };
 
-constexpr std::array<std::uint16_t, NUM_TIMER_FREQS> TIMER_FREQS = { 256,
-                                                                     4,
-                                                                     16,
-                                                                     64 };
 
 std::uint8_t
 Cpu::getR8(std::uint8_t code) const
@@ -1378,6 +1373,7 @@ void
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
 {
+  static_cast<void>(timerMCycles);
   // T-cycle (not M-cycle) granularity specifically matters for
   // Apu::readWaveRam() - CH3's own wave-fetch period can be as short as 4
   // T-cycles (a single M-cycle), so a memory access needs to be placeable
@@ -1396,34 +1392,12 @@ Cpu::advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles)
     ++m_syncedTCycles;
   }
 
-  // The timer's own DIV/TIMA catch-up is M-cycle grained on real hardware
-  // and genuinely doesn't move just because a specific instruction's
-  // peripheral observation point needs sub-M-cycle precision.
-  const auto currentMCycles = timerMCycles;
-  const auto tac = m_mmu.get().readByte(regs::TAC);
-  const auto timerEnabled = (static_cast<unsigned>(tac) & 0x04U) != 0;
-  const auto timerFrequencyBits =
-    static_cast<std::uint8_t>(static_cast<unsigned>(tac) & 0x03U);
+  constexpr std::size_t tCyclesPerMCycle = 4;
+  const auto timerTCycles = timerMCycles * tCyclesPerMCycle;
+  const auto timerAheadTCycles = timerTCycles - currentTCycles;
+  m_mmu.get().runTimerTo(static_cast<std::uint16_t>(
+    m_mmu.get().divCounter() + timerAheadTCycles));
 
-  if (timerEnabled) {
-    const auto timerFrequency = TIMER_FREQS.at(timerFrequencyBits);
-    const auto previousTimerTicks = m_lastTimerMCycles / timerFrequency;
-    const auto currentTimerTicks = currentMCycles / timerFrequency;
-    const auto elapsedTimerTicks = currentTimerTicks - previousTimerTicks;
-    for (std::size_t tick = 0; tick < elapsedTimerTicks; ++tick) {
-      const auto tima = m_mmu.get().readByte(regs::TIMA);
-      if (tima == 0xFF) {
-        m_mmu.get().writeByte(regs::TIMA, m_mmu.get().readByte(regs::TMA));
-        const auto interruptFlags = m_mmu.get().readByte(regs::IF);
-        m_mmu.get().writeByte(regs::IF,
-                              static_cast<std::uint8_t>(
-                                static_cast<unsigned>(interruptFlags) | 0x04U));
-      } else {
-        m_mmu.get().writeByte(regs::TIMA, tima + 1);
-      }
-    }
-  }
-  m_lastTimerMCycles = currentMCycles;
 }
 
 void
@@ -1441,7 +1415,6 @@ Cpu::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_currentOpcode);
   writer.writeU8(m_imeEnableDelay);
   writer.writeSize(m_mcycles);
-  writer.writeSize(m_lastTimerMCycles);
   writer.writeSize(m_syncedTCycles);
   writer.writeSize(m_baseTCycles);
   writer.writeBool(m_doubleSpeedPhase);
@@ -1462,7 +1435,6 @@ Cpu::deserialize(SaveStateReader& reader)
   m_currentOpcode = reader.readU8();
   m_imeEnableDelay = reader.readU8();
   m_mcycles = reader.readSize();
-  m_lastTimerMCycles = reader.readSize();
   m_syncedTCycles = reader.readSize();
   m_baseTCycles = reader.readSize();
   m_doubleSpeedPhase = reader.readBool();

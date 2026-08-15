@@ -50,7 +50,6 @@ private:
   std::uint8_t m_imeEnableDelay{ 0 };
 
   std::size_t m_mcycles{ 0 };
-  std::size_t m_lastTimerMCycles{ 0 };
   // How many CPU T-cycles have already been synchronized. MMU's CPU-clocked
   // state advances on every one; PPU/APU advance on every cycle at normal
   // speed and every other cycle at double speed.
@@ -74,11 +73,9 @@ private:
   void applyAluOp(std::uint8_t op, std::uint8_t operand);
 
   void handleInterrupts();
-  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time, then
-  // runs the timer's own DIV/TIMA catch-up math up to timerMCycles - a
-  // separate parameter since ldha8()'s Wave RAM read needs sub-M-cycle
-  // precision for the peripheral observation point without affecting the
-  // timer's own M-cycle-granular catch-up.
+  // Catches Ppu/Mmu/Apu up to currentTCycles one T-cycle at a time. The
+  // second parameter preserves memory-access observation points which may
+  // deliberately fall partway through an M-cycle.
   void advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles);
   void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;

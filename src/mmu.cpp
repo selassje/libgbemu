@@ -72,6 +72,36 @@ constexpr std::uint16_t WAVE_RAM_SIZE = 16;
 
 }
 
+bool
+Mmu::timerInput() const
+{
+  const auto tac = getByteRef(regs::TAC);
+  constexpr std::uint8_t enableBit = 0x04;
+  constexpr std::uint8_t frequencyMask = 0x03;
+  if ((tac & enableBit) == 0) {
+    return false;
+  }
+
+  constexpr std::array<std::uint8_t, 4> timerBits{ 9, 3, 5, 7 };
+  const auto bit = timerBits.at(tac & frequencyMask);
+  const auto mask = static_cast<std::uint16_t>(std::uint16_t{ 1 } << bit);
+  return (m_timerDivCounter & mask) != 0;
+}
+
+void
+Mmu::incrementTimer()
+{
+  auto& tima = getByteRef(regs::TIMA);
+  if (tima == 0xFF) {
+    tima = getByteRef(regs::TMA);
+    auto& interruptFlags = getByteRef(regs::IF);
+    constexpr std::uint8_t timerInterruptBit = 0x04;
+    interruptFlags |= timerInterruptBit;
+  } else {
+    ++tima;
+  }
+}
+
 std::uint8_t
 Mmu::readByte(std::uint16_t address) const
 {
@@ -412,7 +442,21 @@ Mmu::writeByte(std::uint16_t address, std::uint8_t value)
   // this same counter for a falling edge, so forcing the whole thing to 0
   // counts as one if the watched bit happened to be set beforehand.
   if (address == regs::DIV) {
+    const bool oldTimerInput = timerInput();
     m_divCounter = 0;
+    m_timerDivCounter = 0;
+    if (oldTimerInput && !timerInput()) {
+      incrementTimer();
+    }
+    return;
+  }
+
+  if (address == regs::TAC) {
+    const bool oldTimerInput = timerInput();
+    getByteRef(address) = value;
+    if (oldTimerInput && !timerInput()) {
+      incrementTimer();
+    }
     return;
   }
 
@@ -707,6 +751,18 @@ Mmu::runNextTCycle()
 }
 
 void
+Mmu::runTimerTo(std::uint16_t divCounter)
+{
+  while (m_timerDivCounter != divCounter) {
+    const bool oldTimerInput = timerInput();
+    ++m_timerDivCounter;
+    if (oldTimerInput && !timerInput()) {
+      incrementTimer();
+    }
+  }
+}
+
+void
 Mmu::updateStatMode(std::uint8_t mode)
 {
   constexpr unsigned modeMask = 0b0000'0011U;
@@ -872,6 +928,7 @@ Mmu::serialize(SaveStateWriter& writer) const
   }
 
   writer.writeU16(m_divCounter);
+  writer.writeU16(m_timerDivCounter);
   writer.writeBool(m_bootRomActive);
   writer.writeBytes(m_vram);
   std::visit([&writer](const auto& mapper) { mapper.serialize(writer); },
@@ -922,6 +979,7 @@ Mmu::deserialize(SaveStateReader& reader)
   }
 
   m_divCounter = reader.readU16();
+  m_timerDivCounter = reader.readU16();
   m_bootRomActive = reader.readBool();
   reader.readBytes(m_vram);
   std::visit([&reader](auto& mapper) { mapper.deserialize(reader); }, m_mapper);

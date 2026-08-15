@@ -58,3 +58,18 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
     "daa_reference_dmg.png",
   600)
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "acceptance/timer/tim00",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) / "acceptance/timer/tim00.gb",
+  std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
+    "tim00_reference_dmg.png",
+  600)
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "acceptance/timer/div_write",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) /
+    "acceptance/timer/div_write.gb",
+  std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
+    "div_write_reference_dmg.png",
+  600)
