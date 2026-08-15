@@ -18,6 +18,8 @@ import test_helpers;
 // gbc_dma_cont.gb exercises genuine GDMA (bit 7 clear when writing HDMA5).
 TEST_CASE("gbc_dma_cont (SameSuite, pure GDMA)", "[GameBoy]")
 {
+  gbemu::serialOutput().clear();
+
   auto rom =
     readFile(std::filesystem::path(SAME_SUITE_DIR) / "dma/gbc_dma_cont.gb");
   gbemu::GameBoy gb{};
@@ -44,6 +46,8 @@ TEST_CASE("gbc_dma_cont (SameSuite, pure GDMA)", "[GameBoy]")
 // buffer should differ from their zero-initialized state.
 TEST_CASE("gdma_addr_mask (SameSuite, HDMA with LCD off)", "[GameBoy]")
 {
+  gbemu::serialOutput().clear();
+
   auto rom =
     readFile(std::filesystem::path(SAME_SUITE_DIR) / "dma/gdma_addr_mask.gb");
   gbemu::GameBoy gb{};

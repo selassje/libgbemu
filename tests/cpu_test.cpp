@@ -25,6 +25,9 @@ GB_SERIAL_ROM_TEST("cpu_instrs (combined)", "cpu_instrs/cpu_instrs.gb", 55000)
 
 TEST_CASE("halt_bug", "[GameBoy]")
 {
+  gbemu::serialOutput().clear();
+  gbemu::memoryOutput().clear();
+
   auto rom = readFile(std::filesystem::path(GB_TEST_ROMS_DIR) / "halt_bug.gb");
   gbemu::GameBoy gb{};
 

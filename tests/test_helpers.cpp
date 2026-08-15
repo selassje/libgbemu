@@ -69,6 +69,7 @@ expectSerialPass(gbemu::GameBoy& gb,
                  const std::filesystem::path& romPath,
                  std::chrono::milliseconds duration)
 {
+  gbemu::serialOutput().clear();
   loadAndRun(gb, romPath, duration);
   REQUIRE_THAT(gbemu::serialOutput(),
                Catch::Matchers::ContainsSubstring("Passed"));
@@ -80,6 +81,8 @@ expectMemoryPass(gbemu::GameBoy& gb,
                  const std::filesystem::path& romPath,
                  std::chrono::milliseconds duration)
 {
+  gbemu::memoryOutput().clear();
+  gbemu::serialOutput().clear();
   loadAndRun(gb, romPath, duration);
   REQUIRE_THAT(gbemu::memoryOutput(),
                Catch::Matchers::ContainsSubstring("Passed"));
