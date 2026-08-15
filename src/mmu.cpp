@@ -769,12 +769,15 @@ Mmu::runTimerTo(std::uint16_t divCounter)
 {
   while (m_timerDivCounter != divCounter) {
     m_timerReloadedThisCycle = false;
-    if (m_timerReloadTCycles > 0 && --m_timerReloadTCycles == 0) {
-      getByteRef(regs::TIMA) = getByteRef(regs::TMA);
-      auto& interruptFlags = getByteRef(regs::IF);
-      constexpr std::uint8_t timerInterruptBit = 0x04;
-      interruptFlags |= timerInterruptBit;
-      m_timerReloadedThisCycle = true;
+    if (m_timerReloadTCycles > 0) {
+      --m_timerReloadTCycles;
+      if (m_timerReloadTCycles == 0) {
+        getByteRef(regs::TIMA) = getByteRef(regs::TMA);
+        auto& interruptFlags = getByteRef(regs::IF);
+        constexpr std::uint8_t timerInterruptBit = 0x04;
+        interruptFlags |= timerInterruptBit;
+        m_timerReloadedThisCycle = true;
+      }
     }
 
     const bool oldTimerInput = timerInput();
