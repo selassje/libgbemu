@@ -70,6 +70,7 @@ if(ENABLE_TESTS)
       MBC1_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc1"
       MBC2_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc2"
       MBC5_TEST_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc5"
+      MOONEYE_ACCEPTANCE_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mooneye-acceptance"
       # Fetched at configure time by cmake/fetch_test_roms.cmake - not vendored
       # in git, see that file for why.
       GB_TEST_ROMS_DIR="${TEST_ROMS_DIR}/blargg"

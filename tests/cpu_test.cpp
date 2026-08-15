@@ -4,6 +4,7 @@
 
 import std;
 import gbemu;
+import png;
 import test_helpers;
 
 // clang-format off
@@ -50,3 +51,10 @@ TEST_CASE("halt_bug", "[GameBoy]")
 GB_MEMORY_ROM_TEST("mem_timing-2", "mem_timing-2/mem_timing.gb", 20000)
 GB_MEMORY_ROM_TEST("interrupt_time", "interrupt_time/interrupt_time.gb", 20000)
 // clang-format on
+
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "acceptance/instr/daa",
+  std::filesystem::path(MOONEYE_TEST_SUITE_DIR) / "acceptance/instr/daa.gb",
+  std::filesystem::path(MOONEYE_ACCEPTANCE_EXPECTED_DIR) /
+    "daa_reference_dmg.png",
+  600)
