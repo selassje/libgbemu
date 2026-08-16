@@ -194,9 +194,9 @@ if(ENABLE_FUZZING)
     # inside setup_sanitizers() itself, same as every other target that calls
     # it. Combining ASan/UBSan with libFuzzer (rather than -fsanitize=fuzzer
     # alone) is what actually makes fuzzing effective at finding
-    # memory-safety/UB bugs, not just crashes - see setup_fuzzer()'s own
-    # comment on why that combination lives here instead of being hardcoded
-    # into setup_fuzzer() itself.
+    # memory-safety/UB bugs, not just crashes - see setup_fuzzer()'s own comment
+    # on why that combination lives here instead of being hardcoded into
+    # setup_fuzzer() itself.
     setup_sanitizers(${fuzz_target})
   endforeach()
 
@@ -216,35 +216,35 @@ if(ENABLE_FUZZING)
     # tests/fuzz-corpus/ (writable) and tests/fuzz-artifacts/ (crash
     # reproducers) live under tests/, not the build dir - matching where
     # .github/workflows/ci.yml's own actions/cache and upload-artifact steps
-    # already expect them, so this doesn't need a matching change there.
-    # Each fuzz target gets its own subdirectory of both (load-rom/,
-    # load-state/) - a ROM-shaped corpus entry and a save-state-shaped one
-    # share nothing, so mixing them in one directory would just make each
-    # binary spend time reading and re-minimizing inputs it can never actually
-    # use. tests/fuzz-seeds/<target>/ is the matching 2nd, read-only corpus dir
-    # per target (libFuzzer: "if more than one corpus dir is provided, the 1st
-    # is used for output, the rest are read-only") - committed to git, so it's
-    # always present even on a cold cache, unlike tests/fuzz-corpus/ itself. Without
-    # at least one valid-shaped seed, a random buffer's length is
-    # astronomically unlikely to ever land on an exact multiple of
-    # ROM_BANK_SIZE on its own (confirmed directly: ~35 million executions
-    # across 16 parallel workers, zero of them got past loadRom()'s size/
-    # alignment rejection into real GameBoy execution) - only load-rom has one
-    # right now (tests/fuzz-seeds/load-rom/rom_only_16kb.gb); load-state has no
-    # committed seed dir at all yet (EXISTS-guarded below), so that fuzzer
-    # currently only ever exercises loadState()'s magic/version rejection path
-    # - a real save-state seed would need to be regenerated whenever
+    # already expect them, so this doesn't need a matching change there. Each
+    # fuzz target gets its own subdirectory of both (load-rom/, load-state/) - a
+    # ROM-shaped corpus entry and a save-state-shaped one share nothing, so
+    # mixing them in one directory would just make each binary spend time
+    # reading and re-minimizing inputs it can never actually use.
+    # tests/fuzz-seeds/<target>/ is the matching 2nd, read-only corpus dir per
+    # target (libFuzzer: "if more than one corpus dir is provided, the 1st is
+    # used for output, the rest are read-only") - committed to git, so it's
+    # always present even on a cold cache, unlike tests/fuzz-corpus/ itself.
+    # Without at least one valid-shaped seed, a random buffer's length is
+    # astronomically unlikely to ever land on an exact multiple of ROM_BANK_SIZE
+    # on its own (confirmed directly: ~35 million executions across 16 parallel
+    # workers, zero of them got past loadRom()'s size/ alignment rejection into
+    # real GameBoy execution) - only load-rom has one right now
+    # (tests/fuzz-seeds/load-rom/rom_only_16kb.gb); load-state has no committed
+    # seed dir at all yet (EXISTS-guarded below), so that fuzzer currently only
+    # ever exercises loadState()'s magic/version rejection path - a real
+    # save-state seed would need to be regenerated whenever
     # gbemu::SAVE_STATE_VERSION bumps rather than committed as a static binary
     # blob, which is more machinery than this split needed on its own.
     #
     # The mkdir happens inside the test COMMAND itself (bash -c), not just once
     # at configure time - confirmed directly that relying on configure-time
-    # creation alone is fragile: anything that clears tests/fuzz-corpus/
-    # without also re-running cmake (a cache miss included - actions/cache
-    # doesn't create the restore path on a miss, it just leaves whatever's
-    # already there) leaves ctest unable to find it. bash -c is safe to rely
-    # on unconditionally here - this whole block is already Linux-only (see
-    # the WIN32 FATAL_ERROR above).
+    # creation alone is fragile: anything that clears tests/fuzz-corpus/ without
+    # also re-running cmake (a cache miss included - actions/cache doesn't
+    # create the restore path on a miss, it just leaves whatever's already
+    # there) leaves ctest unable to find it. bash -c is safe to rely on
+    # unconditionally here - this whole block is already Linux-only (see the
+    # WIN32 FATAL_ERROR above).
     set(FUZZ_CORPUS_DIR ${CMAKE_SOURCE_DIR}/tests/fuzz-corpus)
     set(FUZZ_ARTIFACTS_DIR ${CMAKE_SOURCE_DIR}/tests/fuzz-artifacts)
     set(FUZZ_SEEDS_DIR ${CMAKE_SOURCE_DIR}/tests/fuzz-seeds)
@@ -267,14 +267,14 @@ if(ENABLE_FUZZING)
     # -jobs/-workers run one fuzzing process per core in parallel, all pointed
     # at the same corpus directory - what actually lets them learn from each
     # other's finds (via -reload, on by default, periodically re-reading it)
-    # rather than being fully isolated processes that happen to run at the
-    # same time (confirmed directly: without a shared corpus dir, 16 parallel
-    # workers each starting from nothing all got stuck at the exact same
-    # trivial coverage level for the whole run). PROCESSORS tells ctest's own
-    # scheduler each of these tests wants every core, so it doesn't also try
-    # to start other tests alongside them and oversubscribe the machine - the
-    # two fuzz targets' own tests still run one after another rather than
-    # concurrently with each other, for the same reason.
+    # rather than being fully isolated processes that happen to run at the same
+    # time (confirmed directly: without a shared corpus dir, 16 parallel workers
+    # each starting from nothing all got stuck at the exact same trivial
+    # coverage level for the whole run). PROCESSORS tells ctest's own scheduler
+    # each of these tests wants every core, so it doesn't also try to start
+    # other tests alongside them and oversubscribe the machine - the two fuzz
+    # targets' own tests still run one after another rather than concurrently
+    # with each other, for the same reason.
     foreach(fuzz_name load-rom load-state)
       set(fuzz_corpus_dir ${FUZZ_CORPUS_DIR}/${fuzz_name})
       set(fuzz_artifacts_dir ${FUZZ_ARTIFACTS_DIR}/${fuzz_name})
@@ -292,26 +292,25 @@ if(ENABLE_FUZZING)
           "mkdir -p '${fuzz_corpus_dir}' '${fuzz_artifacts_dir}' && exec $<TARGET_FILE:gbemu-fuzz-${fuzz_name}> -max_total_time=60 -max_len=${FUZZ_MAX_LEN} -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${fuzz_artifacts_dir}/' ${fuzz_corpus_args}"
       )
       set_tests_properties("fuzz regression (${fuzz_name})"
-                            PROPERTIES PROCESSORS ${NPROC})
+                           PROPERTIES PROCESSORS ${NPROC})
 
       # Same as above but with no -max_total_time cap - a real, open-ended
-      # fuzzing session instead of a shallow regression check, for manual/
-      # local use. Labeled "manual" and excluded from CI's own ctest
-      # invocation (-LE manual, see ci.yml) - letting this run unbounded on
-      # every push would make every CI run take as long as ctest's own
-      # default per-test timeout (1500s) instead of the ~60s the regression
-      # check above costs. Still bounded by that same default CTest timeout
-      # rather than truly infinite either way - run explicitly via
-      # `ctest -R "fuzz \(unbounded\)"` for a real, longer fuzzing session.
+      # fuzzing session instead of a shallow regression check, for manual/ local
+      # use. Labeled "manual" and excluded from CI's own ctest invocation (-LE
+      # manual, see ci.yml) - letting this run unbounded on every push would
+      # make every CI run take as long as ctest's own default per-test timeout
+      # (1500s) instead of the ~60s the regression check above costs. Still
+      # bounded by that same default CTest timeout rather than truly infinite
+      # either way - run explicitly via `ctest -R "fuzz \(unbounded\)"` for a
+      # real, longer fuzzing session.
       add_test(
         NAME "fuzz (unbounded) (${fuzz_name})"
         COMMAND
           bash -c
           "mkdir -p '${fuzz_corpus_dir}' '${fuzz_artifacts_dir}' && exec $<TARGET_FILE:gbemu-fuzz-${fuzz_name}> -max_len=${FUZZ_MAX_LEN} -jobs=${NPROC} -workers=${NPROC} -artifact_prefix='${fuzz_artifacts_dir}/' ${fuzz_corpus_args}"
       )
-      set_tests_properties(
-        "fuzz (unbounded) (${fuzz_name})" PROPERTIES PROCESSORS ${NPROC}
-                                                       LABELS "manual")
+      set_tests_properties("fuzz (unbounded) (${fuzz_name})"
+                           PROPERTIES PROCESSORS ${NPROC} LABELS "manual")
     endforeach()
   endif()
 endif()
