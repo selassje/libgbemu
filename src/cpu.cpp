@@ -378,7 +378,10 @@ Cpu::ldRR()
   }
 
   if (dst == REG_HL_INDIRECT) {
-    advanceHardware((m_mcycles + 2) * 4);
+    // The write becomes visible on the final T-cycle of the second machine
+    // cycle, before that T-cycle's hardware tick has completed. This matters
+    // for mode-3 register writes such as the Mealybug LCDC timing tests.
+    advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
     m_mmu.get().writeByte(m_HL, value);
     cycles = 2;
   } else {
@@ -1464,7 +1467,6 @@ Cpu::runNextInstruction()
   }
 
   handleInterrupts();
-#ifdef ENABLE_TESTS
   {
     if (false) { // NOLINT(readability-simplify-boolean-expr))
       const auto opcodeByte = m_mmu.get().readByte(m_PC);
@@ -1498,7 +1500,6 @@ Cpu::runNextInstruction()
                 << "\n";
     }
   }
-#endif
   m_currentOpcode = m_mmu.get().readByte(m_PC);
   const auto opcode = m_currentOpcode;
   const auto& instruction = INSTRUCTIONS.at(opcode);

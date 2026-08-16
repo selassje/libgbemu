@@ -268,9 +268,12 @@ private:
   std::uint16_t m_dot{ 0 };
   Mode m_mode{ Mode::OAMSearch };
   // Real hardware: LCDC.7 off forces LY=0/STAT mode=HBlank for as long as
-  // it stays off, and re-enabling always restarts a fresh frame at
-  // scanline 0/mode 2 - never resumes wherever the PPU was paused.
+  // it stays off. Re-enabling starts scanline 0 in the mode-2 interval, but
+  // STAT still reports mode 0 until the first mode-3 transition; the first
+  // generated frame is not driven to the LCD and remains visibly white.
   bool m_lcdEnabled{ false };
+  bool m_lcdStartupLine{ false };
+  bool m_blankFirstFrame{ false };
   std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };

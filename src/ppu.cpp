@@ -429,6 +429,7 @@ Ppu::runNextTCycle()
       // which disables mid-VBlank at LY=148) can rely on this to reset
       // scanline/mode state before reinitializing VRAM/OAM.
       m_lcdEnabled = false;
+      m_lcdStartupLine = false;
       m_dot = 0;
       m_scanline = 0;
       m_mode = Mode::HBlank;
@@ -437,6 +438,7 @@ Ppu::runNextTCycle()
       m_YCondition = false;
       m_bgWndFifo.clear();
       m_objFifo.clear();
+      m_completedFrameBuffer.fill(0xFF);
       m_mmu.get().writeByte(regs::LY, m_scanline);
       m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
       m_mmu.get().updateStatCoincidence(m_scanline ==
@@ -449,12 +451,16 @@ Ppu::runNextTCycle()
 
   if (!m_lcdEnabled) {
     // Real hardware: re-enabling the LCD always restarts a fresh frame at
-    // scanline 0/mode 2 - never resumes whatever mode/scanline it was
-    // paused at before being disabled.
+    // scanline 0 - never resumes whatever mode/scanline it was paused at.
     m_lcdEnabled = true;
+    m_lcdStartupLine = true;
+    m_blankFirstFrame = true;
     m_dot = 0;
     m_scanline = 0;
-    m_mode = Mode::OAMSearch;
+    // The first scanline after LCD-on performs the mode-2 work internally,
+    // but STAT reports mode 0 until pixel transfer begins at dot 80.
+    m_mode = Mode::HBlank;
+    m_completedFrameBuffer.fill(0xFF);
     m_mmu.get().writeByte(regs::LY, m_scanline);
     m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
     m_mmu.get().updateStatCoincidence(m_scanline ==
@@ -463,6 +469,10 @@ Ppu::runNextTCycle()
 
   switch (m_mode) {
     case Mode::HBlank:
+      if (m_lcdStartupLine) {
+        handleOAMSearch();
+      }
+      break;
     case Mode::VBlank:
       // Both are genuinely idle time on real hardware - no fetcher/FIFO
       // activity, nothing to render. Mode transitions, LY updates, and the
@@ -506,7 +516,11 @@ Ppu::incrementDot()
         m_mmu.get().writeByte(
           regs::IF,
           static_cast<std::uint8_t>(interruptFlags | VBLANK_INTERRUPT_BIT));
-        m_completedFrameBuffer = m_frameBuffer;
+        if (m_blankFirstFrame) {
+          m_blankFirstFrame = false;
+        } else {
+          m_completedFrameBuffer = m_frameBuffer;
+        }
       }
     } else {
       m_mode = Mode::OAMSearch;
@@ -515,6 +529,7 @@ Ppu::incrementDot()
   } else {
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
       if (m_dot == MODE_2_DOTS) {
+        m_lcdStartupLine = false;
         m_mode = Mode::PixelTransfer;
         m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
         constexpr std::uint8_t scxLow3BitsMask = 0x07;
@@ -689,6 +704,8 @@ Ppu::serialize(SaveStateWriter& writer) const
   writer.writeU16(m_dot);
   writer.writeU8(static_cast<std::uint8_t>(m_mode));
   writer.writeBool(m_lcdEnabled);
+  writer.writeBool(m_lcdStartupLine);
+  writer.writeBool(m_blankFirstFrame);
   writer.writeU8(m_pixelsRendered);
   writer.writeU8(m_scx3LowBits);
   writer.writeU8(m_scxDiscardedCount);
@@ -715,6 +732,8 @@ Ppu::deserialize(SaveStateReader& reader)
   m_dot = reader.readU16();
   m_mode = static_cast<Mode>(reader.readU8());
   m_lcdEnabled = reader.readBool();
+  m_lcdStartupLine = reader.readBool();
+  m_blankFirstFrame = reader.readBool();
   m_pixelsRendered = reader.readU8();
   m_scx3LowBits = reader.readU8();
   m_scxDiscardedCount = reader.readU8();
