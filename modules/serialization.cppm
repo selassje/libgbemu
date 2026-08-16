@@ -2,8 +2,13 @@ export module gbemu:serialization;
 
 import std;
 
-export namespace gbemu {
+#ifdef ENABLE_TESTS
+export
+#endif
+  namespace gbemu {
 
+constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
+constexpr std::uint32_t SAVE_STATE_VERSION = 4;
 class SaveStateWriter
 {
 public:

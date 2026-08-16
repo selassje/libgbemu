@@ -251,13 +251,13 @@ jobs:
       # available from any previous run (exact key never hits, since
       # github.sha is always new) - saved back below regardless of whether
       # this run found anything new, so it keeps accumulating. A no-op for
-      # the other two presets in this job - fuzz-corpus/ is only ever
+      # the other two presets in this job - tests/fuzz-corpus/ is only ever
       # populated when ENABLE_FUZZING is on.
       - name: Restore Fuzz Corpus Cache
         if: matrix.preset == 'release_ninja_clang_fuzzing_linux'
         uses: actions/cache@v4
         with:
-          path: fuzz-corpus
+          path: tests/fuzz-corpus
           key: fuzz-corpus-${{ github.sha }}
           restore-keys: fuzz-corpus-
 
@@ -273,7 +273,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fuzz-crash-artifacts
-          path: fuzz-artifacts/
+          path: tests/fuzz-artifacts/
 
       # Formatting doesn't vary by build type, so only check it once.
       - name: Check Formatting

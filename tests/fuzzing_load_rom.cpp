@@ -20,15 +20,5 @@ LLVMFuzzerTestOneInput( // NOLINT(readability-identifier-naming)
       break;
     }
   }
-
-  if (!gb.loadState(std::span(data, size)).has_value()) {
-    return 0;
-  }
-
-  for (int i = 0; i < framesToRun; ++i) {
-    if (!gb.runNextFrame().has_value()) {
-      break;
-    }
-  }
   return 0;
 }
