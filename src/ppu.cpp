@@ -6,7 +6,10 @@ namespace {
 
 constexpr std::uint8_t TOTAL_SCANLINES = 154;
 constexpr std::uint8_t LAST_VISIBLE_SCANLINE = 143;
-constexpr std::uint16_t MODE_2_DOTS = 80;
+constexpr std::uint16_t NORMAL_MODE_3_DOT = 84;
+constexpr std::uint16_t NORMAL_RENDERER_START_DOT = 89;
+constexpr std::uint16_t STARTUP_MODE_3_DOT = 87;
+constexpr std::uint16_t STARTUP_RENDERER_START_DOT = 92;
 constexpr std::uint16_t DOTS_PER_SCANLINE = 456;
 
 constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
@@ -63,16 +66,30 @@ Ppu::Fetcher::checkForObject()
   auto objects =
     std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
   auto it = std::ranges::find_if(objects, [&](const auto& object) {
+    const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
+                        m_ppu.get().m_initialPipelinePixelsToDiscard;
     return !object.isFetched &&
-           (m_ppu.get().m_pixelsRendered + 8 >= object.xPos);
+           (fetchX + 8 >= object.xPos);
   });
 
-  if (it != objects.end()) {
-    it->isFetched = true;
-    m_currentObject = *it;
-    m_ppu.get().saveFetcherState();
-    reset(Mode::Object);
+  if (it == objects.end()) {
+    return;
   }
+
+  // Mesen starts the object fetch only after the background fetcher has
+  // reached step 5 and the background FIFO contains pixels.  Sleep is the
+  // state immediately after our high-byte/step-5 operation; PushToFifo
+  // represents the following push opportunities.
+  const bool backgroundReachedStep5 =
+    m_mState == State::Sleep || m_mState == State::PushToFifo;
+  if (!backgroundReachedStep5 || m_ppu.get().m_bgWndFifo.empty()) {
+    return;
+  }
+
+  it->isFetched = true;
+  m_currentObject = *it;
+  m_ppu.get().saveFetcherState();
+  reset(Mode::Object);
 }
 
 void
@@ -91,8 +108,10 @@ Ppu::Fetcher::checkForWindow()
   // around instead, clamped at 0.
   constexpr unsigned wxOffset = 7;
   const auto windowStartX = wx >= wxOffset ? (wx - wxOffset) : 0U;
+  const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
+                      m_ppu.get().m_initialPipelinePixelsToDiscard;
   const auto wxReached =
-    static_cast<unsigned>(m_ppu.get().m_pixelsRendered) == windowStartX;
+    fetchX >= 0 && static_cast<unsigned>(fetchX) == windowStartX;
   if (windowEnabled && yCondition && wxReached) {
     reset(Mode::Window);
   }
@@ -238,7 +257,14 @@ Ppu::Fetcher::runNextTCycle()
       break;
     case State::ReadTileDataLow:
     case State::ReadTileDataHigh:
-      if (elapsedDots >= 2) {
+      // Mesen's object fetcher clocks steps 0..5: tile/index at step 1,
+      // low data at step 3, and high data plus push at step 5.  Object reset
+      // starts at step 0 here, so the low-byte state lasts 3 dots and the
+      // following high-byte state lasts 2.  Background/window bytes retain
+      // their normal two-dot cadence.
+      if (elapsedDots >=
+          (m_mode == Mode::Object && m_mState == State::ReadTileDataLow ? 3
+                                                                        : 2)) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
@@ -354,6 +380,14 @@ Ppu::Fetcher::runNextTCycle()
 };
 
 void
+Ppu::Fetcher::restartCurrentFetch()
+{
+  m_mState = State::ReadTile;
+  m_rowPushed = false;
+  m_lastDotStateChange = m_ppu.get().m_dot;
+}
+
+void
 Ppu::Fetcher::reset(Mode mode)
 {
   m_mState = State::ReadTile;
@@ -455,10 +489,10 @@ Ppu::runNextTCycle()
     m_lcdEnabled = true;
     m_lcdStartupLine = true;
     m_blankFirstFrame = true;
-    m_dot = 0;
+    m_dot = 7;
     m_scanline = 0;
     // The first scanline after LCD-on performs the mode-2 work internally,
-    // but STAT reports mode 0 until pixel transfer begins at dot 80.
+    // but STAT reports mode 0 until its delayed pixel-transfer transition.
     m_mode = Mode::HBlank;
     m_completedFrameBuffer.fill(0xFF);
     m_mmu.get().writeByte(regs::LY, m_scanline);
@@ -482,6 +516,10 @@ Ppu::runNextTCycle()
       handleOAMSearch();
       break;
     case Mode::PixelTransfer:
+      if (m_dot < (m_lcdStartupLine ? STARTUP_RENDERER_START_DOT
+                                    : NORMAL_RENDERER_START_DOT + 4)) {
+        break;
+      }
       if (handlePixelTransfer()) {
         m_mode = Mode::HBlank;
         m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
@@ -528,20 +566,32 @@ Ppu::incrementDot()
     }
   } else {
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
-      if (m_dot == MODE_2_DOTS) {
-        m_lcdStartupLine = false;
+      const auto mode3Dot = m_lcdStartupLine ? STARTUP_MODE_3_DOT
+                                             : NORMAL_MODE_3_DOT;
+      const auto rendererStartDot =
+        m_lcdStartupLine ? STARTUP_RENDERER_START_DOT
+                         : NORMAL_RENDERER_START_DOT + 4;
+      if (m_dot == mode3Dot) {
         m_mode = Mode::PixelTransfer;
         m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+      }
+      if (m_dot == rendererStartDot) {
         constexpr std::uint8_t scxLow3BitsMask = 0x07;
         m_scx3LowBits = static_cast<std::uint8_t>(
           m_mmu.get().readByte(regs::SCX) & scxLow3BitsMask);
         m_scxDiscardedCount = 0;
+        constexpr std::uint8_t initialPipelinePixels = 8;
+        m_initialPipelinePixelsToDiscard = initialPipelinePixels;
         m_windowPixelsToDiscard = 0;
         m_objFifo.clear();
         m_fetcher.reset(Fetcher::Mode::Background);
+        for (unsigned i = 0; i < initialPipelinePixels; ++i) {
+          m_bgWndFifo.push({});
+        }
         if (!m_YCondition && m_scanline == m_mmu.get().readByte(regs::WY)) {
           m_YCondition = true;
         }
+        m_lcdStartupLine = false;
       }
     }
   }
@@ -579,13 +629,26 @@ Ppu::handleOAMSearch()
 bool
 Ppu::handlePixelTransfer()
 {
+  const bool objectFetchWasActive = m_fetcher.isFetchingObject();
   m_fetcher.runNextTCycle();
 
-  if (m_fetcher.isFetchingObject()) {
+  // Mesen returns from the draw cycle even on object step 5, where the high
+  // byte is read and the background fetcher is restored.  Do not pop a BG
+  // pixel on that completion dot.
+  if (objectFetchWasActive || m_fetcher.isFetchingObject()) {
     return false;
   }
 
   if (m_bgWndFifo.empty()) {
+    return false;
+  }
+
+  if (m_initialPipelinePixelsToDiscard > 0) {
+    m_bgWndFifo.pop();
+    --m_initialPipelinePixelsToDiscard;
+    if (!m_objFifo.empty()) {
+      m_objFifo.pop();
+    }
     return false;
   }
 
@@ -610,8 +673,11 @@ Ppu::handlePixelTransfer()
     std::cerr << std::dec << "DMG BG-disabled FIFO pop: LY="
               << static_cast<unsigned>(m_scanline) << " dot=" << m_dot
               << " x=" << static_cast<unsigned>(m_pixelsRendered)
-              << " scxLow=" << static_cast<unsigned>(m_scx3LowBits) << '\n';
-    std::abort();
+              << " scxLow=" << static_cast<unsigned>(m_scx3LowBits)
+              << " pipelineRemaining="
+              << static_cast<unsigned>(m_initialPipelinePixelsToDiscard)
+              << '\n';
+    //std::abort();
   }
 
   const auto bgPixel = m_bgWndFifo.pop();
@@ -718,6 +784,7 @@ Ppu::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_pixelsRendered);
   writer.writeU8(m_scx3LowBits);
   writer.writeU8(m_scxDiscardedCount);
+  writer.writeU8(m_initialPipelinePixelsToDiscard);
   writer.writeU8(m_windowPixelsToDiscard);
   writer.writeBool(m_YCondition);
   m_bgWndFifo.serialize(writer);
@@ -746,6 +813,7 @@ Ppu::deserialize(SaveStateReader& reader)
   m_pixelsRendered = reader.readU8();
   m_scx3LowBits = reader.readU8();
   m_scxDiscardedCount = reader.readU8();
+  m_initialPipelinePixelsToDiscard = reader.readU8();
   m_windowPixelsToDiscard = reader.readU8();
   m_YCondition = reader.readBool();
   m_bgWndFifo.deserialize(reader);

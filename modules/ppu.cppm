@@ -172,6 +172,11 @@ private:
     }
     void runNextTCycle();
     void reset(Mode mode);
+    // Restarts the current tile fetch (same tileX/Y/mode) from its first
+    // step - an object fetch interrupting a background/window fetch
+    // discards that fetch's progress on real hardware rather than resuming
+    // it (gbdev Pan Docs "Sprites"/"Object Fetch Canceling").
+    void restartCurrentFetch();
     [[nodiscard]] bool isFetchingObject() const
     {
       return m_mode == Mode::Object;
@@ -277,6 +282,7 @@ private:
   std::uint8_t m_pixelsRendered{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
+  std::uint8_t m_initialPipelinePixelsToDiscard{ 0 };
   // WX < 7 has no valid on-screen X = WX-7 (it'd be negative) - the window
   // still triggers at screen X=0 in that case, same as WX=7, just with its
   // own leftmost (7-WX) pixels clipped rather than shown.
