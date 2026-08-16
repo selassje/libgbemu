@@ -34,3 +34,31 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST(
   std::filesystem::path(TURTLE_TESTS_DIR) /
     "window_y_trigger_wx_offscreen/window_y_trigger_wx_offscreen.png",
   600)
+
+// Known-failing: our LCDC-bit-0-toggled-mid-scanline handling isn't
+// cycle-accurate yet, so the actual frame doesn't match real DMG hardware's
+// row-by-row staggered pattern. Dumps the actual frame next to the test
+// binary's working directory so a mismatch can be inspected visually rather
+// than just failing pixelsMatchPng() blind.
+TEST_CASE("m3_lcdc_bg_en_change", "[GameBoy][PPU]")
+{
+  auto rom = readFile(std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+                      "ppu/m3_lcdc_bg_en_change.gb");
+  gbemu::GameBoy gb{};
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  const auto frame = stabilizeAndGetFrame(gb, 120);
+  const std::span actualPixels(frame.pixels.data_handle(),
+                               frame.pixels.size());
+
+  writePixelsAsPng("m3_lcdc_bg_en_change_actual.png",
+                   actualPixels,
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT);
+
+  REQUIRE(pixelsMatchPng(actualPixels,
+                        gbemu::SCREEN_WIDTH,
+                        gbemu::SCREEN_HEIGHT,
+                        std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+                          "ppu/m3_lcdc_bg_en_change_dmg_blob.png"));
+}

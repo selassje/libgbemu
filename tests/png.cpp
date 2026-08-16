@@ -404,16 +404,20 @@ paethPredictor(std::uint8_t a, std::uint8_t b, std::uint8_t c)
 
 // Reverses PNG's per-scanline filtering (each row prefixed by which of the
 // 5 filter types it used - see the PNG spec's 9.2/9.3), turning the raw
-// inflated bytes into plain packed pixel data.
+// inflated bytes into plain packed pixel data. rowBytes/bytesPerPixel are
+// taken as already computed by the caller rather than derived from
+// width*channels here, since a sub-byte bit depth (grayscale bitDepth < 8)
+// packs multiple pixels per byte - rowBytes is then less than width, and
+// the PNG spec's own filter byte-distance ("bpp") is still just 1 for those
+// depths, not the logical channel count.
 std::vector<std::uint8_t>
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 unfilter(std::span<const std::uint8_t> filtered,
-         std::size_t width,
+         std::size_t rowBytes,
          std::size_t height,
-         std::size_t channels)
+         std::size_t bytesPerPixel)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
-  const auto rowBytes = width * channels;
   std::vector<std::uint8_t> out(rowBytes * height);
   std::vector<std::uint8_t> previousRow(rowBytes, 0);
 
@@ -426,9 +430,10 @@ unfilter(std::span<const std::uint8_t> filtered,
     const std::span<std::uint8_t> dst(out.data() + (y * rowBytes), rowBytes);
 
     for (std::size_t x = 0; x < rowBytes; ++x) {
-      const std::uint8_t a = (x >= channels) ? dst[x - channels] : 0;
+      const std::uint8_t a = (x >= bytesPerPixel) ? dst[x - bytesPerPixel] : 0;
       const std::uint8_t b = previousRow[x];
-      const std::uint8_t c = (x >= channels) ? previousRow[x - channels] : 0;
+      const std::uint8_t c =
+        (x >= bytesPerPixel) ? previousRow[x - bytesPerPixel] : 0;
       switch (filterType) {
         case 0:
           dst[x] = src[x];
@@ -475,6 +480,43 @@ channelsForColorType(std::uint8_t colorType)
         "readPngAsRgb: unsupported PNG color type (palette images aren't "
         "supported)");
   }
+}
+
+// PNG's own sub-byte-depth packing (spec 2.3): samples are packed MSB-first
+// within each byte, and each row starts a fresh byte (any leftover bits at
+// a row's end are padding, not the next row's first sample) - both already
+// accounted for by unfilter() above treating each row as its own
+// rowBytes-sized span. Only grayscale (colorType 0) ever uses a bit depth
+// under 8 per the PNG spec (RGB/RGBA/palette are always 8 or 16), so this
+// is the only case that needs unpacking; the scale-to-0..255 formula
+// (sample * 255 / maxSample) is the PNG spec's own recommended grayscale
+// expansion and happens to land exactly on the DMG's 4 LCD shades
+// (0x00/0x55/0xAA/0xFF) for bitDepth 2, which is what actually matters here
+// - mealybug-tearoom-tests' DMG reference screenshots ship as 2-bit
+// grayscale.
+std::vector<std::uint8_t>
+expandGrayscaleSamples(std::span<const std::uint8_t> packedRows,
+                       std::size_t width,
+                       std::size_t height,
+                       std::uint8_t bitDepth)
+{
+  const auto rowBytes = (width * bitDepth + 7) / 8;
+  const auto maxSample = (1U << bitDepth) - 1U;
+  std::vector<std::uint8_t> out(width * height);
+  for (std::size_t y = 0; y < height; ++y) {
+    const auto row = packedRows.subspan(y * rowBytes, rowBytes);
+    for (std::size_t x = 0; x < width; ++x) {
+      const auto bitOffset = x * bitDepth;
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
+      const auto byte = row[bitOffset / 8];
+      const auto shift = 8 - bitDepth - (bitOffset % 8);
+      const auto sample =
+        (static_cast<unsigned>(byte) >> shift) & maxSample;
+      out.at((y * width) + x) =
+        static_cast<std::uint8_t>((sample * 255U) / maxSample);
+    }
+  }
+  return out;
 }
 
 std::vector<std::uint8_t>
@@ -613,6 +655,7 @@ readPngAsRgb(const std::filesystem::path& path)
   std::optional<std::uint32_t> width;
   std::optional<std::uint32_t> height;
   std::optional<std::uint8_t> colorType;
+  std::optional<std::uint8_t> bitDepth;
   std::vector<std::uint8_t> idat;
 
   std::size_t offset = signature.size();
@@ -639,15 +682,25 @@ readPngAsRgb(const std::filesystem::path& path)
       width = readBigEndianU32(data.subspan(0, 4));
       height = readBigEndianU32(data.subspan(4, 4));
       // NOLINTBEGIN(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-      const auto bitDepth = data[8];
+      bitDepth = data[8];
       colorType = data[9];
       const auto interlaceMethod = data[12];
       // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-      if (bitDepth != 8) {
+      // Grayscale is the only PNG color type whose bit depth can go under
+      // 8 (RGB/RGBA/palette are always 8 or 16 per the spec) - support
+      // that down to 1, since mealybug-tearoom-tests' DMG reference
+      // screenshots ship as 2-bit grayscale (one of the 4 LCD shades).
+      const bool bitDepthSupported =
+        *colorType == 0
+          ? (*bitDepth == 1 || *bitDepth == 2 || *bitDepth == 4 ||
+             *bitDepth == 8)
+          : (*bitDepth == 8);
+      if (!bitDepthSupported) {
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error(
-          "readPngAsRgb: only 8-bit-per-channel PNGs are supported: " +
-          path.string());
+          "readPngAsRgb: unsupported bit depth (" +
+          std::to_string(*bitDepth) + ") for color type (" +
+          std::to_string(*colorType) + ") in " + path.string());
       }
       if (interlaceMethod != 0) {
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
@@ -662,7 +715,7 @@ readPngAsRgb(const std::filesystem::path& path)
     offset = dataStart + length + 4;
   }
 
-  if (!width || !height || !colorType) {
+  if (!width || !height || !colorType || !bitDepth) {
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: missing IHDR in " + path.string());
   }
@@ -684,7 +737,12 @@ readPngAsRgb(const std::filesystem::path& path)
                                                   idat.size() - 6);
 
   const auto channels = channelsForColorType(*colorType);
-  const auto rowBytes = static_cast<std::size_t>(*width) * channels;
+  const auto rowBytes =
+    (static_cast<std::size_t>(*width) * *bitDepth * channels + 7) / 8;
+  const auto bytesPerPixel =
+    std::max<std::size_t>(1, (static_cast<std::size_t>(*bitDepth) * channels +
+                              7) /
+                              8);
   const auto expectedFilteredSize = (rowBytes + 1) * *height;
 
   const auto filtered = inflate(deflateData);
@@ -695,8 +753,12 @@ readPngAsRgb(const std::filesystem::path& path)
       path.string());
   }
 
-  const auto unfiltered = unfilter(filtered, *width, *height, channels);
-  auto rgb = toRgb(unfiltered, *width, *height, *colorType);
+  const auto unfiltered = unfilter(filtered, rowBytes, *height, bytesPerPixel);
+  const auto expanded = *bitDepth < 8
+                          ? expandGrayscaleSamples(
+                              unfiltered, *width, *height, *bitDepth)
+                          : unfiltered;
+  auto rgb = toRgb(expanded, *width, *height, *colorType);
 
   return PngImage{ std::move(rgb), *width, *height };
 }
