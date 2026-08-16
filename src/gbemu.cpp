@@ -10,9 +10,6 @@ constexpr std::uint16_t CGB_FLAG_ADDRESS = 0x0143;
 constexpr std::uint8_t CGB_SUPPORTED_MASK = 0x80;
 constexpr std::uint8_t CGB_REQUIRED_MASK = 0xC0;
 
-constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
-constexpr std::uint32_t SAVE_STATE_VERSION = 4;
-
 [[nodiscard]] std::expected<void, std::string>
 checkModeCompatible(gbemu::Mode model, std::span<const std::uint8_t> rom)
 {
