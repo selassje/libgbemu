@@ -199,7 +199,7 @@ Ppu::Fetcher::runNextTCycle()
 
   switch (m_mState) {
     case State::ReadTile:
-      if (elapsedDots >= 1) {
+      if (elapsedDots >= 2) {
 
         const auto lcdc = m_mmu.get().readByte(regs::LCDC);
         const auto lcdcBit3 = (lcdc & 0x08U) != 0;
@@ -238,7 +238,7 @@ Ppu::Fetcher::runNextTCycle()
       break;
     case State::ReadTileDataLow:
     case State::ReadTileDataHigh:
-      if (elapsedDots >= 1) {
+      if (elapsedDots >= 2) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
@@ -335,7 +335,7 @@ Ppu::Fetcher::runNextTCycle()
       }
       break;
     case State::Sleep:
-      if (elapsedDots >= 1) {
+      if (elapsedDots >= 2) {
         m_mState = State::PushToFifo;
       }
       break;
@@ -603,10 +603,19 @@ Ppu::handlePixelTransfer()
     ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) + m_pixelsRendered) *
     3;
 
+  const auto lcdc = m_mmu.get().readByte(regs::LCDC);
+  constexpr std::uint8_t bgWindowEnableMask = 0x01;
+  if ((lcdc & LCD_ENABLE_BIT) != 0 &&
+      (lcdc & bgWindowEnableMask) == 0) {
+    std::cerr << std::dec << "DMG BG-disabled FIFO pop: LY="
+              << static_cast<unsigned>(m_scanline) << " dot=" << m_dot
+              << " x=" << static_cast<unsigned>(m_pixelsRendered)
+              << " scxLow=" << static_cast<unsigned>(m_scx3LowBits) << '\n';
+    std::abort();
+  }
+
   const auto bgPixel = m_bgWndFifo.pop();
   auto bgColorIndex = bgPixel.colorIndex;
-  constexpr std::uint8_t bgWindowEnableMask = 0x01;
-  const auto lcdc = m_mmu.get().readByte(regs::LCDC);
   const bool native = m_hardwareMode == HardwareMode::CgbNative;
   if (!native && (lcdc & bgWindowEnableMask) == 0) {
     bgColorIndex = 0;
