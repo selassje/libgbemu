@@ -789,7 +789,7 @@ Mmu::runTimerTo(std::uint16_t divCounter)
 }
 
 void
-Mmu::updateStatMode(std::uint8_t mode)
+Mmu::updateStatMode(std::uint8_t mode, bool triggerInterrupt)
 {
   constexpr unsigned modeMask = 0b0000'0011U;
   constexpr std::uint8_t hblankMode = 0;
@@ -813,8 +813,20 @@ Mmu::updateStatMode(std::uint8_t mode)
     modeInterruptEnableBit = oamInterruptEnableBit;
   }
 
-  if (modeInterruptEnableBit != 0 &&
+  if (triggerInterrupt && modeInterruptEnableBit != 0 &&
       (static_cast<unsigned>(stat) & modeInterruptEnableBit) != 0) {
+    auto& interruptFlags = getByteRef(regs::IF);
+    interruptFlags = static_cast<std::uint8_t>(
+      static_cast<unsigned>(interruptFlags) | STAT_INTERRUPT_FLAG_BIT);
+  }
+}
+
+void
+Mmu::triggerStatOamInterrupt()
+{
+  constexpr unsigned oamInterruptEnableBit = 0b0010'0000U;
+  const auto stat = getByteRef(regs::STAT);
+  if ((static_cast<unsigned>(stat) & oamInterruptEnableBit) != 0) {
     auto& interruptFlags = getByteRef(regs::IF);
     interruptFlags = static_cast<std::uint8_t>(
       static_cast<unsigned>(interruptFlags) | STAT_INTERRUPT_FLAG_BIT);

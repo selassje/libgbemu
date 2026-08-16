@@ -517,7 +517,7 @@ Ppu::runNextTCycle()
       break;
     case Mode::PixelTransfer:
       if (m_dot < (m_lcdStartupLine ? STARTUP_RENDERER_START_DOT
-                                    : NORMAL_RENDERER_START_DOT + 4)) {
+                                    : NORMAL_RENDERER_START_DOT)) {
         break;
       }
       if (handlePixelTransfer()) {
@@ -561,16 +561,31 @@ Ppu::incrementDot()
         }
       }
     } else {
+      // The PPU starts scanning OAM internally at the line boundary, but
+      // STAT's externally-observable timing is staggered.  On LY 1-143 the
+      // OAM interrupt condition becomes active at the line-boundary event;
+      // the reported mode changes to OAM at dot 4.  LY 0 has no early
+      // condition and gets both at dot 4.  This is the CPU-visible timing
+      // corresponding to Mesen's cycle-2/cycle-4 split and is required for the
+      // Mealybug palette test's LY-0/LY-1 interrupt paths to converge.
       m_mode = Mode::OAMSearch;
-      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+      if (m_scanline > 0) {
+        // In libgbemu's tick convention the line-boundary callback is the
+        // CPU-visible equivalent of Mesen's early cycle-2 IRQ condition.
+        m_mmu.get().triggerStatOamInterrupt();
+      }
     }
   } else {
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
+      if (!m_lcdStartupLine && m_dot == 4) {
+        m_mmu.get().updateStatMode(
+          static_cast<std::uint8_t>(Mode::OAMSearch), m_scanline == 0);
+      }
       const auto mode3Dot = m_lcdStartupLine ? STARTUP_MODE_3_DOT
                                              : NORMAL_MODE_3_DOT;
       const auto rendererStartDot =
         m_lcdStartupLine ? STARTUP_RENDERER_START_DOT
-                         : NORMAL_RENDERER_START_DOT + 4;
+                         : NORMAL_RENDERER_START_DOT;
       if (m_dot == mode3Dot) {
         m_mode = Mode::PixelTransfer;
         m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
@@ -692,6 +707,13 @@ Ppu::handlePixelTransfer()
   const auto shade = static_cast<std::uint8_t>(
     (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
     shadeMask);
+  if (m_scanline == 0 && m_pixelsRendered < 8) {
+    std::cerr << std::dec << "LY0 pixel: dot=" << m_dot
+              << " x=" << static_cast<unsigned>(m_pixelsRendered)
+              << " bgColor=" << static_cast<unsigned>(bgColorIndex)
+              << " BGP=" << static_cast<unsigned>(bgp)
+              << " shade=" << static_cast<unsigned>(shade) << '\n';
+  }
   // A DMG-only cartridge running in CGB compatibility mode still computes
   // its shade index exactly as above, but looks it up in CGB background
   // palette 0 instead of the fixed DMG grayscale table - see

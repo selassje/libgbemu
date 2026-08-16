@@ -382,6 +382,12 @@ Cpu::ldRR()
     // cycle, before that T-cycle's hardware tick has completed. This matters
     // for mode-3 register writes such as the Mealybug LCDC timing tests.
     advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
+    if (m_HL == regs::BGP) {
+      std::cerr << std::dec << "BGP write: LY="
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " dot=" << m_ppu.get().dot() << " value="
+                << static_cast<unsigned>(value) << '\n';
+    }
     m_mmu.get().writeByte(m_HL, value);
     cycles = 2;
   } else {
@@ -668,6 +674,12 @@ Cpu::ldha8()
     // Writes become visible on the final T-cycle of the last machine cycle,
     // before that T-cycle's hardware tick has completed.
     advanceHardware(((m_mcycles + 3) * 4) - 1, m_mcycles + 3);
+    if (address == regs::BGP) {
+      std::cerr << std::dec << "BGP write: LY="
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " dot=" << m_ppu.get().dot() << " value="
+                << static_cast<unsigned>(getR8(REG_A)) << '\n';
+    }
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
@@ -688,6 +700,12 @@ Cpu::ldhca()
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
     advanceHardware((m_mcycles + 2) * 4);
+    if (address == regs::BGP) {
+      std::cerr << std::dec << "BGP write: LY="
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " dot=" << m_ppu.get().dot() << " value="
+                << static_cast<unsigned>(getR8(REG_A)) << '\n';
+    }
     m_mmu.get().writeByte(address, getR8(REG_A));
   }
 
