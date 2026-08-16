@@ -10,21 +10,11 @@ LLVMFuzzerTestOneInput( // NOLINT(readability-identifier-naming)
   std::size_t size)
 {
   gbemu::GameBoy gb;
-  if (!gb.loadRom(std::span(data, size)).has_value()) {
-    return 0;
-  }
-
-  constexpr int framesToRun = 60;
-  for (int i = 0; i < framesToRun; ++i) {
-    if (!gb.runNextFrame().has_value()) {
-      break;
-    }
-  }
-
   if (!gb.loadState(std::span(data, size)).has_value()) {
     return 0;
   }
 
+  constexpr int framesToRun = 60;
   for (int i = 0; i < framesToRun; ++i) {
     if (!gb.runNextFrame().has_value()) {
       break;

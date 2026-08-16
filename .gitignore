@@ -4,3 +4,5 @@ CMakeUserPresets.json
 .vscode/settings.json
 .sonarlint/connectedMode.json
 tests/game-boy-test-roms/
+tests/fuzz-corpus/
+tests/fuzz-artifacts/
