@@ -478,8 +478,7 @@ channelsForColorType(std::uint8_t colorType)
       return 4; // RGBA
     default:
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
-      throw std::runtime_error(
-        "readPngAsRgb: unsupported PNG color type");
+      throw std::runtime_error("readPngAsRgb: unsupported PNG color type");
   }
 }
 
@@ -494,12 +493,14 @@ channelsForColorType(std::uint8_t colorType)
 // scaling to 0..255 afterward (see scaleGrayscaleSample()), but a palette
 // index must stay exactly as-is to index PLTE correctly.
 std::vector<std::uint8_t>
+// NOLINTBEGIN(bugprone-easily-swappable-parameters)
 unpackSubByteSamples(std::span<const std::uint8_t> packedRows,
                      std::size_t width,
                      std::size_t height,
                      std::uint8_t bitDepth)
+// NOLINTEND(bugprone-easily-swappable-parameters)
 {
-  const auto rowBytes = (width * bitDepth + 7) / 8;
+  const auto rowBytes = ((width * bitDepth) + 7) / 8;
   const auto maxSample = (1U << bitDepth) - 1U;
   std::vector<std::uint8_t> out(width * height);
   for (std::size_t y = 0; y < height; ++y) {
@@ -509,9 +510,8 @@ unpackSubByteSamples(std::span<const std::uint8_t> packedRows,
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
       const auto byte = row[bitOffset / 8];
       const auto shift = 8 - bitDepth - (bitOffset % 8);
-      out.at((y * width) + x) =
-        static_cast<std::uint8_t>((static_cast<unsigned>(byte) >> shift) &
-                                  maxSample);
+      out.at((y * width) + x) = static_cast<std::uint8_t>(
+        (static_cast<unsigned>(byte) >> shift) & maxSample);
     }
   }
   return out;
@@ -543,7 +543,7 @@ toRgb(std::span<const std::uint8_t> unfiltered,
   const auto channels = channelsForColorType(colorType);
   std::vector<std::uint8_t> rgb(width * height * 3);
   for (std::size_t i = 0; i < width * height; ++i) {
-    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    // NOLINTBEGIN(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     const auto* pixel = unfiltered.data() + (i * channels);
     std::uint8_t r = 0;
     std::uint8_t g = 0;
@@ -563,8 +563,7 @@ toRgb(std::span<const std::uint8_t> unfiltered,
         const auto paletteOffset = static_cast<std::size_t>(pixel[0]) * 3;
         if (paletteOffset + 2 >= palette.size()) {
           // NOLINTNEXTLINE(hicpp-exception-baseclass)
-          throw std::runtime_error(
-            "readPngAsRgb: palette index out of range");
+          throw std::runtime_error("readPngAsRgb: palette index out of range");
         }
         r = palette[paletteOffset];
         g = palette[paletteOffset + 1];
@@ -574,7 +573,7 @@ toRgb(std::span<const std::uint8_t> unfiltered,
       default:
         std::unreachable();
     }
-    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic)
+    // NOLINTEND(cppcoreguidelines-pro-bounds-pointer-arithmetic,cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
     rgb.at((i * 3) + 0) = r;
     rgb.at((i * 3) + 1) = g;
     rgb.at((i * 3) + 2) = b;
@@ -717,17 +716,16 @@ readPngAsRgb(const std::filesystem::path& path)
       // that down to 1: mealybug-tearoom-tests' DMG reference screenshots
       // ship as 2-bit grayscale (one of the 4 LCD shades), and dmg-acid2/
       // cgb-acid2's bundled references ship as indexed color.
-      const bool bitDepthSupported =
-        (*colorType == 0 || *colorType == 3)
-          ? (*bitDepth == 1 || *bitDepth == 2 || *bitDepth == 4 ||
-             *bitDepth == 8)
-          : (*bitDepth == 8);
+      const bool bitDepthSupported = (*colorType == 0 || *colorType == 3)
+                                       ? (*bitDepth == 1 || *bitDepth == 2 ||
+                                          *bitDepth == 4 || *bitDepth == 8)
+                                       : (*bitDepth == 8);
       if (!bitDepthSupported) {
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
         throw std::runtime_error(
-          "readPngAsRgb: unsupported bit depth (" +
-          std::to_string(*bitDepth) + ") for color type (" +
-          std::to_string(*colorType) + ") in " + path.string());
+          "readPngAsRgb: unsupported bit depth (" + std::to_string(*bitDepth) +
+          ") for color type (" + std::to_string(*colorType) + ") in " +
+          path.string());
       }
       if (interlaceMethod != 0) {
         // NOLINTNEXTLINE(hicpp-exception-baseclass)
@@ -773,11 +771,9 @@ readPngAsRgb(const std::filesystem::path& path)
 
   const auto channels = channelsForColorType(*colorType);
   const auto rowBytes =
-    (static_cast<std::size_t>(*width) * *bitDepth * channels + 7) / 8;
-  const auto bytesPerPixel =
-    std::max<std::size_t>(1, (static_cast<std::size_t>(*bitDepth) * channels +
-                              7) /
-                              8);
+    ((static_cast<std::size_t>(*width) * *bitDepth * channels) + 7) / 8;
+  const auto bytesPerPixel = std::max<std::size_t>(
+    1, ((static_cast<std::size_t>(*bitDepth) * channels) + 7) / 8);
   const auto expectedFilteredSize = (rowBytes + 1) * *height;
 
   const auto filtered = inflate(deflateData);
@@ -789,10 +785,9 @@ readPngAsRgb(const std::filesystem::path& path)
   }
 
   const auto unfiltered = unfilter(filtered, rowBytes, *height, bytesPerPixel);
-  auto expanded = *bitDepth < 8
-                    ? unpackSubByteSamples(unfiltered, *width, *height,
-                                          *bitDepth)
-                    : unfiltered;
+  auto expanded =
+    *bitDepth < 8 ? unpackSubByteSamples(unfiltered, *width, *height, *bitDepth)
+                  : unfiltered;
   if (*bitDepth < 8 && *colorType == 0) {
     scaleGrayscaleSamples(expanded, *bitDepth);
   }
@@ -836,10 +831,7 @@ pixelsMatchPng(std::span<const std::uint8_t> actualRgbPixels,
     dumpActualOnMismatch(actualRgbPixels, width, height, referencePngPath);
     return false;
   }
-  const bool matches = std::equal(actualRgbPixels.begin(),
-                                  actualRgbPixels.end(),
-                                  reference.rgbPixels.begin(),
-                                  reference.rgbPixels.end());
+  const bool matches = std::ranges::equal(actualRgbPixels, reference.rgbPixels);
   if (!matches) {
     dumpActualOnMismatch(actualRgbPixels, width, height, referencePngPath);
   }

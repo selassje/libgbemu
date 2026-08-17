@@ -115,8 +115,7 @@ Ppu::Fetcher::checkForWindow()
   const auto windowStartX = wx >= wxOffset ? (wx - wxOffset) : 0U;
   const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
                       m_ppu.get().m_initialPipelinePixelsToDiscard;
-  const auto wxReached =
-    fetchX >= 0 && static_cast<unsigned>(fetchX) == windowStartX;
+  const auto wxReached = std::cmp_equal(fetchX, windowStartX);
   if (windowEnabled && yCondition && wxReached) {
     reset(Mode::Window);
   }
@@ -489,7 +488,7 @@ Ppu::runNextTCycle()
       m_objFifo.clear();
       m_completedFrameBuffer.fill(0xFF);
       m_mmu.get().writeByte(regs::LY, m_scanline);
-      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode), true);
       m_mmu.get().updateStatCoincidence(m_scanline ==
                                         m_mmu.get().readByte(regs::LYC));
     }
@@ -511,7 +510,7 @@ Ppu::runNextTCycle()
     m_mode = Mode::HBlank;
     m_completedFrameBuffer.fill(0xFF);
     m_mmu.get().writeByte(regs::LY, m_scanline);
-    m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+    m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode), true);
     m_mmu.get().updateStatCoincidence(m_scanline ==
                                       m_mmu.get().readByte(regs::LYC));
   }
@@ -537,7 +536,7 @@ Ppu::runNextTCycle()
       }
       if (handlePixelTransfer()) {
         m_mode = Mode::HBlank;
-        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode), true);
         if (m_scanline <= LAST_VISIBLE_SCANLINE) {
           m_mmu.get().notifyHBlankStart();
         }
@@ -561,7 +560,7 @@ Ppu::incrementDot()
                                       m_mmu.get().readByte(regs::LYC));
     if (m_scanline > LAST_VISIBLE_SCANLINE) {
       m_mode = Mode::VBlank;
-      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+      m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode), true);
       m_activeWindowRow = 0;
       m_YCondition = false;
       if (m_scanline == FIRST_VBLANK_SCANLINE) {
@@ -593,17 +592,17 @@ Ppu::incrementDot()
   } else {
     if (m_scanline <= LAST_VISIBLE_SCANLINE) {
       if (!m_lcdStartupLine && m_dot == 4) {
-        m_mmu.get().updateStatMode(
-          static_cast<std::uint8_t>(Mode::OAMSearch), m_scanline == 0);
+        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(Mode::OAMSearch),
+                                   m_scanline == 0);
       }
-      const auto mode3Dot = m_lcdStartupLine ? STARTUP_MODE_3_DOT
-                                             : NORMAL_MODE_3_DOT;
-      const auto rendererStartDot =
-        m_lcdStartupLine ? STARTUP_RENDERER_START_DOT
-                         : NORMAL_RENDERER_START_DOT;
+      const auto mode3Dot =
+        m_lcdStartupLine ? STARTUP_MODE_3_DOT : NORMAL_MODE_3_DOT;
+      const auto rendererStartDot = m_lcdStartupLine
+                                      ? STARTUP_RENDERER_START_DOT
+                                      : NORMAL_RENDERER_START_DOT;
       if (m_dot == mode3Dot) {
         m_mode = Mode::PixelTransfer;
-        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode));
+        m_mmu.get().updateStatMode(static_cast<std::uint8_t>(m_mode), true);
       }
       if (m_dot == rendererStartDot) {
         constexpr std::uint8_t scxLow3BitsMask = 0x07;

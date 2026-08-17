@@ -52,11 +52,11 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
 
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(pixelsMatchPng(
-    std::span(frame.pixels.data_handle(), frame.pixels.size()),
-    gbemu::SCREEN_WIDTH,
-    gbemu::SCREEN_HEIGHT,
-    std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
 }
 
 TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
@@ -75,11 +75,11 @@ TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
 
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(pixelsMatchPng(
-    std::span(frame.pixels.data_handle(), frame.pixels.size()),
-    gbemu::SCREEN_WIDTH,
-    gbemu::SCREEN_HEIGHT,
-    std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
+  REQUIRE(
+    pixelsMatchPng(std::span(frame.pixels.data_handle(), frame.pixels.size()),
+                   gbemu::SCREEN_WIDTH,
+                   gbemu::SCREEN_HEIGHT,
+                   std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
 }
 
 TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",

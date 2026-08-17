@@ -64,7 +64,7 @@ public:
 
   void enableBootRom(std::span<const std::uint8_t> bootRom);
 
-  void updateStatMode(std::uint8_t mode, bool triggerInterrupt = true);
+  void updateStatMode(std::uint8_t mode, bool triggerInterrupt);
   void triggerStatOamInterrupt();
   void updateStatCoincidence(bool coincidence);
 

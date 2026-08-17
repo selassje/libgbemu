@@ -56,8 +56,8 @@ if(ENABLE_TESTS)
     gbemu-tests
     PRIVATE
       # Not vendored/tracked - pixelsMatchPng() (png.cpp) writes into this on
-      # every mismatch, so a failing PNG-comparison test's actual frame can
-      # be opened directly instead of only getting a pass/fail bool.
+      # every mismatch, so a failing PNG-comparison test's actual frame can be
+      # opened directly instead of only getting a pass/fail bool.
       TEST_OUTPUTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/outputs"
       MBC3_TESTER_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc3-tester"
       # mooneye-test-suite doesn't ship its own reference screenshots the way
