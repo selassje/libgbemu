@@ -693,17 +693,6 @@ Ppu::handlePixelTransfer()
 
   const auto lcdc = m_mmu.get().readByte(regs::LCDC);
   constexpr std::uint8_t bgWindowEnableMask = 0x01;
-  if ((lcdc & LCD_ENABLE_BIT) != 0 &&
-      (lcdc & bgWindowEnableMask) == 0) {
-    std::cerr << std::dec << "DMG BG-disabled FIFO pop: LY="
-              << static_cast<unsigned>(m_scanline) << " dot=" << m_dot
-              << " x=" << static_cast<unsigned>(m_pixelsRendered)
-              << " scxLow=" << static_cast<unsigned>(m_scx3LowBits)
-              << " pipelineRemaining="
-              << static_cast<unsigned>(m_initialPipelinePixelsToDiscard)
-              << '\n';
-    //std::abort();
-  }
 
   const auto bgPixel = m_bgWndFifo.pop();
   auto bgColorIndex = bgPixel.colorIndex;
@@ -717,13 +706,6 @@ Ppu::handlePixelTransfer()
   const auto shade = static_cast<std::uint8_t>(
     (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
     shadeMask);
-  if (m_scanline == 0 && m_pixelsRendered < 8) {
-    std::cerr << std::dec << "LY0 pixel: dot=" << m_dot
-              << " x=" << static_cast<unsigned>(m_pixelsRendered)
-              << " bgColor=" << static_cast<unsigned>(bgColorIndex)
-              << " BGP=" << static_cast<unsigned>(bgp)
-              << " shade=" << static_cast<unsigned>(shade) << '\n';
-  }
   // A DMG-only cartridge running in CGB compatibility mode still computes
   // its shade index exactly as above, but looks it up in CGB background
   // palette 0 instead of the fixed DMG grayscale table - see
@@ -738,6 +720,7 @@ Ppu::handlePixelTransfer()
       m_mmu.get().bgPaletteColor(cgbCompatibilityBgPalette, shade));
   }
 
+  bool pixelIsBackground = true;
   if (!m_objFifo.empty()) {
     const auto objPixel = m_objFifo.pop();
     const auto objectBehindBackground = objPixel.behindBackground;
@@ -750,6 +733,7 @@ Ppu::handlePixelTransfer()
                 (!bgPixel.priority && !objectBehindBackground))
              : (bgColorIndex == 0 || !objectBehindBackground);
     if (objPixel.colorIndex != 0 && objEnabled && objectAboveBackground) {
+      pixelIsBackground = false;
       const auto objPaletteAddress = static_cast<std::uint16_t>(
         objPixel.palette == 0 ? regs::OBP0 : regs::OBP1);
       const auto obp = m_mmu.get().readByte(objPaletteAddress);
@@ -775,9 +759,37 @@ Ppu::handlePixelTransfer()
   m_frameBuffer.at(pixelIndex) = rgb.at(0);
   m_frameBuffer.at(pixelIndex + 1) = rgb.at(1);
   m_frameBuffer.at(pixelIndex + 2) = rgb.at(2);
+  m_lastPixelWasBackground = pixelIsBackground;
+  if (pixelIsBackground) {
+    m_lastBgColorIndex = bgColorIndex;
+  }
   ++m_pixelsRendered;
 
   return m_pixelsRendered >= SCREEN_WIDTH;
+}
+
+void
+Ppu::handleBgpWrite(std::uint8_t newValue)
+{
+  if (m_hardwareMode != HardwareMode::Dmg || m_mode != Mode::PixelTransfer ||
+      m_pixelsRendered == 0 || !m_lastPixelWasBackground) {
+    return;
+  }
+  const auto oldValue = m_mmu.get().readByte(regs::BGP);
+  const auto orValue = static_cast<std::uint8_t>(oldValue | newValue);
+  constexpr unsigned shadeMask = 0x03;
+  const auto shade = static_cast<std::uint8_t>(
+    (static_cast<unsigned>(orValue) >>
+     (static_cast<unsigned>(m_lastBgColorIndex) * 2U)) &
+    shadeMask);
+  const auto& rgb = DMG_PALETTE.at(shade);
+  const auto pixelIndex =
+    ((static_cast<std::size_t>(m_scanline) * SCREEN_WIDTH) +
+     (m_pixelsRendered - 1)) *
+    3;
+  m_frameBuffer.at(pixelIndex) = rgb.at(0);
+  m_frameBuffer.at(pixelIndex + 1) = rgb.at(1);
+  m_frameBuffer.at(pixelIndex + 2) = rgb.at(2);
 }
 
 const Ppu::FrameBuffer&

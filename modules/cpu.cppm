@@ -79,6 +79,11 @@ private:
   void advanceHardware(std::size_t currentTCycles, std::size_t timerMCycles);
   void advanceHardware(std::size_t currentTCycles);
   [[nodiscard]] bool interruptRequestPending() const;
+  // The single choke point every memory-store instruction writes through -
+  // notifies Ppu of BGP writes (see Ppu::handleBgpWrite()'s own comment)
+  // before the new value lands in Mmu, regardless of which opcode performed
+  // the write.
+  void writeByte(std::uint16_t address, std::uint8_t value);
 
   std::size_t nop();
   std::size_t halt();

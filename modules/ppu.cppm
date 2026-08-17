@@ -40,6 +40,15 @@ public:
   // palettes 0-7, and CGB priority rules instead.
   void setHardwareMode(HardwareMode mode) { m_hardwareMode = mode; }
 
+  // On real DMG hardware (not CGB, even in CGB-compatibility mode),
+  // writing BGP mid-scanline retroactively re-colors the pixel that was
+  // just drawn, using (oldValue | newValue) rather than a clean cutover to
+  // the new value - a real hardware glitch from writing to the palette
+  // register while a pixel's shade is still being latched. Called by Cpu
+  // right where it performs the write, before the new value lands in Mmu,
+  // so oldValue can still be read live from there.
+  void handleBgpWrite(std::uint8_t newValue);
+
   void serialize(SaveStateWriter& writer) const;
   void deserialize(SaveStateReader& reader);
 
@@ -280,6 +289,11 @@ private:
   bool m_lcdStartupLine{ false };
   bool m_blankFirstFrame{ false };
   std::uint8_t m_pixelsRendered{ 0 };
+  // Tracks the most recently drawn pixel this scanline, for handleBgpWrite()'s
+  // retroactive-redraw quirk - m_lastBgColorIndex is the raw (pre-BGP-shading)
+  // background color index, meaningful only while m_lastPixelWasBackground.
+  bool m_lastPixelWasBackground{ false };
+  std::uint8_t m_lastBgColorIndex{ 0 };
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
   std::uint8_t m_initialPipelinePixelsToDiscard{ 0 };
