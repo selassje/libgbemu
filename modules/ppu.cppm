@@ -188,7 +188,7 @@ private:
     void restartCurrentFetch();
     [[nodiscard]] bool isFetchingObject() const
     {
-      return m_mode == Mode::Object;
+      return m_mode == Mode::Object || m_objectPending;
     }
 
     void serialize(SaveStateWriter& writer) const;
@@ -212,6 +212,7 @@ private:
     State m_mState{ State::ReadTile };
     Mode m_mode{ Mode::Background };
     bool m_rowPushed{ false };
+    bool m_objectPending{ false };
     std::uint8_t m_tileX{ 0 };
     std::uint8_t m_Y{ 0 };
     std::uint8_t m_mTileIndex{ 0 };

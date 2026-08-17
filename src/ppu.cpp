@@ -60,20 +60,26 @@ Ppu::Fetcher::checkForObject()
   if (m_mode == Mode::Object) {
     return;
   }
-  // Only the first m_objectCount entries are valid for this scanline -
-  // slots beyond it hold stale data from whichever earlier scanline last
-  // wrote there.
-  auto objects =
-    std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
-  auto it = std::ranges::find_if(objects, [&](const auto& object) {
-    const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
-                        m_ppu.get().m_initialPipelinePixelsToDiscard;
-    return !object.isFetched &&
-           (fetchX + 8 >= object.xPos);
-  });
 
-  if (it == objects.end()) {
-    return;
+  if (!m_objectPending) {
+    // Only the first m_objectCount entries are valid for this scanline -
+    // slots beyond it hold stale data from whichever earlier scanline last
+    // wrote there.
+    auto objects =
+      std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
+    auto it = std::ranges::find_if(objects, [&](const auto& object) {
+      const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
+                          m_ppu.get().m_initialPipelinePixelsToDiscard;
+      return !object.isFetched && (fetchX + 8 >= object.xPos);
+    });
+
+    if (it == objects.end()) {
+      return;
+    }
+
+    it->isFetched = true;
+    m_currentObject = *it;
+    m_objectPending = true;
   }
 
   // Mesen starts the object fetch only after the background fetcher has
@@ -86,8 +92,7 @@ Ppu::Fetcher::checkForObject()
     return;
   }
 
-  it->isFetched = true;
-  m_currentObject = *it;
+  m_objectPending = false;
   m_ppu.get().saveFetcherState();
   reset(Mode::Object);
 }
@@ -262,9 +267,7 @@ Ppu::Fetcher::runNextTCycle()
       // starts at step 0 here, so the low-byte state lasts 3 dots and the
       // following high-byte state lasts 2.  Background/window bytes retain
       // their normal two-dot cadence.
-      if (elapsedDots >=
-          (m_mode == Mode::Object && m_mState == State::ReadTileDataLow ? 3
-                                                                        : 2)) {
+      if (elapsedDots >= 2) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
@@ -349,7 +352,6 @@ Ppu::Fetcher::runNextTCycle()
           if (m_mode == Mode::Object) {
             mergeObjectRowIntoFifo();
             m_ppu.get().restoreFetcherState();
-            m_lastDotStateChange = m_ppu.get().m_dot;
           } else {
             m_mState = State::Sleep;
             pushTileRowToFifo();
@@ -402,6 +404,7 @@ Ppu::Fetcher::reset(Mode mode)
 {
   m_mState = State::ReadTile;
   m_rowPushed = false;
+  m_objectPending = false;
   m_tileX = 0;
   m_lastDotStateChange = m_ppu.get().m_dot;
   m_mode = mode;
@@ -434,6 +437,7 @@ Ppu::Fetcher::serialize(SaveStateWriter& writer) const
   writer.writeU8(static_cast<std::uint8_t>(m_mState));
   writer.writeU8(static_cast<std::uint8_t>(m_mode));
   writer.writeBool(m_rowPushed);
+  writer.writeBool(m_objectPending);
   writer.writeU8(m_tileX);
   writer.writeU8(m_Y);
   writer.writeU8(m_mTileIndex);
@@ -450,6 +454,7 @@ Ppu::Fetcher::deserialize(SaveStateReader& reader)
   m_mState = static_cast<State>(reader.readU8());
   m_mode = static_cast<Mode>(reader.readU8());
   m_rowPushed = reader.readBool();
+  m_objectPending = reader.readBool();
   m_tileX = reader.readU8();
   m_Y = reader.readU8();
   m_mTileIndex = reader.readU8();
