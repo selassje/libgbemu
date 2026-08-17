@@ -16,8 +16,6 @@ constexpr std::uint8_t VBLANK_INTERRUPT_BIT = 0x01;
 constexpr std::uint8_t FIRST_VBLANK_SCANLINE = LAST_VISIBLE_SCANLINE + 1;
 constexpr std::uint8_t LCD_ENABLE_BIT = 0x80;
 
-// Standard grayscale mapping for the DMG's 4 shades, indexed by BGP-mapped
-// shade (0 = lightest, 3 = darkest).
 constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
   { 0xFF, 0xFF, 0xFF },
   { 0xAA, 0xAA, 0xAA },
@@ -25,12 +23,6 @@ constexpr std::array<std::array<std::uint8_t, 3>, 4> DMG_PALETTE = { {
   { 0x00, 0x00, 0x00 },
 } };
 
-// Expands a CGB palette color (15-bit RGB555, packed 0bBBBBBGGGGGRRRRR) to
-// 8-bit RGB. Bit-replicates the top 3 bits into the low 3 so a component's
-// full 5-bit range 0-31 maps onto the full 8-bit range 0-255 (0->0,
-// 31->255) instead of leaving it capped at 248 - not a hardware-accurate
-// color-correction curve (real CGB hardware's LCD has its own non-linear
-// response that this doesn't attempt to model).
 std::array<std::uint8_t, 3>
 cgbColorToRgb(std::uint16_t color)
 {
@@ -62,9 +54,6 @@ Ppu::Fetcher::checkForObject()
   }
 
   if (!m_objectPending) {
-    // Only the first m_objectCount entries are valid for this scanline -
-    // slots beyond it hold stale data from whichever earlier scanline last
-    // wrote there.
     auto objects =
       std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
     auto it = std::ranges::find_if(objects, [&](const auto& object) {
@@ -82,10 +71,6 @@ Ppu::Fetcher::checkForObject()
     m_objectPending = true;
   }
 
-  // Mesen starts the object fetch only after the background fetcher has
-  // reached step 5 and the background FIFO contains pixels.  Sleep is the
-  // state immediately after our high-byte/step-5 operation; PushToFifo
-  // represents the following push opportunities.
   const bool backgroundReachedStep5 =
     m_mState == State::Sleep || m_mState == State::PushToFifo;
   if (!backgroundReachedStep5 || m_ppu.get().m_bgWndFifo.empty()) {
@@ -106,11 +91,6 @@ Ppu::Fetcher::checkForWindow()
   const auto wx = m_mmu.get().readByte(regs::WX);
   const auto windowEnabled = (m_mmu.get().readByte(regs::LCDC) & 0x20U) != 0;
   const auto yCondition = m_ppu.get().m_YCondition;
-  // wx + 7 == m_pixelsRendered would never match any wx below 7, since
-  // m_pixelsRendered can't go negative - real hardware still triggers at
-  // screen X=0 for wx < 7 (see m_windowPixelsToDiscard's own comment for
-  // the clipping that handles the rest), so this compares the other way
-  // around instead, clamped at 0.
   constexpr unsigned wxOffset = 7;
   const auto windowStartX = wx >= wxOffset ? (wx - wxOffset) : 0U;
   const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
@@ -124,10 +104,6 @@ Ppu::Fetcher::checkForWindow()
 void
 Ppu::Fetcher::runNextTCycle()
 {
-  // Window must be checked first: its trigger is an exact-equality check
-  // on m_pixelsRendered, unlike the object trigger (deliberately >= so it
-  // survives being stalled) - checking window first lets it switch mode
-  // before an object fetch can steal the dot.
   checkForWindow();
   checkForObject();
 
@@ -162,11 +138,6 @@ Ppu::Fetcher::runNextTCycle()
     return true;
   };
 
-  // Pads the object FIFO up to 8 pixels (transparent, lowest priority) if it
-  // was short, then merges the just-fetched object row into it, one pixel
-  // at a time: an opaque incoming pixel always replaces an existing
-  // transparent one; between two opaque pixels, DMG priority (smaller
-  // objectX wins, tied objectX broken by smaller oamIndex) decides.
   const auto mergeObjectRowIntoFifo = [this]() {
     constexpr std::uint8_t xFlipMask = 0x20;
     constexpr std::uint8_t dmgPaletteMask = 0x10;
@@ -261,18 +232,10 @@ Ppu::Fetcher::runNextTCycle()
       break;
     case State::ReadTileDataLow:
     case State::ReadTileDataHigh:
-      // Mesen's object fetcher clocks steps 0..5: tile/index at step 1,
-      // low data at step 3, and high data plus push at step 5.  Object reset
-      // starts at step 0 here, so the low-byte state lasts 3 dots and the
-      // following high-byte state lasts 2.  Background/window bytes retain
-      // their normal two-dot cadence.
       if (elapsedDots >= 2) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
-          // Objects always use unsigned tile indexing out of tile block 0
-          // ($8000-8FFF) - unlike background/window, there's no LCDC.4
-          // dependent signed/$9000-relative addressing for objects.
           constexpr std::uint8_t objectSizeMask = 0x04;
           constexpr std::uint8_t yFlipMask = 0x40;
           constexpr std::uint8_t topTileMask = 0xFE;
@@ -362,9 +325,6 @@ Ppu::Fetcher::runNextTCycle()
       }
       break;
     case State::Sleep:
-      // Sleep performs no fetch work, but the independent push circuit gets
-      // its two ordinary opportunities here (steps 6 and 7).  The extra
-      // step-5 attempt already happened alongside the high-byte read above.
       pushTileRowToFifo();
       if (elapsedDots >= 2) {
         if (m_rowPushed) {
@@ -410,12 +370,7 @@ Ppu::Fetcher::reset(Mode mode)
   if (m_mode == Mode::Window) {
     m_Y = m_ppu.get().m_activeWindowRow;
     m_ppu.get().m_activeWindowRow += 1;
-    // The window has no SCX-driven fine scroll of its own, so this just
-    // neutralizes the background's own SCX discard check for the rest of
-    // the scanline.
     m_ppu.get().m_scxDiscardedCount = m_ppu.get().m_scx3LowBits;
-    // WX < 7 triggers here at screen X=0 same as WX == 7, but still owes
-    // (7 - WX) pixels of clipping from its own left edge.
     constexpr std::uint8_t wxOffset = 7;
     const auto wx = m_mmu.get().readByte(regs::WX);
     m_ppu.get().m_windowPixelsToDiscard =
@@ -472,10 +427,6 @@ Ppu::runNextTCycle()
 
   if (!lcdEnabled) {
     if (m_lcdEnabled) {
-      // Real hardware: disabling the LCD immediately forces LY=0 and STAT
-      // mode=HBlank, not "stay wherever it was" - a game (e.g. Tetris,
-      // which disables mid-VBlank at LY=148) can rely on this to reset
-      // scanline/mode state before reinitializing VRAM/OAM.
       m_lcdEnabled = false;
       m_lcdStartupLine = false;
       m_dot = 0;
@@ -492,21 +443,15 @@ Ppu::runNextTCycle()
       m_mmu.get().updateStatCoincidence(m_scanline ==
                                         m_mmu.get().readByte(regs::LYC));
     }
-    // The PPU is completely inert while LCDC bit 7 stays clear - no
-    // dot/scanline/mode advancement, no interrupts.
     return;
   }
 
   if (!m_lcdEnabled) {
-    // Real hardware: re-enabling the LCD always restarts a fresh frame at
-    // scanline 0 - never resumes whatever mode/scanline it was paused at.
     m_lcdEnabled = true;
     m_lcdStartupLine = true;
     m_blankFirstFrame = true;
     m_dot = 7;
     m_scanline = 0;
-    // The first scanline after LCD-on performs the mode-2 work internally,
-    // but STAT reports mode 0 until its delayed pixel-transfer transition.
     m_mode = Mode::HBlank;
     m_completedFrameBuffer.fill(0xFF);
     m_mmu.get().writeByte(regs::LY, m_scanline);
@@ -522,9 +467,6 @@ Ppu::runNextTCycle()
       }
       break;
     case Mode::VBlank:
-      // Both are genuinely idle time on real hardware - no fetcher/FIFO
-      // activity, nothing to render. Mode transitions, LY updates, and the
-      // VBlank interrupt are all already handled by incrementDot().
       break;
     case Mode::OAMSearch:
       handleOAMSearch();
@@ -575,17 +517,8 @@ Ppu::incrementDot()
         }
       }
     } else {
-      // The PPU starts scanning OAM internally at the line boundary, but
-      // STAT's externally-observable timing is staggered.  On LY 1-143 the
-      // OAM interrupt condition becomes active at the line-boundary event;
-      // the reported mode changes to OAM at dot 4.  LY 0 has no early
-      // condition and gets both at dot 4.  This is the CPU-visible timing
-      // corresponding to Mesen's cycle-2/cycle-4 split and is required for the
-      // Mealybug palette test's LY-0/LY-1 interrupt paths to converge.
       m_mode = Mode::OAMSearch;
       if (m_scanline > 0) {
-        // In libgbemu's tick convention the line-boundary callback is the
-        // CPU-visible equivalent of Mesen's early cycle-2 IRQ condition.
         m_mmu.get().triggerStatOamInterrupt();
       }
     }
@@ -661,9 +594,6 @@ Ppu::handlePixelTransfer()
   const bool objectFetchWasActive = m_fetcher.isFetchingObject();
   m_fetcher.runNextTCycle();
 
-  // Mesen returns from the draw cycle even on object step 5, where the high
-  // byte is read and the background fetcher is restored.  Do not pop a BG
-  // pixel on that completion dot.
   if (objectFetchWasActive || m_fetcher.isFetchingObject()) {
     return false;
   }
@@ -710,10 +640,6 @@ Ppu::handlePixelTransfer()
   const auto shade = static_cast<std::uint8_t>(
     (static_cast<unsigned>(bgp) >> (static_cast<unsigned>(bgColorIndex) * 2U)) &
     shadeMask);
-  // A DMG-only cartridge running in CGB compatibility mode still computes
-  // its shade index exactly as above, but looks it up in CGB background
-  // palette 0 instead of the fixed DMG grayscale table - see
-  // setHardwareMode()'s comment.
   constexpr std::uint8_t cgbCompatibilityBgPalette = 0;
   std::array<std::uint8_t, 3> rgb = DMG_PALETTE.at(shade);
   if (native) {
@@ -745,9 +671,6 @@ Ppu::handlePixelTransfer()
         (static_cast<unsigned>(obp) >>
          (static_cast<unsigned>(objPixel.colorIndex) * 2U)) &
         shadeMask);
-      // objPixel.palette (0 or 1, from OAM attribute bit 4 - the same bit
-      // that selects OBP0/OBP1 above) doubles as the CGB object palette
-      // index in compatibility mode - see setHardwareMode()'s comment.
       std::array<std::uint8_t, 3> objRgb = DMG_PALETTE.at(objShade);
       if (native) {
         objRgb = cgbColorToRgb(
