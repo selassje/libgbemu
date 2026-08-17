@@ -134,7 +134,7 @@ Ppu::Fetcher::runNextTCycle()
   constexpr std::uint16_t tileDataBlock2 = 0x9000;
 
   const auto pushTileRowToFifo = [this]() {
-    if (m_rowPushed || m_ppu.get().m_bgWndFifo.size() >= 8) {
+    if (m_rowPushed || !m_ppu.get().m_bgWndFifo.empty()) {
       return false;
     }
     const bool native = m_ppu.get().m_hardwareMode == HardwareMode::CgbNative;
@@ -361,8 +361,18 @@ Ppu::Fetcher::runNextTCycle()
       }
       break;
     case State::Sleep:
+      // Sleep performs no fetch work, but the independent push circuit gets
+      // its two ordinary opportunities here (steps 6 and 7).  The extra
+      // step-5 attempt already happened alongside the high-byte read above.
+      pushTileRowToFifo();
       if (elapsedDots >= 2) {
-        m_mState = State::PushToFifo;
+        if (m_rowPushed) {
+          m_mState = State::ReadTile;
+          m_rowPushed = false;
+          ++m_tileX;
+        } else {
+          m_mState = State::PushToFifo;
+        }
       }
       break;
     case State::PushToFifo:

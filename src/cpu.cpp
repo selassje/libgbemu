@@ -699,7 +699,15 @@ Cpu::ldhca()
     advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    advanceHardware((m_mcycles + 2) * 4);
+    if (address == regs::BGP) {
+      std::cerr << std::dec << "BGP E2 start: LY="
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " dot=" << m_ppu.get().dot() << " value="
+                << static_cast<unsigned>(getR8(REG_A)) << '\n';
+      advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
+    } else {
+      advanceHardware((m_mcycles + 2) * 4);
+    }
     if (address == regs::BGP) {
       std::cerr << std::dec << "BGP write: LY="
                 << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
