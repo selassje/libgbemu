@@ -6,19 +6,56 @@ import gbemu;
 import png;
 import test_helpers;
 
-GB_ROM_MATCHES_REFERENCE_RGB_TEST(
-  "dmg-acid2",
-  gbemu::Mode::Auto,
-  std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb",
-  std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb",
-  120)
+// Forces mode explicitly (Dmg/Cgb) rather than leaving it to what the
+// cartridge header auto-resolves to - that's exactly what dmg-acid2/
+// cgb-acid2 are meant to verify, so this doesn't fit
+// GB_ROM_MATCHES_REFERENCE_PNG_TEST's implicit-mode shape. Compares against
+// the bundled reference PNG (c-sp/game-boy-test-roms ships one alongside
+// the ROM itself, fetched into DMG_ACID2_DIR/CGB_ACID2_DIR the same as
+// every other ROM - see fetch_test_roms.cmake) rather than a separately
+// vendored copy, matching turtle-tests/mealybug-tearoom-tests/rtc3test
+// below. Also dumps the actual frame next to the test binary's working
+// directory, so either PNG can be opened directly to inspect a mismatch
+// instead of only getting a pass/fail bool.
+TEST_CASE("dmg-acid2", "[GameBoy][PPU]")
+{
+  auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
+  gbemu::GameBoy gb{ gbemu::Mode::Auto };
+  REQUIRE(gb.loadRom(rom).has_value());
 
-GB_ROM_MATCHES_REFERENCE_RGB_TEST(
-  "cgb-acid2",
-  gbemu::Mode::Cgb,
-  std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc",
-  std::filesystem::path(CGB_ACID2_EXPECTED_DIR) / "reference.rgb",
-  120)
+  const auto frame = stabilizeAndGetFrame(gb, 120);
+  const std::span actualPixels(frame.pixels.data_handle(),
+                               frame.pixels.size());
+
+  writePixelsAsPng(
+    "dmg-acid2_actual.png", actualPixels, gbemu::SCREEN_WIDTH, gbemu::SCREEN_HEIGHT);
+
+  REQUIRE(pixelsMatchPng(actualPixels,
+                        gbemu::SCREEN_WIDTH,
+                        gbemu::SCREEN_HEIGHT,
+                        std::filesystem::path(DMG_ACID2_DIR) /
+                          "dmg-acid2-dmg.png"));
+}
+
+TEST_CASE("cgb-acid2", "[GameBoy][PPU]")
+{
+  auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
+  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
+  REQUIRE(gb.loadRom(rom).has_value());
+
+  const auto frame = stabilizeAndGetFrame(gb, 120);
+  const std::span actualPixels(frame.pixels.data_handle(),
+                               frame.pixels.size());
+
+  writePixelsAsPng(
+    "cgb-acid2_actual.png", actualPixels, gbemu::SCREEN_WIDTH, gbemu::SCREEN_HEIGHT);
+
+  REQUIRE(pixelsMatchPng(actualPixels,
+                        gbemu::SCREEN_WIDTH,
+                        gbemu::SCREEN_HEIGHT,
+                        std::filesystem::path(CGB_ACID2_DIR) /
+                          "cgb-acid2.png"));
+}
 
 GB_ROM_MATCHES_REFERENCE_PNG_TEST("window_y_trigger",
                                   std::filesystem::path(TURTLE_TESTS_DIR) /

@@ -55,13 +55,6 @@ if(ENABLE_TESTS)
   target_compile_definitions(
     gbemu-tests
     PRIVATE
-      # DMG_ACID2_EXPECTED_DIR/CGB_ACID2_EXPECTED_DIR still point at a small
-      # vendored dir under tests/ - reference.rgb is a raw dump of this
-      # project's own frame buffer, not something upstream (or the fetched zip
-      # below) provides. The ROMs themselves are unmodified upstream binaries,
-      # so those come from the fetched zip like every other suite.
-      DMG_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/dmg-acid2"
-      CGB_ACID2_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/cgb-acid2"
       MBC3_TESTER_EXPECTED_DIR="${CMAKE_CURRENT_SOURCE_DIR}/mbc3-tester"
       # mooneye-test-suite doesn't ship its own reference screenshots the way
       # game-boy-test-roms does for rtc3test/mbc3-tester - self-captured PNGs

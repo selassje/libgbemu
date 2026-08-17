@@ -2,6 +2,7 @@
 
 import std;
 import gbemu;
+import png;
 import test_helpers;
 
 TEST_CASE("GameBoy::create rejects a too-small ROM", "[GameBoy]")
@@ -39,8 +40,6 @@ TEST_CASE("GameBoy::create accepts a minimally-sized ROM", "[GameBoy]")
 TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
-  auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
   gbemu::GameBoy gb{};
 
   auto result = gb.loadRom(rom);
@@ -53,16 +52,16 @@ TEST_CASE("GameBoy::reset() re-stabilizes to the same image", "[GameBoy]")
 
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
+  REQUIRE(pixelsMatchPng(
+    std::span(frame.pixels.data_handle(), frame.pixels.size()),
+    gbemu::SCREEN_WIDTH,
+    gbemu::SCREEN_HEIGHT,
+    std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
 }
 
 TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
 {
   auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
-  auto reference =
-    readFile(std::filesystem::path(DMG_ACID2_EXPECTED_DIR) / "reference.rgb");
   gbemu::GameBoy gb{ gbemu::Mode::Cgb };
 
   auto result = gb.loadRom(rom);
@@ -76,9 +75,11 @@ TEST_CASE("GameBoy::setMode() re-stabilizes to the same image", "[GameBoy]")
 
   const auto frame = stabilizeAndGetFrame(gb, framesToStabilize);
 
-  REQUIRE(reference.size() == frame.pixels.size());
-  REQUIRE(
-    std::equal(reference.begin(), reference.end(), frame.pixels.data_handle()));
+  REQUIRE(pixelsMatchPng(
+    std::span(frame.pixels.data_handle(), frame.pixels.size()),
+    gbemu::SCREEN_WIDTH,
+    gbemu::SCREEN_HEIGHT,
+    std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
 }
 
 TEST_CASE("GameBoy::create rejects a CGB-required cartridge forced to Dmg",

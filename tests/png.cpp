@@ -470,6 +470,8 @@ channelsForColorType(std::uint8_t colorType)
       return 1; // grayscale
     case 2:
       return 3; // RGB
+    case 3:
+      return 1; // palette index
     case 4:
       return 2; // grayscale + alpha
     case 6:
@@ -477,8 +479,7 @@ channelsForColorType(std::uint8_t colorType)
     default:
       // NOLINTNEXTLINE(hicpp-exception-baseclass)
       throw std::runtime_error(
-        "readPngAsRgb: unsupported PNG color type (palette images aren't "
-        "supported)");
+        "readPngAsRgb: unsupported PNG color type");
   }
 }
 
@@ -486,19 +487,17 @@ channelsForColorType(std::uint8_t colorType)
 // within each byte, and each row starts a fresh byte (any leftover bits at
 // a row's end are padding, not the next row's first sample) - both already
 // accounted for by unfilter() above treating each row as its own
-// rowBytes-sized span. Only grayscale (colorType 0) ever uses a bit depth
-// under 8 per the PNG spec (RGB/RGBA/palette are always 8 or 16), so this
-// is the only case that needs unpacking; the scale-to-0..255 formula
-// (sample * 255 / maxSample) is the PNG spec's own recommended grayscale
-// expansion and happens to land exactly on the DMG's 4 LCD shades
-// (0x00/0x55/0xAA/0xFF) for bitDepth 2, which is what actually matters here
-// - mealybug-tearoom-tests' DMG reference screenshots ship as 2-bit
-// grayscale.
+// rowBytes-sized span. Only grayscale (colorType 0) and palette (colorType
+// 3) ever use a bit depth under 8 per the PNG spec (RGB/RGBA are always 8
+// or 16), so those are the only cases that need unpacking. Returns the raw
+// sample/index values (0..2^bitDepth-1) unscaled - grayscale still needs
+// scaling to 0..255 afterward (see scaleGrayscaleSample()), but a palette
+// index must stay exactly as-is to index PLTE correctly.
 std::vector<std::uint8_t>
-expandGrayscaleSamples(std::span<const std::uint8_t> packedRows,
-                       std::size_t width,
-                       std::size_t height,
-                       std::uint8_t bitDepth)
+unpackSubByteSamples(std::span<const std::uint8_t> packedRows,
+                     std::size_t width,
+                     std::size_t height,
+                     std::uint8_t bitDepth)
 {
   const auto rowBytes = (width * bitDepth + 7) / 8;
   const auto maxSample = (1U << bitDepth) - 1U;
@@ -510,13 +509,26 @@ expandGrayscaleSamples(std::span<const std::uint8_t> packedRows,
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
       const auto byte = row[bitOffset / 8];
       const auto shift = 8 - bitDepth - (bitOffset % 8);
-      const auto sample =
-        (static_cast<unsigned>(byte) >> shift) & maxSample;
       out.at((y * width) + x) =
-        static_cast<std::uint8_t>((sample * 255U) / maxSample);
+        static_cast<std::uint8_t>((static_cast<unsigned>(byte) >> shift) &
+                                  maxSample);
     }
   }
   return out;
+}
+
+// The PNG spec's own recommended grayscale expansion - happens to land
+// exactly on the DMG's 4 LCD shades (0x00/0x55/0xAA/0xFF) for bitDepth 2,
+// which is what actually matters here - mealybug-tearoom-tests' DMG
+// reference screenshots ship as 2-bit grayscale.
+void
+scaleGrayscaleSamples(std::span<std::uint8_t> samples, std::uint8_t bitDepth)
+{
+  const auto maxSample = (1U << bitDepth) - 1U;
+  for (auto& sample : samples) {
+    sample = static_cast<std::uint8_t>((static_cast<unsigned>(sample) * 255U) /
+                                       maxSample);
+  }
 }
 
 std::vector<std::uint8_t>
@@ -524,7 +536,8 @@ std::vector<std::uint8_t>
 toRgb(std::span<const std::uint8_t> unfiltered,
       std::size_t width,
       std::size_t height,
-      std::uint8_t colorType)
+      std::uint8_t colorType,
+      std::span<const std::uint8_t> palette)
 // NOLINTEND(bugprone-easily-swappable-parameters)
 {
   const auto channels = channelsForColorType(colorType);
@@ -546,6 +559,18 @@ toRgb(std::span<const std::uint8_t> unfiltered,
         g = pixel[1];
         b = pixel[2]; // RGB(A) - alpha, if any, dropped
         break;
+      case 3: {
+        const auto paletteOffset = static_cast<std::size_t>(pixel[0]) * 3;
+        if (paletteOffset + 2 >= palette.size()) {
+          // NOLINTNEXTLINE(hicpp-exception-baseclass)
+          throw std::runtime_error(
+            "readPngAsRgb: palette index out of range");
+        }
+        r = palette[paletteOffset];
+        g = palette[paletteOffset + 1];
+        b = palette[paletteOffset + 2];
+        break;
+      }
       default:
         std::unreachable();
     }
@@ -657,6 +682,7 @@ readPngAsRgb(const std::filesystem::path& path)
   std::optional<std::uint8_t> colorType;
   std::optional<std::uint8_t> bitDepth;
   std::vector<std::uint8_t> idat;
+  std::vector<std::uint8_t> palette;
 
   std::size_t offset = signature.size();
   while (offset + 12 <= bytes.size()) {
@@ -686,12 +712,13 @@ readPngAsRgb(const std::filesystem::path& path)
       colorType = data[9];
       const auto interlaceMethod = data[12];
       // NOLINTEND(cppcoreguidelines-pro-bounds-avoid-unchecked-container-access)
-      // Grayscale is the only PNG color type whose bit depth can go under
-      // 8 (RGB/RGBA/palette are always 8 or 16 per the spec) - support
-      // that down to 1, since mealybug-tearoom-tests' DMG reference
-      // screenshots ship as 2-bit grayscale (one of the 4 LCD shades).
+      // Grayscale and palette are the only PNG color types whose bit depth
+      // can go under 8 (RGB/RGBA are always 8 or 16 per the spec) - support
+      // that down to 1: mealybug-tearoom-tests' DMG reference screenshots
+      // ship as 2-bit grayscale (one of the 4 LCD shades), and dmg-acid2/
+      // cgb-acid2's bundled references ship as indexed color.
       const bool bitDepthSupported =
-        *colorType == 0
+        (*colorType == 0 || *colorType == 3)
           ? (*bitDepth == 1 || *bitDepth == 2 || *bitDepth == 4 ||
              *bitDepth == 8)
           : (*bitDepth == 8);
@@ -707,6 +734,8 @@ readPngAsRgb(const std::filesystem::path& path)
         throw std::runtime_error(
           "readPngAsRgb: interlaced PNGs aren't supported: " + path.string());
       }
+    } else if (type == "PLTE") {
+      palette.assign(data.begin(), data.end());
     } else if (type == "IDAT") {
       idat.insert(idat.end(), data.begin(), data.end());
     } else if (type == "IEND") {
@@ -722,6 +751,12 @@ readPngAsRgb(const std::filesystem::path& path)
   if (idat.empty()) {
     // NOLINTNEXTLINE(hicpp-exception-baseclass)
     throw std::runtime_error("readPngAsRgb: missing IDAT in " + path.string());
+  }
+  if (*colorType == 3 && palette.empty()) {
+    // NOLINTNEXTLINE(hicpp-exception-baseclass)
+    throw std::runtime_error("readPngAsRgb: missing PLTE for palette image "
+                             "in " +
+                             path.string());
   }
   // zlib wrapper (RFC 1950): 2-byte header, the DEFLATE stream, then a
   // 4-byte Adler-32 of the uncompressed data - the header/trailer are
@@ -754,11 +789,14 @@ readPngAsRgb(const std::filesystem::path& path)
   }
 
   const auto unfiltered = unfilter(filtered, rowBytes, *height, bytesPerPixel);
-  const auto expanded = *bitDepth < 8
-                          ? expandGrayscaleSamples(
-                              unfiltered, *width, *height, *bitDepth)
-                          : unfiltered;
-  auto rgb = toRgb(expanded, *width, *height, *colorType);
+  auto expanded = *bitDepth < 8
+                    ? unpackSubByteSamples(unfiltered, *width, *height,
+                                          *bitDepth)
+                    : unfiltered;
+  if (*bitDepth < 8 && *colorType == 0) {
+    scaleGrayscaleSamples(expanded, *bitDepth);
+  }
+  auto rgb = toRgb(expanded, *width, *height, *colorType, palette);
 
   return PngImage{ std::move(rgb), *width, *height };
 }
