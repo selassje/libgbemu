@@ -6,47 +6,19 @@ import gbemu;
 import png;
 import test_helpers;
 
-// Forces mode explicitly (Dmg/Cgb) rather than leaving it to what the
-// cartridge header auto-resolves to - that's exactly what dmg-acid2/
-// cgb-acid2 are meant to verify, so this doesn't fit
-// GB_ROM_MATCHES_REFERENCE_PNG_TEST's implicit-mode shape. Compares against
-// the bundled reference PNG (c-sp/game-boy-test-roms ships one alongside
-// the ROM itself, fetched into DMG_ACID2_DIR/CGB_ACID2_DIR the same as
-// every other ROM - see fetch_test_roms.cmake) rather than a separately
-// vendored copy, matching turtle-tests/mealybug-tearoom-tests/rtc3test
-// below. pixelsMatchPng() dumps the actual frame to tests/outputs on
-// mismatch, so it can be inspected visually rather than just failing blind.
-TEST_CASE("dmg-acid2", "[GameBoy][PPU]")
-{
-  auto rom = readFile(std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2.gb");
-  gbemu::GameBoy gb{ gbemu::Mode::Auto };
-  REQUIRE(gb.loadRom(rom).has_value());
+GB_ROM_MATCHES_REFERENCE_PNG_TEST("dmg-acid2",
+                                  std::filesystem::path(DMG_ACID2_DIR) /
+                                    "dmg-acid2.gb",
+                                  std::filesystem::path(DMG_ACID2_DIR) /
+                                    "dmg-acid2-dmg.png",
+                                  120)
 
-  const auto frame = stabilizeAndGetFrame(gb, 120);
-  const std::span actualPixels(frame.pixels.data_handle(), frame.pixels.size());
-
-  REQUIRE(
-    pixelsMatchPng(actualPixels,
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(DMG_ACID2_DIR) / "dmg-acid2-dmg.png"));
-}
-
-TEST_CASE("cgb-acid2", "[GameBoy][PPU]")
-{
-  auto rom = readFile(std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.gbc");
-  gbemu::GameBoy gb{ gbemu::Mode::Cgb };
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  const auto frame = stabilizeAndGetFrame(gb, 120);
-  const std::span actualPixels(frame.pixels.data_handle(), frame.pixels.size());
-
-  REQUIRE(
-    pixelsMatchPng(actualPixels,
-                   gbemu::SCREEN_WIDTH,
-                   gbemu::SCREEN_HEIGHT,
-                   std::filesystem::path(CGB_ACID2_DIR) / "cgb-acid2.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST("cgb-acid2",
+                                  std::filesystem::path(CGB_ACID2_DIR) /
+                                    "cgb-acid2.gbc",
+                                  std::filesystem::path(CGB_ACID2_DIR) /
+                                    "cgb-acid2.png",
+                                  120)
 
 GB_ROM_MATCHES_REFERENCE_PNG_TEST("window_y_trigger",
                                   std::filesystem::path(TURTLE_TESTS_DIR) /
@@ -70,11 +42,6 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST("first frame after LCD enable stays white",
                                     "firstwhite-dmg-cgb.png",
                                   120)
 
-// Known-failing: our LCDC-bit-0-toggled-mid-scanline handling isn't
-// cycle-accurate yet, so the actual frame doesn't match real DMG hardware's
-// row-by-row staggered pattern. pixelsMatchPng() dumps the actual frame to
-// tests/outputs on mismatch, so it can be inspected visually rather than
-// just failing blind.
 TEST_CASE("m3_lcdc_bg_en_change", "[GameBoy][PPU]")
 {
   auto rom = readFile(std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
@@ -95,8 +62,6 @@ TEST_CASE("m3_lcdc_bg_en_change", "[GameBoy][PPU]")
   }
 }
 
-// pixelsMatchPng() dumps the actual frame to tests/outputs on mismatch, so
-// it can be inspected visually rather than just failing blind.
 TEST_CASE("m3_bgp_change", "[GameBoy][PPU]")
 {
   auto rom = readFile(std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
