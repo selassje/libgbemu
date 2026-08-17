@@ -6,3 +6,4 @@ CMakeUserPresets.json
 tests/game-boy-test-roms/
 tests/fuzz-corpus/
 tests/fuzz-artifacts/
+tests/outputs/

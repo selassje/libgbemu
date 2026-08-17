@@ -801,6 +801,28 @@ readPngAsRgb(const std::filesystem::path& path)
   return PngImage{ std::move(rgb), *width, *height };
 }
 
+namespace {
+
+// Writes actualRgbPixels to TEST_OUTPUTS_DIR/<referencePngPath's own
+// filename>_actual.png (not tracked in git - see tests/CMakeLists.txt's own
+// comment on TEST_OUTPUTS_DIR) so a failing comparison's actual frame can be
+// opened directly rather than only getting a pass/fail bool.
+void
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+dumpActualOnMismatch(std::span<const std::uint8_t> actualRgbPixels,
+                     std::size_t width,
+                     std::size_t height,
+                     const std::filesystem::path& referencePngPath)
+{
+  const std::filesystem::path outputsDir(TEST_OUTPUTS_DIR);
+  std::filesystem::create_directories(outputsDir);
+  const auto outputPath =
+    outputsDir / (referencePngPath.stem().string() + "_actual.png");
+  writePixelsAsPng(outputPath, actualRgbPixels, width, height);
+}
+
+}
+
 bool
 // NOLINTBEGIN(bugprone-easily-swappable-parameters)
 pixelsMatchPng(std::span<const std::uint8_t> actualRgbPixels,
@@ -811,10 +833,15 @@ pixelsMatchPng(std::span<const std::uint8_t> actualRgbPixels,
 {
   const auto reference = readPngAsRgb(referencePngPath);
   if (reference.width != width || reference.height != height) {
+    dumpActualOnMismatch(actualRgbPixels, width, height, referencePngPath);
     return false;
   }
-  return std::equal(actualRgbPixels.begin(),
-                    actualRgbPixels.end(),
-                    reference.rgbPixels.begin(),
-                    reference.rgbPixels.end());
+  const bool matches = std::equal(actualRgbPixels.begin(),
+                                  actualRgbPixels.end(),
+                                  reference.rgbPixels.begin(),
+                                  reference.rgbPixels.end());
+  if (!matches) {
+    dumpActualOnMismatch(actualRgbPixels, width, height, referencePngPath);
+  }
+  return matches;
 }
