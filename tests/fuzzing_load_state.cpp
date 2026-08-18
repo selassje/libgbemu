@@ -13,17 +13,17 @@ LLVMFuzzerTestOneInput( // NOLINT(readability-identifier-naming)
 {
 
   std::vector input = {
-    gbemu::SAVE_STATE_MAGIC[0],
-    gbemu::SAVE_STATE_MAGIC[1],
-    gbemu::SAVE_STATE_MAGIC[2],
-    gbemu::SAVE_STATE_MAGIC[3],
-    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 24) & 0xFF),
-    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 16) & 0xFF),
-    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 8) & 0xFF),
-    static_cast<std::uint8_t>(gbemu::SAVE_STATE_VERSION & 0xFF)
+    gbemu::SAVE_STATE_MAGIC.at(0),
+    gbemu::SAVE_STATE_MAGIC.at(1),
+    gbemu::SAVE_STATE_MAGIC.at(2),
+    gbemu::SAVE_STATE_MAGIC.at(3),
+    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 24U) & 0xFFU),
+    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 16U) & 0xFFU),
+    static_cast<std::uint8_t>((gbemu::SAVE_STATE_VERSION >> 8U) & 0xFFU),
+    static_cast<std::uint8_t>(gbemu::SAVE_STATE_VERSION & 0xFFU)
   };
 
-  std::copy(data, data + size, std::back_inserter(input));
+  std::ranges::copy(std::span(data, size), std::back_inserter(input));
 
   gbemu::GameBoy gb;
   if (!gb.loadState(input).has_value()) {
