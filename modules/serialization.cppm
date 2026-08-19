@@ -9,7 +9,7 @@ export
 
 constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
 constexpr std::uint32_t SAVE_STATE_VERSION = 4;
-class SaveStateWriter
+class SaveStateWriter // NOLINT(misc-use-internal-linkage)
 {
 public:
   void writeU8(std::uint8_t value);
@@ -27,7 +27,7 @@ private:
   std::vector<std::uint8_t> m_bytes;
 };
 
-class SaveStateReader
+class SaveStateReader // NOLINT(misc-use-internal-linkage)
 {
 public:
   explicit SaveStateReader(std::span<const std::uint8_t> data);
