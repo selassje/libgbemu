@@ -27,14 +27,10 @@ struct EmulationFrame
   std::mdspan<const std::uint8_t,
               std::extents<std::size_t, SCREEN_HEIGHT, SCREEN_WIDTH, 3>>
     pixels;
-  // Interleaved stereo (L, R, L, R, ...), normalized to [-1, 1] - dynamic
-  // in the sample-frame count since the Game Boy's clock doesn't divide
-  // evenly into any standard sample rate.
   std::mdspan<const float, std::extents<std::size_t, std::dynamic_extent, 2>>
     audio;
 };
 
-// Which physical console this GameBoy instance emulates.
 enum class Mode : std::uint8_t
 {
   // Boots as DMG for a cartridge that doesn't declare CGB support/
@@ -70,14 +66,8 @@ public:
   [[nodiscard]] std::expected<void, std::string> loadRom(
     std::span<const std::uint8_t> rom);
 
-  // Power-cycle equivalent: re-runs the exact same boot sequence against
-  // the already-loaded cartridge - the same cartridge stays "inserted",
-  // same as a real Game Boy's power switch off/on.
   void reset();
 
-  // Changes which physical console this instance emulates, then reset()s -
-  // matches unplugging the already-inserted cartridge, plugging it into a
-  // different physical console, and powering that on.
   [[nodiscard]] std::expected<void, std::string> setMode(Mode mode);
 
   [[nodiscard]] Mode getMode() const { return m_model; }
@@ -101,8 +91,6 @@ private:
   Mmu m_mmu;
   Ppu m_ppu;
   Cpu m_cpu;
-  // Computed once in initializeFromRom() by combining m_model with the
-  // cartridge's own header CGB flag.
   HardwareMode m_hardwareMode{ HardwareMode::Dmg };
   std::vector<std::uint8_t> m_romBytes;
 };
