@@ -19,6 +19,7 @@ public:
   void runNextTCycle();
 
   [[nodiscard]] std::uint16_t dot() const { return m_dot; }
+  [[nodiscard]] std::uint8_t scanline() const { return m_scanline; }
 
   using FrameBuffer =
     std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;

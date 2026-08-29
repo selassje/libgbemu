@@ -1486,6 +1486,39 @@ Cpu::runNextInstruction()
   }
 
   handleInterrupts();
+  {
+    if (false) { // NOLINT(readability-simplify-boolean-expr))
+      const auto opcodeByte = m_mmu.get().readByte(m_PC);
+      const auto a = m_AF >> 8U;
+      const auto f = m_AF & 0xFFU;
+      const auto b = m_BC >> 8U;
+      const auto c = m_BC & 0xFFU;
+      const auto d = m_DE >> 8U;
+      const auto e = m_DE & 0xFFU;
+      const std::array<char, 5> flagsStr = { (f & 0x80U) != 0U ? 'Z' : 'z',
+                                             (f & 0x40U) != 0U ? 'N' : 'n',
+                                             (f & 0x20U) != 0U ? 'H' : 'h',
+                                             (f & 0x10U) != 0U ? 'C' : 'c',
+                                             '\0' };
+      std::cerr << std::uppercase << std::hex << std::setw(4)
+                << std::setfill('0') << m_PC << "  op=" << std::setw(2)
+                << static_cast<unsigned>(opcodeByte) << "  A:" << std::setw(2)
+                << a << " B:" << std::setw(2) << b << " C:" << std::setw(2) << c
+                << " D:" << std::setw(2) << d << " E:" << std::setw(2) << e
+                << " F:" << flagsStr.data() << " HL:" << std::setw(4) << m_HL
+                << " SP:" << std::setw(4) << m_SP << std::dec
+                << " V:" << std::setw(2)
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::LY))
+                << " H:" << m_ppu.get().dot() << " CYC:" << std::dec
+                << m_mcycles << " IF:" << std::hex
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::IF))
+                << " TIMA:"
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::TIMA))
+                << " TAC:"
+                << static_cast<unsigned>(m_mmu.get().readByte(regs::TAC))
+                << "\n";
+    }
+  }
   m_currentOpcode = m_mmu.get().readByte(m_PC);
   const auto opcode = m_currentOpcode;
   const auto& instruction = INSTRUCTIONS.at(opcode);

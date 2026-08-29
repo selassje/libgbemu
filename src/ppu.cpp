@@ -57,8 +57,12 @@ Ppu::Fetcher::checkForObject()
     auto objects =
       std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
     auto it = std::ranges::find_if(objects, [&](const auto& object) {
+      const auto scxRemaining =
+        static_cast<int>(m_ppu.get().m_scx3LowBits) -
+        static_cast<int>(m_ppu.get().m_scxDiscardedCount);
       const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
-                          m_ppu.get().m_initialPipelinePixelsToDiscard;
+                          m_ppu.get().m_initialPipelinePixelsToDiscard -
+                          scxRemaining;
       return !object.isFetched && (fetchX + 8 >= object.xPos);
     });
 
@@ -71,8 +75,10 @@ Ppu::Fetcher::checkForObject()
     m_objectPending = true;
   }
 
+  const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const bool backgroundReachedStep5 =
-    m_mState == State::Sleep || m_mState == State::PushToFifo;
+    m_mState == State::Sleep || m_mState == State::PushToFifo ||
+    (m_mState == State::ReadTileDataHigh && elapsedDots >= 1);
   if (!backgroundReachedStep5 || m_ppu.get().m_bgWndFifo.empty()) {
     return;
   }
@@ -232,7 +238,9 @@ Ppu::Fetcher::runNextTCycle()
       break;
     case State::ReadTileDataLow:
     case State::ReadTileDataHigh:
-      if (elapsedDots >= 2) {
+      if (elapsedDots >=
+          (m_mode == Mode::Object && m_mState == State::ReadTileDataHigh ? 3
+                                                                         : 2)) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
