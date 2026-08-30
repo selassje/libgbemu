@@ -687,16 +687,10 @@ Cpu::ldhca()
     advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    if (address == regs::BGP) {
-      // Writes become visible on the final T-cycle of the last machine
-      // cycle, before that T-cycle's hardware tick has completed - same
-      // convention as ldRR()/ldha8() above. Scoped to BGP only: applying
-      // this to every address regressed dmg-acid2/cgb-acid2 and the
-      // reset()/setMode() re-stabilization tests.
-      advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
-    } else {
-      advanceHardware((m_mcycles + 2) * 4);
-    }
+    // Writes become visible on the final T-cycle of the last machine cycle,
+    // before that T-cycle's hardware tick has completed - same convention
+    // as ldRR()/ldha8() above.
+    advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
     writeByte(address, getR8(REG_A));
   }
 
