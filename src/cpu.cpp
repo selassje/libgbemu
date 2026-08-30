@@ -687,10 +687,18 @@ Cpu::ldhca()
     advanceHardware((m_mcycles + 2) * 4);
     setR8(REG_A, m_mmu.get().readByte(address));
   } else {
-    // Writes become visible on the final T-cycle of the last machine cycle,
-    // before that T-cycle's hardware tick has completed - same convention
-    // as ldRR()/ldha8() above.
-    advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
+    if (address == regs::BGP) {
+      // DMG hardware treats BGP (and OBP0/OBP1) as a genuinely distinct
+      // write-timing case from other registers - SameBoy's sm83_cpu.c
+      // models it as a two-phase write (an intermediate old-value/new-value
+      // OR glitch, then the real value one cycle later), not simply "every
+      // address becomes visible one T-cycle early" the way ldRR()/ldha8()
+      // approximate it. Scoped to BGP only until that finer two-phase
+      // behavior is modeled directly.
+      advanceHardware(((m_mcycles + 2) * 4) - 1, m_mcycles + 2);
+    } else {
+      advanceHardware((m_mcycles + 2) * 4);
+    }
     writeByte(address, getR8(REG_A));
   }
 
