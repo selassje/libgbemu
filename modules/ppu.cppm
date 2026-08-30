@@ -19,6 +19,7 @@ public:
   void runNextTCycle();
 
   [[nodiscard]] std::uint16_t dot() const { return m_dot; }
+  [[nodiscard]] std::uint8_t scanline() const { return m_scanline; }
 
   using FrameBuffer =
     std::array<std::uint8_t, gbemu::SCREEN_WIDTH * gbemu::SCREEN_HEIGHT * 3>;
@@ -298,6 +299,7 @@ private:
   std::uint8_t m_scx3LowBits{ 0 };
   std::uint8_t m_scxDiscardedCount{ 0 };
   std::uint8_t m_initialPipelinePixelsToDiscard{ 0 };
+  bool m_blankNextBgPixel{ false };
   // WX < 7 has no valid on-screen X = WX-7 (it'd be negative) - the window
   // still triggers at screen X=0 in that case, same as WX=7, just with its
   // own leftmost (7-WX) pixels clipped rather than shown.

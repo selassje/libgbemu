@@ -8,7 +8,7 @@ export
   namespace gbemu {
 
 constexpr std::array<std::uint8_t, 4> SAVE_STATE_MAGIC = { 'G', 'B', 'S', 'T' };
-constexpr std::uint32_t SAVE_STATE_VERSION = 4;
+constexpr std::uint32_t SAVE_STATE_VERSION = 5;
 class SaveStateWriter // NOLINT(misc-use-internal-linkage)
 {
 public:

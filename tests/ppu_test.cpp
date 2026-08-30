@@ -52,14 +52,11 @@ TEST_CASE("m3_lcdc_bg_en_change", "[GameBoy][PPU]")
   const auto frame = stabilizeAndGetFrame(gb, 120);
   const std::span actualPixels(frame.pixels.data_handle(), frame.pixels.size());
 
-  if (!pixelsMatchPng(actualPixels,
-                      gbemu::SCREEN_WIDTH,
-                      gbemu::SCREEN_HEIGHT,
-                      std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
-                        "ppu/m3_lcdc_bg_en_change_dmg_blob.png")) {
-    SKIP("known-failing: LCDC-bit-0-toggled-mid-scanline handling isn't "
-         "cycle-accurate yet - see ppu-debug-memory.md");
-  }
+  REQUIRE(pixelsMatchPng(actualPixels,
+                         gbemu::SCREEN_WIDTH,
+                         gbemu::SCREEN_HEIGHT,
+                         std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+                           "ppu/m3_lcdc_bg_en_change_dmg_blob.png"));
 }
 
 TEST_CASE("m3_bgp_change", "[GameBoy][PPU]")

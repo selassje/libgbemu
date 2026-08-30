@@ -1,5 +1,28 @@
 # PPU debugging notes
 
+## RESOLVED (2026-08-30): m3_lcdc_bg_en_change passes
+
+The test is now pixel-perfect (commits b528173 + fd14081 on ppu_fixes).
+Three fixes, all verified against Mesen's GbPpu.cpp source and the
+mealybug DMG-blob hardware photo:
+
+1. Object fetch may preempt the background fetch one dot earlier - from
+   the second dot of ReadTileDataHigh (Mesen's `Step >= 5`), not only
+   from Sleep/PushToFifo.
+2. The object fetch's high-byte read takes 3 elapsed dots (total 6-dot
+   stall), and the trigger's fetchX accounts for the in-progress SCX
+   discard.
+3. A DMG silicon quirk no reference emulator models (ours/Mesen/SameBoy
+   all converge on the same wrong pixel; the hardware photo arbitrated):
+   an object trigger landing on the exact dot the bg fetcher completes
+   its tile-map read, during the initial pipeline discard, blanks the
+   line's first visible pixel to color 0 without shifting any timing.
+   Note DMG-CPU B's expected image differs from DMG-blob's by 228 px on
+   this test - these edges are hardware-revision-dependent.
+
+Most of the notes below predate these fixes; treat their open questions
+as answered.
+
 - `m3_lcdc_bg_en_change.gb` toggles LCDC bit 0 while LCDC bit 7 remains set.
 - On DMG, LCDC bit 0 is applied during final background/object pixel mixing:
   the background fetcher and FIFO continue normally, but a popped background

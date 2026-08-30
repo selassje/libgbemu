@@ -57,8 +57,12 @@ Ppu::Fetcher::checkForObject()
     auto objects =
       std::span{ m_ppu.get().m_objects }.first(m_ppu.get().m_objectCount);
     auto it = std::ranges::find_if(objects, [&](const auto& object) {
+      const auto scxRemaining =
+        static_cast<int>(m_ppu.get().m_scx3LowBits) -
+        static_cast<int>(m_ppu.get().m_scxDiscardedCount);
       const auto fetchX = static_cast<int>(m_ppu.get().m_pixelsRendered) -
-                          m_ppu.get().m_initialPipelinePixelsToDiscard;
+                          m_ppu.get().m_initialPipelinePixelsToDiscard -
+                          scxRemaining;
       return !object.isFetched && (fetchX + 8 >= object.xPos);
     });
 
@@ -69,10 +73,23 @@ Ppu::Fetcher::checkForObject()
     it->isFetched = true;
     m_currentObject = *it;
     m_objectPending = true;
+    // DMG quirk, verified against the DMG-blob hardware photo for
+    // m3_lcdc_bg_en_change: an object trigger landing on the exact dot the
+    // background fetcher completes its tile-map read, while the scanline's
+    // initial pipeline discard is still in progress, corrupts the first
+    // visible pixel of the line to background color 0. The pop schedule
+    // itself is unaffected - only that one pixel's color latch is lost.
+    if (m_mState == State::ReadTile &&
+        (m_ppu.get().m_dot - m_lastDotStateChange) >= 2 &&
+        m_ppu.get().m_initialPipelinePixelsToDiscard > 0) {
+      m_ppu.get().m_blankNextBgPixel = true;
+    }
   }
 
+  const auto elapsedDots = m_ppu.get().m_dot - m_lastDotStateChange;
   const bool backgroundReachedStep5 =
-    m_mState == State::Sleep || m_mState == State::PushToFifo;
+    m_mState == State::Sleep || m_mState == State::PushToFifo ||
+    (m_mState == State::ReadTileDataHigh && elapsedDots >= 1);
   if (!backgroundReachedStep5 || m_ppu.get().m_bgWndFifo.empty()) {
     return;
   }
@@ -232,7 +249,9 @@ Ppu::Fetcher::runNextTCycle()
       break;
     case State::ReadTileDataLow:
     case State::ReadTileDataHigh:
-      if (elapsedDots >= 2) {
+      if (elapsedDots >=
+          (m_mode == Mode::Object && m_mState == State::ReadTileDataHigh ? 3
+                                                                         : 2)) {
         const bool isHighByte = (m_mState == State::ReadTileDataHigh);
         std::uint8_t tileByte{};
         if (m_mode == Mode::Object) {
@@ -544,6 +563,7 @@ Ppu::incrementDot()
         m_scxDiscardedCount = 0;
         constexpr std::uint8_t initialPipelinePixels = 8;
         m_initialPipelinePixelsToDiscard = initialPipelinePixels;
+        m_blankNextBgPixel = false;
         m_windowPixelsToDiscard = 0;
         m_objFifo.clear();
         m_fetcher.reset(Fetcher::Mode::Background);
@@ -632,6 +652,10 @@ Ppu::handlePixelTransfer()
   auto bgColorIndex = bgPixel.colorIndex;
   const bool native = m_hardwareMode == HardwareMode::CgbNative;
   if (!native && (lcdc & bgWindowEnableMask) == 0) {
+    bgColorIndex = 0;
+  }
+  if (m_blankNextBgPixel) {
+    m_blankNextBgPixel = false;
     bgColorIndex = 0;
   }
 
@@ -756,6 +780,7 @@ Ppu::serialize(SaveStateWriter& writer) const
   writer.writeU8(m_scx3LowBits);
   writer.writeU8(m_scxDiscardedCount);
   writer.writeU8(m_initialPipelinePixelsToDiscard);
+  writer.writeBool(m_blankNextBgPixel);
   writer.writeU8(m_windowPixelsToDiscard);
   writer.writeBool(m_YCondition);
   m_bgWndFifo.serialize(writer);
@@ -785,6 +810,7 @@ Ppu::deserialize(SaveStateReader& reader)
   m_scx3LowBits = reader.readU8();
   m_scxDiscardedCount = reader.readU8();
   m_initialPipelinePixelsToDiscard = reader.readU8();
+  m_blankNextBgPixel = reader.readBool();
   m_windowPixelsToDiscard = reader.readU8();
   m_YCondition = reader.readBool();
   m_bgWndFifo.deserialize(reader);
