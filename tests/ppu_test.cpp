@@ -42,36 +42,17 @@ GB_ROM_MATCHES_REFERENCE_PNG_TEST("first frame after LCD enable stays white",
                                     "firstwhite-dmg-cgb.png",
                                   120)
 
-TEST_CASE("m3_lcdc_bg_en_change", "[GameBoy][PPU]")
-{
-  auto rom = readFile(std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
-                      "ppu/m3_lcdc_bg_en_change.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "m3_lcdc_bg_en_change",
+  std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+    "ppu/m3_lcdc_bg_en_change.gb",
+  std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+    "ppu/m3_lcdc_bg_en_change_dmg_blob.png",
+  120)
 
-  const auto frame = stabilizeAndGetFrame(gb, 120);
-  const std::span actualPixels(frame.pixels.data_handle(), frame.pixels.size());
-
-  REQUIRE(pixelsMatchPng(actualPixels,
-                         gbemu::SCREEN_WIDTH,
-                         gbemu::SCREEN_HEIGHT,
-                         std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
-                           "ppu/m3_lcdc_bg_en_change_dmg_blob.png"));
-}
-
-TEST_CASE("m3_bgp_change", "[GameBoy][PPU]")
-{
-  auto rom = readFile(std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
-                      "ppu/m3_bgp_change.gb");
-  gbemu::GameBoy gb{};
-  REQUIRE(gb.loadRom(rom).has_value());
-
-  const auto frame = stabilizeAndGetFrame(gb, 120);
-  const std::span actualPixels(frame.pixels.data_handle(), frame.pixels.size());
-
-  REQUIRE(pixelsMatchPng(actualPixels,
-                         gbemu::SCREEN_WIDTH,
-                         gbemu::SCREEN_HEIGHT,
-                         std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
-                           "ppu/m3_bgp_change_dmg_blob.png"));
-}
+GB_ROM_MATCHES_REFERENCE_PNG_TEST(
+  "m3_bgp_change",
+  std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) / "ppu/m3_bgp_change.gb",
+  std::filesystem::path(MEALYBUG_TEAROOM_TESTS_DIR) /
+    "ppu/m3_bgp_change_dmg_blob.png",
+  120)
